@@ -402,3 +402,20 @@ git push origin v0.4.0-imogen-data-fetch-script
 git push kit    v0.4.0-imogen-data-fetch-script
 git push helmholtz v0.4.0-imogen-data-fetch-script
 ```
+
+## 10. Follow-ups raised by this step
+
+Tracked centrally in `notes/FOLLOWUPS.md`. The two raised by step 4 are:
+
+- **F-1**: Upload the 4 data tarballs to a permanent host (Zenodo /
+  GitHub Releases / institutional bucket), then update
+  `IMOGEN_DATA_BASE` URL hints in `tools/README.md`,
+  `imogen/patterns/README.md`, `imogen/CRUNCEP_1960_1989/README.md`.
+  Until that's done, the fetch script only works against a local
+  directory base — fresh clones cannot run end-to-end.
+- **F-2**: Investigate the 2× line count of our Fortran's
+  `T_anom.dat` vs `version_A`'s reference. Low priority; structural
+  output is sane.
+
+See `notes/FOLLOWUPS.md` for the full record (triggers, suggested
+timing, action specifics).

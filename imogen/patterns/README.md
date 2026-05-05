@@ -43,8 +43,16 @@ tools/fetch_imogen_data.sh --base <DATA_LOCATION>
 #   - a local directory containing the 4 tarballs
 #     (e.g. ../lpj-guess_imogen_landsymm_data/ on the workstation)
 #   - an https:// URL prefix where they're hosted
-#     (TBD: a Zenodo record / GitHub Release / institutional bucket)
+#     (TBD: a Zenodo record / GitHub Release / institutional bucket;
+#      see notes/FOLLOWUPS.md item F-1)
 ```
+
+> **NOTE (post-step-4)**: until item **F-1** in `notes/FOLLOWUPS.md` is
+> closed (the tarballs are uploaded to a permanent public host), the
+> fetch script only works against a **local directory** `--base`.
+> Fresh clones therefore cannot acquire the data without first being
+> pointed at a copy on the same machine or via `rsync` from another
+> machine. This is a temporary state.
 
 `tools/imogen_data_manifest.txt` is the authoritative manifest of
 filenames, SHA256 checksums, and sizes. The fetch script verifies

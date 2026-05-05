@@ -120,11 +120,21 @@ step 4 this is **worked around at runtime** by pre-staging an empty
 
 - The 4 data tarballs themselves (saved at sibling path
   `lpj-guess_imogen_landsymm_data/`; user uploads to a permanent host
-  in a follow-up).
+  in a follow-up — tracked as **F-1** in `notes/FOLLOWUPS.md`).
 - A source-code fix for bug C2/C3 (deferred to step 7).
 - Rh/W writer parity in Fortran (deferred to step 9.5).
 - CMIP6 NetCDF → ASCII converter (step 5).
 - Coupled-mode validation (steps 6-9).
+- Investigation of the 2× line count of our Fortran's `T_anom.dat`
+  vs `version_A`'s reference (low priority — tracked as **F-2**
+  in `notes/FOLLOWUPS.md`).
+
+### Follow-ups document
+
+This release introduces `notes/FOLLOWUPS.md` — a centralised tracker
+for non-blocking action items raised during step work. Items move
+from OPEN to DONE as they close. Currently 5 OPEN items
+(F-1 through F-5).
 
 ---
 
