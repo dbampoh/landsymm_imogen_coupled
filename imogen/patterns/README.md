@@ -102,15 +102,53 @@ as the historical baseline against which other GCMs are compared.
 
 Each of 5 CMIP6 GCMs has 2 files:
 
-- `<gcm>_patterns.nc` (~4.1 MB NetCDF) — pattern coefficients
+- `<gcm>_patterns.nc` (~4.1 MB NetCDF) — 8 pattern variables
+  (`tl1_patt`, `ql1_patt`, `precip_patt`, `wind_patt`, `pstar_patt`,
+  `swdown_patt`, `lwdown_patt`, `range_tl1_patt`) on a
+  (`imogen_drive=12`, `lat=56`, `lon=96`) grid
 - `<gcm>_params.json` (~180 bytes) — energy-balance model params
+  (`kappa_o`, `lambda_l`, `lambda_o`, `mu`, `f_ocean`)
 
-The Fortran IMOGEN binary in this repository **does not yet read
-NetCDF directly**. Step 5 of the rebuild plan introduces
-`tools/cmip6_nc_to_cmip5_ascii.py` which converts these to the
-CMIP5 ASCII format the binary already accepts; that converted output
-will land at `imogen/patterns/CEN_CMIP6_MOD_<gcm>/` and is therefore
-covered by the same `CEN_*` gitignore rule.
+The Fortran IMOGEN binary in this repository **does not read NetCDF
+directly**. **Step 5** of the rebuild added `tools/cmip6_nc_to_cmip5_ascii.py`
+which converts these to the CMIP5 ASCII format the binary already
+accepts:
+
+```bash
+# Batch-convert all 5 CMIP6 GCMs:
+python tools/cmip6_nc_to_cmip5_ascii.py \
+  --input-dir imogen/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/ \
+  --gridlist imogen/code/patterns_gridlist.txt \
+  --output-base imogen/patterns/
+
+# Result:
+#   imogen/patterns/CEN_CMIP6_MOD_GFDL-ESM4/{jan,feb,...,dec}
+#   imogen/patterns/CEN_CMIP6_MOD_IPSL-CM6A-LR/{jan,feb,...,dec}
+#   imogen/patterns/CEN_CMIP6_MOD_MPI-ESM1-2-HR/{jan,feb,...,dec}
+#   imogen/patterns/CEN_CMIP6_MOD_MRI-ESM2-0/{jan,feb,...,dec}
+#   imogen/patterns/CEN_CMIP6_MOD_UKESM1-0-LL/{jan,feb,...,dec}
+#   imogen/patterns/<MODEL>_ebm.nml   (one per GCM; energy-balance scalars)
+```
+
+Outputs land at `imogen/patterns/CEN_CMIP6_MOD_<gcm>/`, are covered by
+the same `CEN_*` gitignore rule, and the binary then consumes them
+identically to a native CMIP5 directory by setting
+`DIR_PATT=../patterns/CEN_CMIP6_MOD_<gcm>/` in `imogen_settings.txt`.
+
+Three documented caveats in the conversion (see `tools/cmip6_nc_to_cmip5_ascii.py`
+module docstring + `notes/STEP_5.md` for full discussion + `notes/FOLLOWUPS.md`
+F-6, F-7, F-8 for follow-up confirmations needed):
+
+- **CAVEAT-A**: `ql1_patt` (units "K-1") is passed through into CMIP5
+  col 4 (`DRH15M_PAT`) without unit conversion. Open question: is the
+  CMIP6 file already aligned to IMOGEN's RH-sensitivity convention?
+- **CAVEAT-B**: CMIP6 stores only wind-speed magnitude `wind_patt`,
+  not signed U/V components. We split equally
+  (`U = V = wind_patt / √2`) to preserve magnitude.
+- **CAVEAT-C**: CMIP6 stores only total `precip_patt`, not rain/snow
+  split. We put the full pattern into rainfall, zero into snowfall.
+  Total precip is preserved; the rain/snow partition is then handled
+  downstream by IMOGEN's temperature-based partition rule.
 
 ## Selecting a GCM
 

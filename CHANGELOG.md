@@ -19,6 +19,104 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.5.0-cmip6-converter] — 2026-05-06 — step 5
+
+### Added — `tools/cmip6_nc_to_cmip5_ascii.py` (CMIP6 NetCDF → CMIP5 ASCII)
+
+Per `EXECUTION_PLAN.md` §V step 5 + Appendix A.3, implemented the
+CMIP6 NetCDF → CMIP5 ASCII converter so the Fortran IMOGEN binary
+can run against any of the 5 CMIP6 GCMs (GFDL-ESM4, IPSL-CM6A-LR,
+MPI-ESM1-2-HR, MRI-ESM2-0, UKESM1-0-LL) without modifying the
+binary's pattern reader.
+
+**~340 Python lines** (xarray + scipy bilinear interpolation). Two
+operating modes:
+
+- Single-GCM: `--nc`, `--json`, `--output`
+- Batch: `--input-dir`, `--output-base` (auto-discovers all 5 GCMs
+  in ~1.6 sec wall-clock)
+
+For each (GCM, month):
+1. Read NetCDF with xarray; verify expected dims `(imogen_drive=12,
+   lat=56, lon=96)`.
+2. Read target gridlist (1631-cell IMOGEN HadCM3 land grid from
+   `imogen/code/patterns_gridlist.txt`).
+3. Bilinearly interpolate each of 8 `_patt` variables onto target
+   gridlist. Handles lat-descending and lon-negative source grids.
+4. Apply per-column transform (e.g. `wind_patt × 1/√2` for U/V split).
+5. Write CMIP5-style ASCII with bbox header
+   `0.00 -60.00 360.00 90.00` + 1631 data rows × 12 columns.
+6. Emit Fortran namelist `<MODEL>_ebm.nml` with KAPPA_O, LAMBDA_L,
+   LAMBDA_O, MU, F_OCEAN from the JSON params.
+
+#### Verified column ordering
+
+Authoritative ordering from `imogen_lpjg.f::GCM_ANLG` `READ` statement
+at line 3270-3274 (the Appendix A.3 sketch had 12 mapped variables,
+which was incorrect — actual is **10 variable columns + 2 coords**):
+
+```text
+LON LAT  T  RH15M  U-wind  V-wind  LW  SW  DTEMP_DAY  RAIN  SNOW  PSTAR
+[1] [2] [3]  [4]    [5]     [6]   [7] [8]  [9]       [10]  [11]  [12]
+```
+
+#### Three documented CMIP6→CMIP5 mapping caveats
+
+- **CAVEAT-A**: CMIP6 `ql1_patt` (units "K-1") passed through directly
+  into CMIP5 col 4 `DRH15M_PAT` without unit conversion. Upstream
+  alignment with IMOGEN's RH-sensitivity convention to be confirmed
+  with the CMIP6 NetCDF generator (followup **F-6**).
+- **CAVEAT-B**: CMIP6 stores wind-speed magnitude only; we split
+  equally `U = V = wind_patt / √2` to preserve magnitude. Loses
+  direction. Acceptable for v1.0; revisit at step 9.5 if needed
+  (followup **F-8**).
+- **CAVEAT-C**: CMIP6 stores total `precip_patt` only; we put full
+  pattern into RAIN col 10 and 0.0 into SNOW col 11. Total preserved;
+  rain/snow split handled downstream by IMOGEN's temperature-based
+  partition rule (followup **F-8**).
+
+#### Verification
+
+- Build clean. `--help`, `--list`, `--component`, `--verify-only` all
+  tested.
+- Standalone IMOGEN run with `DIR_PATT=patterns/CEN_CMIP6_MOD_MRI-ESM2-0/`
+  produces years 1871, 1872 with all expected climate files written.
+- Cell (lat=82.5°, lon=281.25°, Jan): our CMIP6/MRI T = 237.676 K
+  vs step 4's CMIP5/IPSL T = 237.736 K — **0.06 K** difference
+  (within the inter-GCM scatter expected from year 1871's tiny
+  land-mean anomaly).
+
+#### Open follow-up: `pstar_patt` units
+
+Discovered while comparing converter output: the CMIP6/MRI Pstar
+pattern at the same Arctic cell is −49.40 vs CMIP5/IPSL +0.32 — a
+150× magnitude difference + opposite sign. Most likely a Pa-vs-hPa
+unit mismatch in the source NetCDF; needs author confirmation
+(followup **F-7**).
+
+### Files added (committed to git)
+
+- `tools/cmip6_nc_to_cmip5_ascii.py` (new)
+- `notes/STEP_5.md` (new — per-edit verification)
+
+### Files modified
+
+- `.gitignore` — gitignore the derivative `*_ebm.nml` output
+- `imogen/patterns/README.md` — extend with conversion recipe + caveats
+- `tools/README.md` — extend with the converter under "Implemented tools"
+- `notes/FOLLOWUPS.md` — add F-6, F-7, F-8
+- `CHANGELOG.md` — this entry
+- `EXECUTION_PLAN.md` — V.1 step 5 marked ✅
+
+### NOT in this release
+
+- 5 derivative directories `imogen/patterns/CEN_CMIP6_MOD_<gcm>/` and 5
+  `<gcm>_ebm.nml` files (regeneratable; gitignored).
+- A source-code fix for bug C2/C3 (deferred to step 7).
+- Numerical parity Fortran ↔ C++ (Phase-2; Decision #2).
+
+---
+
 ## [v0.4.0-imogen-data-fetch-script] — 2026-05-05 — step 4
 
 ### Added — IMOGEN reference-data acquisition infrastructure + first real Fortran output

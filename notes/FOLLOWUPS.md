@@ -103,6 +103,67 @@ with the closing date. Do not delete; the audit trail is valuable.
   a row to `tools/imogen_data_manifest.txt`.
 - **Timing**: step 6 of the formal V.1 plan.
 
+### F-6 — Confirm CMIP6 `ql1_patt` unit alignment with IMOGEN's `DRH15M_PAT`
+
+- **Trigger**: step 5 (`notes/STEP_5.md` §2 CAVEAT-A; §4.4). The CMIP6
+  NetCDF stores `ql1_patt` with units "K-1", suggesting it represents
+  delta(specific-humidity) per K of land-mean warming. The CMIP5
+  ASCII column 4 (`DRH15M_PAT`) is a relative-humidity sensitivity per
+  K. These are not the same physical quantity in general (they differ
+  by a temperature-dependent saturation factor).
+- **Symptom**: in our converted CMIP6/MRI-ESM2-0 output for cell
+  (lat=82.5°, lon=281.25°, Jan), col 4 is +0.00014 — about 1500×
+  smaller in magnitude than CMIP5/IPSL-CM5A-MR's -0.2364 at the same
+  cell. Magnitude AND sign differ.
+- **Action**: contact the upstream CMIP6 NetCDF author (likely PRIME /
+  Mathison 2025) to confirm the convention. Either:
+  1. The CMIP6 generator already aligned to IMOGEN's RH-sensitivity
+     convention and the difference is just inter-GCM scatter (then no
+     code change needed; document and close).
+  2. The CMIP6 file is a specific-humidity sensitivity that needs a
+     unit-conversion factor (e.g. multiply by `dRH/dq` evaluated at
+     monthly mean T) before being written to col 4.
+- **Workaround until closed**: we pass `ql1_patt` through directly.
+  If a CMIP6-driven IMOGEN run produces hydrologically odd output
+  (e.g. unphysical RH, broken precip-evap balance), revisit this.
+- **Timing**: medium priority. Wait for the upstream author. If a
+  CMIP6 GCM is selected for a published v1.0 run, this should be
+  resolved before submission.
+
+### F-7 — Verify CMIP6 `pstar_patt` units match CMIP5 `DPSTAR_C_PAT`
+
+- **Trigger**: step 5 (`notes/STEP_5.md` §4.4). Our converted CMIP6/MRI
+  Pstar pattern at cell (lat=82.5°, lon=281.25°, Jan) is **−49.40**;
+  CMIP5/IPSL at the same cell is **+0.32**. That's a 150× magnitude
+  difference plus opposite sign.
+- **Possible explanations**:
+  1. The CMIP6 NetCDF stores Pstar in **Pa/K** while the CMIP5 ASCII
+     stores it in **hPa/K**. 100× factor would convert -49.40 Pa/K to
+     -0.494 hPa/K — same order of magnitude as IPSL's +0.32, with
+     reasonable inter-GCM scatter.
+  2. The CMIP6 file genuinely has an opposite-sign response at this
+     polar cell (different model physics).
+  3. A bug in our interpolation or transform.
+- **Action**: contact the upstream NetCDF author to confirm units;
+  fix the converter's transform if needed. Likely a one-line fix
+  (`* 0.01` to convert Pa/K → hPa/K).
+- **Workaround until closed**: documented in `notes/STEP_5.md` §4.4.
+- **Timing**: medium priority; same authoring contact as F-6 so can
+  be batched with that.
+
+### F-8 — Revisit CMIP6 wind-magnitude split + precip rain/snow partition at step 9.5
+
+- **Trigger**: step 5 CAVEAT-B and CAVEAT-C. The CMIP6 NetCDF doesn't
+  store separate U/V wind components or rain/snow split; we currently
+  approximate via `U=V=wind_patt/√2` (preserves magnitude, loses
+  direction) and `rain=precip, snow=0` (preserves total).
+- **Action**: at step 9.5 (climate-output enhancements), if the
+  approximations cause measurable downstream biases (e.g. in BLAZE
+  fire model wind sensitivity, or LPJ-GUESS snow accumulation), implement
+  finer splits — e.g. distribute wind direction climatologically; split
+  precip by climate-zone rain/snow fraction.
+- **Timing**: step 9.5 of the formal V.1 plan; only if biases manifest.
+
 ---
 
 ## DONE
