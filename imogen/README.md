@@ -1,49 +1,166 @@
-# `imogen/` — IMOGEN climate emulator
+# `imogen/` — IMOGEN climate emulator (Fortran, working IMOGEN)
 
-Will hold the Fortran IMOGEN with the `ALLOCATABLE`-array refactor
-(Phase 1, primary) and the C++ refactor brought to numerical parity
-(Phase 2, follow-on; both backends switchable).
+The Fortran IMOGEN climate emulator with the LPJ-GUESS coupling
+extensions. Imported and minimally fixed at **step 2** of the rebuild
+plan (`EXECUTION_PLAN.md` §V.1; see `../notes/STEP_2.md` for
+verification record).
 
-**Phase 1 (step 2):** Import the working Fortran IMOGEN from
-`Common-directory/IMOGEN-codebase/code/`:
+The C++ refactor (`IMOGENCXX/`) gets brought to numerical parity
+against this Fortran in **Phase 2** of the IMOGEN rebuild
+(post-v1.0). Both backends will then be available as switchable
+implementations per Decision #2.
 
-- `imogen_lpjg.f` (4 138 lines, 17 subroutines), `nonco2.f` (174 lines,
-  2 subroutines).
-- `Makefile`, `compile.sh` (gfortran build).
-- `imogen_settings.txt`, `imogen_settings_tmpl.txt` — but with paths
-  rewritten from Windows `C:\GitHub\...` to relative.
+## Provenance
 
-Apply the small fixes immediately on import:
-- Delete `PAUSE` at line 4134 (the `QSAT` debug-halt).
-- Delete the `qsat_output.txt` debug-dump block (lines 4120-4128).
-- Replace `\\` with `/` in `mkdir` calls (lines 435, 461).
+Imported from the user's predecessor framework's
+`Common-directory/IMOGEN-codebase/code/` (in `version_A`). Source
+attribution: Huntingford & Cox 2000, Huntingford 2010 (the
+foundational IMOGEN papers in `docs/`); Zelazowski 2018 for the
+22-GCM pattern set; Hayman 2021 for CH4-mitigation extensions;
+Mathison 2025 PRIME for the FaIR ERF integration approach the
+working paper adopts.
 
-**Phase 1 (step 3):** Convert the ~30 statically-declared arrays in
-`imogen_lpjg.f` and `nonco2.f` that scale with `NGPOINTS` or
-`GPOINTS` to `ALLOCATABLE`; add `ALLOCATE` calls keyed off the
-gridlist file length. This delivers heap allocation and unblocks
-62 000+ cell gridlists (Decision #2 in EXECUTION_PLAN §Decisions
-Settled).
+## Layout (post-step-2)
 
-**Phase 1 (step 9.5):** Port the C++ Rh+W writers
-(`Rh_anom.dat`, `W_anom.dat`) back into Fortran so both backends
-produce parity output. Add `Tmin_anom.dat` and `Tmax_anom.dat`
-writers (compute `Tmin = T - DTEMP/2`, `Tmax = T + DTEMP/2`).
+```
+imogen/
+├── README.md                          (this file)
+├── code/                              ← imported from
+│   ├── imogen_lpjg.f                   Common-directory/IMOGEN-codebase/code/
+│   ├── nonco2.f                        in step 2 (~470 KB)
+│   ├── Makefile                       Build with: make
+│   ├── compile.sh                     Alternative: bash compile.sh
+│   ├── imogen_settings.txt            Linux-relative-path defaults (rewritten
+│   │                                   from Windows C:\GitHub\... paths in step 2)
+│   ├── imogen_settings_tmpl.txt       Shell-variable template (upstream)
+│   ├── gridlist_global.txt            13-cell tiny test grid
+│   ├── gridlist_3deg.txt              2 371-cell 3° grid
+│   ├── gridlist_hurtt_RNDM_midpoint_3698.txt    NGPOINTS=3698 default
+│   ├── gridlist_hurtt_RNDM_midpoint_3711.txt    older variant
+│   ├── gridlist_out.txt               (alias for 3deg?)
+│   ├── patterns_gridlist.txt          1631-cell IMOGEN native (HadCM3 land)
+│   ├── ch4_n2o_annual_historical_rcp85_allsources_1850_2100.txt
+│   ├── .gitignore                     upstream Fortran .gitignore
+│   └── (build/run output gitignored: imogen_lpjg, *.o, qsat_output.txt, IMOGEN/)
+│
+├── patterns/                          ← imported in step 4 (~169 MB)
+│                                       36 GCM-pattern dirs:
+│                                       • 34 CMIP5 ASCII (CEN_*_MOD_*)
+│                                       • 1 CMIP3 legacy (ukmo_hadcm3_rel)
+│                                       • 1 CMIP6 NetCDF (5 GCMs incl. MRI-ESM2-0)
+│                                       Plus CMIP6 → CMIP5 ASCII converted
+│                                       output in step 5 (CEN_CMIP6_MOD_*).
+│
+└── CRUNCEP_1960_1989/                 ← imported in step 4
+                                        30-year base climatology, 12 months ×
+                                        30 years × 1631 cells.
+```
 
-**Phase 2 (step 20+):** Bring the C++ refactor (`IMOGENCXX/` from
-the predecessor framework) to numerical parity using Fortran
-outputs as QC reference. 25 catalogued bugs to fix; port `DAY_CALC`
-and `SOLPOS` from Fortran; add a build system. Then expose both
-as switchable backends via the `imogen_backend` ins parameter.
+## Build instructions
 
-See `EXECUTION_PLAN.md` §II.2 for the strategic decision and
-Part V for the implementation sequence.
+The build uses `gfortran` with fixed-form Fortran 77 settings:
 
-## Subdirectories (to be populated)
+```bash
+cd imogen/code
+make                               # produces ./imogen_lpjg (Linux convention)
+# OR
+bash compile.sh                    # alternative; same output
+```
 
-- `code/` — Fortran source + Makefile + settings template.
-- `patterns/` — 36 GCM-pattern dirs (34 CMIP5 ASCII + 1 CMIP3 legacy
-  + 5 CMIP6 NetCDF converted to CMIP5 ASCII via
-  `tools/cmip6_nc_to_cmip5_ascii.py`).
-- `CRUNCEP_1960_1989/` — 30-year base climatology.
-- `docs/` — Huntingford 2000, Huntingford 2010 PDFs.
+Expected output: `imogen_lpjg` — a 119 KB ELF 64-bit Linux executable.
+
+The build target was renamed from `imogen` (predecessor) to
+`imogen_lpjg` for two reasons: (a) consistency with the source
+filename `imogen_lpjg.f`, (b) matches the binary name expected by the
+top-level `.gitignore`. The `.exe` suffix was removed from
+`compile.sh` (Windows convention; superfluous on Linux).
+
+## Step-2 immediate fixes applied on import
+
+Three fixes from `[CMI §8.1]` were applied immediately on import,
+per the V.1 step-2 spec ("apply the small fixes immediately on
+import"):
+
+| Bug | Where | Fix |
+|---|---|---|
+| **C10** — `PAUSE` left inside `QSAT` | `imogen_lpjg.f:4134` (now removed) | Deleted the active `PAUSE` statement that halted non-interactive runs awaiting an interactive keystroke |
+| **C11** — `qsat_output.txt` debug-dump | `imogen_lpjg.f:4119-4135` (now removed) | Deleted the `OPEN`/`WRITE` block that opened `qsat_output.txt` per QSAT call (per cell × per sub-day step × per day × per month) without closing — leaking file handles and generating O(GB) of unused output |
+| **C12** — Windows `\IMOGEN\output\` mkdir paths | `imogen_lpjg.f:435, 461` (now `/IMOGEN/output/`) | Replaced backslash separators with forward slashes so `CALL SYSTEM('mkdir ...')` works on Linux |
+| **C13** — Windows paths in settings file | `imogen_settings.txt` lines 1-6 | Rewrote `C:\GitHub\dbampoh\...` absolute paths to relative paths (`./`, `../patterns/...`, `../CRUNCEP_1960_1989/`, etc.) |
+
+A small portability fix to the `Makefile` `clean` target was also
+applied (Windows `del` → Linux `rm -f`); this aligns with the
+`[CMI §1.4]` Linux-only declaration.
+
+The standalone IMOGEN-only run (1631-cell native grid for 3 years
+1871-1873, producing `Common-directory/IMOGEN/output/<YYYY>/{T_anom.dat,
+P_anom.dat, ..., done}` matching the existing run on disk in
+`version_A`) is **deferred to step 4** — it requires the patterns
+and CRUNCEP base climatology that get imported at step 4. The
+step-2 verification reduces to "build succeeds" + "binary starts up
+and parses settings file" (both confirmed; see `notes/STEP_2.md`).
+
+## What's NOT in this step
+
+- No `ALLOCATABLE` array refactor yet. That's **step 3**, where the
+  ~30 statically-declared arrays in `imogen_lpjg.f` and `nonco2.f`
+  that scale with `NGPOINTS` or `GPOINTS` get converted to
+  `ALLOCATABLE`, removing the practical 3 698-cell gridlist cap.
+- No CMIP6 patterns. Step 4 imports them; step 5 converts them to
+  CMIP5 ASCII format.
+- No live coupling with LPJ-GUESS. The `imogen` binary is
+  standalone-Fortran here; the in-process IMOGEN engine that
+  `lpjguess/modules/climatemodel.cpp` invokes is a separate (C++)
+  port that gets brought to parity in Phase 2 (post-v1.0).
+
+## Settings file convention
+
+`imogen_settings.txt` ships with sensible Linux-relative defaults
+that resolve from `imogen/code/`:
+
+```
+DIR_COMMON ./
+DIR_PATT ../patterns/CEN_IPSL_MOD_IPSL-CM5A-MR/
+DIR_CLIM ../CRUNCEP_1960_1989/
+FILE_SCEN_EMITS ../emiss/co2_emissions_annual_historical_rcp85_allsources.txt
+FILE_NON_CO2_VALS ../emiss/nonco2_ch4_n2o_RF_historical_rcp85.txt
+FILE_CH4_N2O_EMITS ../emiss/ch4_n2o_annual_historical_rcp85_non_lpjg_simulated.txt
+...
+```
+
+This is a **standalone-IMOGEN reference config**, used when running
+`imogen_lpjg` directly from `imogen/code/`. Coupled-mode runs
+(LPJ-GUESS in `imogencfx` mode invoking the in-process IMOGEN
+engine) use a separate `runs/<SSP>/imogen_intermediary.ins` file
+that overrides via the `IMOGENConfig::*` namespace. See
+`runs/README.md` and Decision #4 for the three coupling modes.
+
+For shell-variable templating (e.g. `$IMOGENPATH`, `$WORKPATH`,
+`$IMOGENPATTERN`), see `imogen_settings_tmpl.txt` (upstream
+template, unchanged).
+
+## Backup preserved at `archive/`
+
+The predecessor's `Original Imogen Modified for LPJG Coupling/imogen_lpjg.f`
+(180 KB; described in `[SA3 §11]` as a backup of an earlier
+`NGPOINTS=3711`/disabled-`done`-poll/no-PAUSE version) was archived
+to `../archive/imogen_fortran_backup/imogen_lpjg.f` for forensic
+reference rather than imported. This is per Decision #5
+(rebuild-approach: A/B remain immutable archives; legacy artefacts
+preserved in `archive/` rather than mutated).
+
+## Cross-references
+
+- `[CMI §4.2]` — full deep-dive on this Fortran source (17 subroutines
+  catalogued; bug list).
+- `[SA3]` — Subagent 3's 47-KB report at
+  `../_phase2_findings/03_imogen_fortran.md` is the canonical
+  evidence base.
+- `[EXEC §V.1 step 2]` — the V.1 plan entry for this step.
+- `[EXEC §II.2]` — the strategic decision for the
+  Fortran-with-`ALLOCATABLE`-first / C++-port-second IMOGEN strategy.
+- `[Decision #2]` — IMOGEN implementation strategy.
+- `[Decision #8]` — Anaconda3 NetCDF preference (note: IMOGEN itself
+  doesn't use NetCDF — pure Fortran 77 ASCII I/O — so this build
+  doesn't depend on NetCDF at all; the only step that needs NetCDF
+  is the CMIP6 → CMIP5 ASCII converter at step 5, written in Python).

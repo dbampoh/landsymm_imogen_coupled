@@ -1,0 +1,41 @@
+DIR_COMMON ./
+DIR_PATT ../patterns/CEN_IPSL_MOD_IPSL-CM5A-MR/
+DIR_CLIM ../CRUNCEP_1960_1989/
+FILE_SCEN_EMITS ../emiss/co2_emissions_annual_historical_rcp85_allsources.txt
+FILE_NON_CO2_VALS ../emiss/nonco2_ch4_n2o_RF_historical_rcp85.txt
+FILE_CH4_N2O_EMITS ../emiss/ch4_n2o_annual_historical_rcp85_non_lpjg_simulated.txt
+FILE_LPJG_FLUX extended_lpjg_only_cfluxrcp85.txt
+FILE_GRIDLIST gridlist_hurtt_RNDM_midpoint_3698.txt
+FILE_LPJG_CH4_N2O_FLUX ch4_n2o_annual_historical_ssp5rcp85_lpjg_simulated_real.txt
+FILE_SCEN_CO2_PPMV
+STEP_DAY 1 		!IN Number of daily timesteps of IMPACTS_MODEL !NOTE: Formerly set to 24 - TP 13.07.15
+T_OCEAN_INIT 289.28	!IN Initial ocean temperature (K)
+KAPPA_O 280.0		!IN Ocean eddy diffusivity (W/m/K)
+F_OCEAN 0.71		!IN Fractional coverage of the ocean
+LAMBDA_L 0.4		!IN Inverse of climate sensitivity over land (W/m2/K)
+LAMBDA_O 1.9		!IN Inverse of climate sensitivity over ocean (W/m2/K)
+MU 1.78			!IN Ratio of land to ocean temperature anomalies
+Q2CO2 3.74		!IN Radiative forcing due to doubling CO2 (W/m2)
+TAU_DECAY_CH4 9.3       !IN Atmospheric lifetime of CH4 (years)
+TAU_DECAY_N2O 121       !IN Atmospheric lifetime of N2O (years)
+FILE_NON_CO2 .TRUE.	!IN If true, then non-CO2 radiative forcings are contained within a file.
+NYR_NON_CO2 251		!IN Number of years for which NON_CO2 forcing is prescribed.
+NONCO2_EMISSIONS .TRUE. !IN If true, use FAIR model for CH4 and N2O forcing
+NONCO2_EMISSIONS_LPJG .TRUE. !IN Whether to use LPJG to provide natural CH4 and N2O emissions (if NONCO2_EMISSIONS==T)
+CO2_INIT_PPMV 286.085	!IN Initial CO2 concentration (ppmv)
+CH4_INIT_PPBV 865.0	!IN Initial CH4 concentration (ppbv)
+N2O_INIT_PPBV 277.4     !IN Initial N2O concentration (ppbv)
+NYR_EMISS_NONCO2 251    !IN Number of years of emission data in file.
+NYR_EMISS 251		!IN Number of years of emission data in file.
+NYR_LPJG_FLUX 251		!IN Number of years of emission data in LPJ-GUESS C flux file
+C_EMISSIONS .TRUE.	!IN If true, means CO2 concentration is calcula
+LPJG_CFLUX .FALSE.	!IN If true, take land C flux from LPJ-GUESS output file
+INCLUDE_CO2 .TRUE.	!IN Are adjustments to CO2 values allowed?
+INCLUDE_NON_CO2 .TRUE.	!IN Are adjustments to non-CO2 values allowed?
+DAILYOUT .FALSE.	!IN Are outputs daily (true) or monthly (false)?
+LAND_FEED .TRUE.	!IN Are land feedbacks allowed on atmospheric CO2?
+OCEAN_FEED .TRUE.	!IN Are ocean feedbacks allowed on atmospheric CO2?
+ANLG .TRUE.		!IN If true, then use the GCM analogue model
+ANOM .TRUE.		!IN If true, then use the GCM analogue model
+REGRID .FALSE.		!IN If true use nearest-neighbour regridding
+CO2_RF_FAIR .FALSE.      !IN Whether to use the CO2 radiative forcing calculation from the FAIR model (T) or IMOGEN standard (F)
