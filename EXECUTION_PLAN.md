@@ -1,0 +1,2595 @@
+# LandSyMM-IMOGEN — Execution Plan, Gap Inventory, and Strategic Decisions
+
+> **Document role**
+> This is the operational complement to `COUPLED_MODEL_INVESTIGATION.md`.
+> The investigation document tells you *what is wrong*; this document
+> tells you *what needs to happen, in what order, with what
+> dependencies, with what scientific or operational alternatives, and
+> with what residual uncertainties* before the coupled model can run a
+> real closed-loop simulation that the working paper can defend.
+>
+> **Audience**
+> The user (the project lead who is writing the GMD paper and will
+> own the unified codebase), and any successor or collaborator who
+> needs to think through the same decisions.
+>
+> **Tone**
+> Specific, evidence-tied, decision-oriented. Where this document
+> recommends an approach, the recommendation is given alongside the
+> alternatives so the reader can disagree on first principles. Where
+> this document flags something the audit could not resolve, the
+> uncertainty is named explicitly so the reader can fill in or ask for
+> further investigation.
+>
+> **How to use this document**
+> - Part I (Necessities) is a prioritised checklist of all the items
+>   that must be settled before a coupled run can succeed. Each item
+>   has a status, a "what needs to happen", a "where in the code or
+>   data", a "how (proposed approach)", and a "knowledge gap (where
+>   the user might know more than the audit)".
+> - Part II (Strategic decisions) walks through the major
+>   either-or choices that shape the rest of the work — the kind that
+>   change the paper's claims and the codebase's architecture. The two
+>   you flagged explicitly (IIASA vs RCMIP for anthropogenic
+>   substitution; Fortran vs C++ IMOGEN) are §II.1 and §II.2; the
+>   others are unavoidable downstream consequences.
+> - Part III (Open questions to the user) is a focused list of items
+>   the audit could not answer from on-disk evidence. These are where
+>   your own knowledge of the project is most likely to fill in gaps,
+>   point me toward code I missed, or correct an assumption.
+> - Part IV (Recommended sequencing) folds Parts I-III into a phased
+>   plan with rough effort estimates.
+>
+> **Cross-references**
+> All citations to source files use the form `path:line`. Citations to
+> the master document use the form `[CMI §x.y]` (master doc section
+> x.y) and to the eight subagent reports use `[SAn §x.y]`.
+
+---
+
+## Decisions settled (as of 5 May 2026)
+
+This section records the user-confirmed strategic choices that govern
+the rest of this document. Earlier subsections are written
+forward-compatibly: where a decision was open at the time of writing
+and has since been settled, the relevant subsection notes it
+explicitly with a callout.
+
+| # | Decision | Settled choice | Rationale |
+|---|---|---|---|
+| 1 | Anthropogenic substitution backbone (§II.1) | **RCMIP** | Python pipeline already produces validated outputs against RCMIP; the working paper §2.1.3 adopts the PRIME (Mathison 2025) framing which itself uses RCMIP; RCMIP Phase 2 is built atop IIASA + CEDS + GFED so the underlying scientific content is preserved. The working paper will be updated to cite RCMIP as the substitution backbone alongside IIASA as the upstream scenario source. |
+| 2 | IMOGEN implementation strategy (§II.2) | **Phase 1 = Fortran with `ALLOCATABLE` arrays; Phase 2 = C++ refactor brought to numerical parity using Phase 1 as QC reference; both available as switchable backends in v1.0 or v1.1.** | The C++ refactor's heap-allocation IS a real practical benefit at large gridlists (62 000+ cells); revising the Fortran to use `ALLOCATABLE` arrays delivers the same scalability while keeping the working physics. The C++ refactor remains valuable as a second implementation for cross-validation. |
+| 3 | LPJ-GUESS fork choice (new — §II.11) | **`trunk_r13078` (the standalone LandSyMM fork) is the canonical Phase-1 LPJ-GUESS; the integrated LTS becomes a switchable Phase-2 backend.** | The framework has historically worked with `trunk_r13078`; preserving that for the immediate rebuild reduces risk of cross-cutting integration issues. The integrated LTS the user previously produced is brought in as a second backend in Phase 2. |
+| 4 | Coupling-mode default (§II.4) | **`coupling_mode = tight` (closed-loop) is the default; `prescribed` and `loose` available as opt-in via the same ins parameter.** | The working paper §2.4.3 specifies tight as the canonical mode. Prescribed and loose are valuable for sensitivity studies and reproduce the system's earlier de facto operating mode respectively. |
+| 5 | Coupled-model rebuild approach (Part V) | **Build incrementally in `lpj-guess_imogen_landsymm/`, importing one component at a time from A/B with each step ending in a verifiable working state. A/B remain immutable archives.** | Lower risk than fix-in-place. Forces explicit per-component verification. Naturally yields a clean public-quality codebase. |
+| 6 | Discipline on units and data-exchange integrity (§I.D) | **Every variable, every file, every transfer between components is documented with explicit units, sign conventions, and column orderings; cross-checked at component boundaries; tested in CI.** | Most of the latent bugs in A/B come from undocumented unit assumptions (the 1.25° vs 0.5° grid-resolution hardcoding, the IYEAR-vs-IYEAR-1 ambiguity, the `calcNitrogenExcretion` factor-10⁶ bug, the Mt CO2 vs Pg C confusions). A discipline of explicit units everywhere prevents recurrence. |
+| 7 | Single codebase serves both workstation and cluster | **The unified `lpj-guess_imogen_landsymm/` codebase ships one set of binaries, one Python venv, one `scripts/run_coupled.sh`, and one `scripts/run_coupled.sbatch`; the workstation/cluster choice is made at run time by which launcher is invoked.** | The user's stated requirement: a single public version-controlled codebase that does both. Validated by the existing owl-cluster scripts being thin SLURM wrappers around the same `./guess` binary that runs locally; no separate "cluster build" needed. |
+| 8 | Build-environment NetCDF library preference (workstation) | **Anaconda3-provided NetCDF libraries are preferred over native Ubuntu `libnetcdf-dev` on the user's workstation; the unified build documents the Anaconda path and falls back to the native library only if Anaconda is unavailable.** | The user reports that native Ubuntu NetCDF behaves less reliably than the Anaconda3 conda-forge build on their machine. Documenting the preferred path saves a class of "fails to build" support requests for any successor. |
+| 9 | Stage I yield-generation scope (§I.B.4 reframed) | **Deferred for v1.0 (PLUM is not embedded; we use already-produced PLUM scenario LU + activity data); preserved in documentation as the design intent for a future v2.0 in which PLUM might be procured/embedded into the coupled framework.** | The user has yields and PLUM outputs from prior work; running Stage I again is unnecessary now. But the working paper §2.4.3 framing of Stage I as a foundational design feature should remain in the documentation so the eventual v2.0 PLUM-embedding effort has a clear specification to build to. |
+| 10 | Land-use data strategy (§I.B reframed; new Option D) | **Use `save_state`/`restart` (Option D) to keep historic and scenario LU runs separated: Phase 1 standalone LPJ-GUESS run with HILDA+ historic 1850-2020 → save state at 2020; Phase 2 coupled run starts from 2020 saved state with new PLUM scenario LU 2021-2100 (no concatenation needed). Fallback: legacy concatenated 1901-2100 LU files (Option C) if save_state proves complex at integration time.** | The save_state machinery exists in LPJ-GUESS (used during the integrated-LTS work). It eliminates the concatenation step, naturally maps to the working paper's two-stage protocol, and lets us use the new `landsymm_py` scenario LU directly without column-order remapping. |
+| 11 | Tmin/Tmax computation in IMOGEN | **IMOGEN computes `Tmin = T_mean − DTEMP/2` and `Tmax = T_mean + DTEMP/2` and writes `Tmin_anom.dat` and `Tmax_anom.dat`; `imogencfx` reads them and sets `climate.tmin` / `climate.tmax`. ~3 hours of code (small enhancement at step 9.5 of Part V).** | LandSyMM normally takes Tmin/Tmax as inputs (in non-IMOGEN modes). The current design has LPJG derive Tmin/Tmax internally from DTEMP, but explicit IMOGEN-derived inputs let the user verify numerical self-consistency and eliminate a hidden derivation. Fortran path: ~20 LOC. C++ path: ~30 LOC. |
+| 12 | Rh_anom and W_anom output asymmetry (§II.2) | **The C++ refactor ALREADY writes `Rh_anom.dat` and `W_anom.dat` (with real engine data, verified at `climatemodel.cpp:875-876, 903-904, 915-916` with `//DKB` annotations); the Fortran does NOT. Phase 1 of the IMOGEN rebuild ports these two writers into Fortran-with-`ALLOCATABLE`. The LPJG-side consumer (`imogencfx::get_climate_for_gridcell`) needs ~30 LOC to read these files and set `climate.relhum` / `climate.u10`.** | The audit's earlier framing of "BLAZE wind/humidity unwired" applied to the consumer side only. The C++ producer side is wired and producing data. Bringing Fortran to parity, plus wiring the consumer, completes the BLAZE / wind / humidity story in one effort. |
+
+These decisions resolve previously open questions in Part II and
+Part III. The remaining open items (e.g. whether `do_potyield` is in
+`trunk_r13078` or only in the integrated LTS — confirmed by the user
+to be in `trunk_r13078`; the HPC environment specifics — to be
+confirmed at step 16 with the user's terminal back-and-forth) settle
+at the appropriate point in Part V's rebuild sequence.
+
+---
+
+## Table of contents
+
+- [Decisions settled (as of 5 May 2026)](#decisions-settled-as-of-5-may-2026)
+- [Part I — Necessities (item-by-item gap inventory)](#part-i--necessities-item-by-item-gap-inventory)
+  - [I.A Code-level fixes that are already mapped](#ia-code-level-fixes-that-are-already-mapped)
+  - [I.B Major missing components and wiring](#ib-major-missing-components-and-wiring)
+    - [I.B.1 LPJG-side writer for the IMOGEN handshake files](#ib1-lpjg-side-writer-for-the-imogen-handshake-files)
+    - [I.B.2 Python Intermediary → LPJG-format adapter](#ib2-python-intermediary--lpjg-format-adapter)
+    - [I.B.3 Top-level coupled-run launcher](#ib3-top-level-coupled-run-launcher)
+    - [I.B.4 Stage-I yield-generation pipeline](#ib4-stage-i-yield-generation-pipeline)
+    - [I.B.5 CMIP6 GCM-pattern operationalisation](#ib5-cmip6-gcm-pattern-operationalisation)
+    - [I.B.6 Boundary-harmonisation algorithm](#ib6-boundary-harmonisation-algorithm)
+    - [I.B.7 NEE/NBP code-vs-doc audit on the LPJG side](#ib7-neenbp-code-vs-doc-audit-on-the-lpjg-side)
+  - [I.C Data acquisition and staging](#ic-data-acquisition-and-staging)
+  - [I.D Discipline on units and data-exchange integrity](#id-discipline-on-units-and-data-exchange-integrity)
+- [Part II — Strategic decisions](#part-ii--strategic-decisions)
+  - [II.1 IIASA vs RCMIP for the anthropogenic substitution backbone](#ii1-iiasa-vs-rcmip-for-the-anthropogenic-substitution-backbone)
+  - [II.2 Fortran IMOGEN vs C++ refactor](#ii2-fortran-imogen-vs-c-refactor)
+  - [II.3 CMIP5 vs CMIP6 emissions / GCM forcing](#ii3-cmip5-vs-cmip6-emissions--gcm-forcing)
+  - [II.4 Tight (closed-loop) vs prescribed coupling default](#ii4-tight-closed-loop-vs-prescribed-coupling-default)
+  - [II.5 IPCC 2006 vs 2019-Refinement parameter sets](#ii5-ipcc-2006-vs-2019-refinement-parameter-sets)
+  - [II.6 N2O sectoral disaggregation methodology](#ii6-n2o-sectoral-disaggregation-methodology)
+  - [II.7 Wetland CH4 framing](#ii7-wetland-ch4-framing)
+  - [II.8 Year-indexing convention (IYEAR vs IYEAR-1)](#ii8-year-indexing-convention-iyear-vs-iyear-1)
+  - [II.9 Tier-1 vs Tier-2/Tier-3 ambition for v1.0](#ii9-tier-1-vs-tier-23-ambition-for-v10)
+  - [II.10 NEE/NBP unit and column definition](#ii10-neenbp-unit-and-column-definition)
+  - [II.11 LPJ-GUESS fork choice — `trunk_r13078` vs integrated LTS](#ii11-lpj-guess-fork-choice--trunk_r13078-vs-integrated-lts)
+- [Part III — Open questions to the user](#part-iii--open-questions-to-the-user)
+- [Part IV — Recommended sequencing and effort estimates (deprecated; see Part V)](#part-iv--recommended-sequencing-and-effort-estimates-deprecated-see-part-v)
+- [Part V — Formal incremental rebuild plan](#part-v--formal-incremental-rebuild-plan)
+- [Appendix A — Implementation sketches](#appendix-a--implementation-sketches)
+  - [A.1 LPJG-side handshake writer (sketch)](#a1-lpjg-side-handshake-writer-sketch)
+  - [A.2 Python Intermediary → LPJG-format adapter (sketch)](#a2-python-intermediary--lpjg-format-adapter-sketch)
+  - [A.3 CMIP6 NetCDF → CMIP5 ASCII converter (sketch)](#a3-cmip6-netcdf--cmip5-ascii-converter-sketch)
+  - [A.4 Coupled-run launcher (sketch)](#a4-coupled-run-launcher-sketch)
+  - [A.5 RCMIP-vs-IIASA backbone selector (sketch)](#a5-rcmip-vs-iiasa-backbone-selector-sketch)
+
+---
+
+## Part I — Necessities (item-by-item gap inventory)
+
+This part lists, item by item, every piece of work the audit identified
+as needed for a successful coupled run. Items are flagged with status:
+
+- **🟢 Mapped** — the issue is clearly understood; the fix is known
+  and bounded. Mostly source-file edits.
+- **🟡 Partial** — the issue is identified but the fix is non-trivial,
+  or has a sub-decision the user should make.
+- **🔴 Open** — the audit could not find or specify the fix. The user
+  may have knowledge that closes the gap, or further investigation is
+  required.
+
+### I.A Code-level fixes that are already mapped
+
+These are the 35 catalogue entries from `[CMI §8.1]`. They are all
+🟢 status and listed here only for completeness. See the master doc
+for full source citations and proposed fixes; here we just summarise.
+
+| ID | One-line | Status |
+|---|---|---|
+| C1 | Delete `exit(200);` at `imogencfx.cpp:483` | 🟢 |
+| C2, C3 | Restore polling-loop guards in `climatemodel.cpp:330-350` | 🟢 |
+| C4 | Uncomment `ndep.getndep(...)` at `imogen_input.cpp:728` | 🟢 |
+| C5 | Fix `IMOGEN/ouput/` typo in `imogen_intermediary.ins` (×6) and `R_anom.dat`/`Rh_anom.dat` (×1) | 🟢 |
+| C6 | Restore the commented-out Adder/Extractor/Wetlands block in C++ Intermediary `Main.cpp` (or retire C++ Intermediary entirely) | 🟢 |
+| C7 | Adopt B's corrected `calcNitrogenExcretion` formula (or retire C++ Intermediary entirely) | 🟢 |
+| C8 | Adopt B's corrected `n2ofertilizer.csv` getline (or retire C++ Intermediary entirely) | 🟢 |
+| C9 | Fix `Adder::set_actual_lpjg_simulated_IIASA_*` global mutation at `Adder.cpp:239` (currently dead) | 🟢 |
+| C10 | Delete `PAUSE` at `imogen_lpjg.f:4134` | 🟢 |
+| C11 | Delete `qsat_output.txt` debug dump | 🟢 |
+| C12 | Replace Windows `\\` with `/` in `imogen_lpjg.f:435,461` mkdir calls | 🟢 |
+| C13 | Replace Windows paths in `imogen_settings.txt` with relative paths | 🟢 |
+| C14-C28 | C++ IMOGEN refactor bugs (likely irrelevant — see §II.2) | 🟢 (or moot) |
+| C29-C30 | Imogen-controller bugs (likely irrelevant — to be retired) | 🟢 (or moot) |
+| C31, C32 | C++ Intermediary config + 1.25° grid (likely irrelevant — see §II) | 🟢 (or moot) |
+| C33 | Add `openpyxl` to `requirements.txt` for Python Intermediary | 🟢 |
+| C34 | Provide self-contained launcher (see I.B.3) | 🟢 (becomes I.B.3) |
+| C35 | Rewrite `FILE_LPJG_FLUX` to relative filenames (only meaningful with I.B.1 + II.4) | 🟢 (depends on I.B.1) |
+
+The 🟢 entries are mostly trivial. The non-trivial ones (C6, C35) are
+strategic decisions and reduce to "retire C++ Intermediary in favour of
+Python" + "decide tight vs prescribed coupling default" — see Part II.
+
+### I.B Major missing components and wiring
+
+These are the substantive engineering tasks. Each subsection is a
+mini-spec.
+
+#### I.B.1 LPJG-side writer for the IMOGEN handshake files
+
+**Status: 🔴 Open — the audit could not locate this writer in the
+existing codebase.**
+
+##### What needs to happen
+
+At the end of every LPJ-GUESS simulation year, the coupled framework
+needs LPJ-GUESS itself to write three files to
+`<DIR_COMMON>/LPJG_main/IMOGEN/`:
+
+1. **`imogen_lpjg.txt`** — the per-call settings file the IMOGEN
+   engine reads via `SETTIN_LPJG` (`imogen_lpjg.f:1439-1504`). 6 keys:
+   `YEAR1`, `IYEND`, `YEAR1_LPJG`, `SPINUP`, `KEEPRUNNING`, `FIRSTCALL`.
+   Written as `key value !comment` ASCII per the format in the
+   existing 369-byte placeholder.
+
+2. **`imogen_lpjg_flux.txt`** — the per-year LPJ-GUESS C-flux feedback
+   file the engine reads at `imogen_lpjg.f:565-573`. Format:
+   `<year> <flux>` per line, where `<flux>` is global net biome
+   productivity in TgC/yr (or the unit the engine expects — see §II.10
+   for the unit decision). The engine reads `NYR_LPJG_FLUX` rows; a
+   year-by-year run would append one row per LPJG year and grow the
+   file across years.
+
+3. **`imogen_lpjg_ch4_n2o_flux.txt`** — the per-year LPJ-GUESS natural
+   CH4+N2O feedback file. Format: `<year> <ch4> <n2o>` per line.
+   Tg CH4/yr and Tg N2O/yr (with the same caveat — §II.10).
+
+Plus the file LPJ-GUESS deletes/recreates as the synchronisation token:
+
+4. **`<DIR_COMMON>/LPJG_main/IMOGEN/done`** — empty file written when
+   LPJ-GUESS has finished writing (1)-(3) for the year. The IMOGEN
+   engine polls for it (`climatemodel.cpp:330` *should* check this;
+   currently bug C2 hardcodes `doneExist=true`).
+
+##### Why it is needed
+
+In a real two-way closed-loop tight-coupled run, the data flow is:
+
+```
+LPJG year N completes ─► writes (1)-(3)+(4) ─► engine reads (1)-(3)
+   ▲                                                  │
+   │                                                  ▼
+   ◄───── engine writes IMOGEN/output/<N+1>/done + climate files
+                  ◄──── LPJG reads climate, advances to year N+1
+```
+
+If LPJG never writes (1)-(3), the engine has nothing real to feed back
+into its C-cycle. The current configuration sidesteps this by setting
+`FILE_LPJG_FLUX` to a static IIASA reference file (the override
+analysed in `[CMI §3.7]` and `[Findings 4]`), which has the side effect
+of converting the run from "tight-coupled" to "prescribed-flux". To
+get real two-way coupling, LPJG must actually write these files.
+
+##### Where in the codebase
+
+The audit's grep for the literal filenames `imogen_lpjg.txt`,
+`imogen_lpjg_flux.txt`, `imogen_lpjg_ch4_n2o_flux.txt` in the LPJ-GUESS
+trunk found **only the engine-side READS** (`climatemodel.cpp:300-394`,
+`imogen_lpjg.f:357-590`), no writes anywhere on the LPJG output side.
+The likely candidate locations for a writer would be:
+
+- **`modules/commonoutput.cpp`** — already writes the standard `cflux.out`,
+  `cpool.out`, `mch4.out`, `ngases.out`, etc. per year per gridcell.
+  An additional **annual global-aggregation** pass at the end of the
+  per-year writer would fit naturally.
+- **`modules/miscoutput.cpp`** — already declares the 12 IMOGEN-output
+  ins-file params (`miscoutput.cpp:121-136`) and the 12 dead `Table`
+  objects (`miscoutput.h:172`); declares the random-number stub
+  `getImogenData(int lower, int upper)` at `miscoutput.h:69-79`. This
+  was scaffolded for IMOGEN-output integration but never finished.
+- **A new module** `modules/imogenoutput.cpp/.h` parallel to the
+  existing `imogen_input.cpp` / `imogencfx.cpp`. Cleaner separation.
+
+##### How (proposed approach)
+
+A small new output module that is invoked at the same point as the
+standard per-year `commonoutput`. Pseudocode:
+
+```cpp
+// modules/imogenoutput.cpp (proposed)
+#include "imogenoutput.h"
+#include "framework.h"
+#include "outputmodule.h"
+#include "parameters.h"      // for IMOGENConfig::*
+#include <fstream>
+
+REGISTER_OUTPUT_MODULE("imogenoutput", ImogenOutput)
+
+void ImogenOutput::init() {
+    // No init needed — files are append-only and created on first call.
+}
+
+void ImogenOutput::outannual(Gridcell& gridcell) {
+    // Per-gridcell hook; we use this to ACCUMULATE the global sum.
+    // Actual file write happens once per year in outglobal_year (a new hook).
+    // ...
+}
+
+void ImogenOutput::outglobal_year(int calendar_year) {
+    if (!IMOGENConfig::tight_coupling) return;     // see §II.4
+
+    const std::string dir = std::string((char*)IMOGENConfig::DIR_COMMON) + "/LPJG_main/IMOGEN/";
+
+    // 1. Flux files — append year row.
+    {
+        std::ofstream f(dir + "imogen_lpjg_flux.txt", std::ios::app);
+        f << calendar_year << "\t" << total_NEE_TgC_yr << std::endl;
+    }
+    {
+        std::ofstream f(dir + "imogen_lpjg_ch4_n2o_flux.txt", std::ios::app);
+        f << calendar_year << "\t"
+          << total_CH4_TgCH4_yr << "\t"
+          << total_N2O_TgN2O_yr << std::endl;
+    }
+
+    // 2. Per-call settings file — re-write each year for the next call.
+    {
+        std::ofstream f(dir + "imogen_lpjg.txt", std::ios::trunc);
+        const int next = calendar_year + 1;
+        const bool done_all = (next > IMOGENConfig::IYEND_LPJG);
+        f << "YEAR1 " << next      << " !IN First year of the numerical experiment\n";
+        f << "IYEND " << next      << " !IN Stop year of the ENTIRE run\n";
+        f << "YEAR1_LPJG " << IMOGENConfig::YEAR1_LPJG << "\n";
+        f << "SPINUP "      << (next < IMOGENConfig::FIRST_HIST_YEAR ? "TRUE" : "FALSE") << "\n";
+        f << "KEEPRUNNING " << (done_all ? "FALSE" : "TRUE") << "\n";
+        f << "FIRSTCALL FALSE\n";   // first-call only on year 0
+    }
+
+    // 3. Touch done file (at end, after everything else is on disk).
+    {
+        std::ofstream f(dir + "done");
+    }
+}
+```
+
+The accumulation of `total_NEE_TgC_yr`, `total_CH4_TgCH4_yr`,
+`total_N2O_TgN2O_yr` would happen via the same area-weighted gridcell
+aggregation that the Python Intermediary's Component B already does
+(see `src/component_b_natural/historical/lpjg_historical_processing.py`)
+— except in C++, in-process, on the live LPJG state rather than from
+gzipped output files.
+
+##### Knowledge gaps (where the user might know more than the audit)
+
+1. **Does an LPJG-side writer for these files already exist somewhere
+   the audit missed?** The integrated LTS work the user did earlier
+   may have included annual flux-flushing infrastructure that I did
+   not connect to this need. Worth grepping the integrated LTS
+   codebase for `imogen_lpjg`, `IMOGEN/output`, etc.
+2. **Was the writer ever started and abandoned?** The
+   `getImogenData` random-number stub at `miscoutput.h:69-79` and the
+   12 commented-but-declared `Table` objects suggest someone began
+   scaffolding this but stopped. Knowing how far it got would inform
+   whether to extend the stubs or write fresh.
+3. **What is the canonical hook point in LPJ-GUESS for "after a year
+   has been written"?** The framework's main loop in
+   `framework.cpp` calls `outannual()` per gridcell per year. There
+   may already be a "global, post-gridcell-loop, per-year" hook that
+   the user knows about; if not, one would need to be added.
+4. **Is "global sum" the right LPJG → IMOGEN aggregation level, or
+   does IMOGEN expect per-grid (1631-cell) flux fields?** The Fortran
+   reader at `imogen_lpjg.f:565-571` reads only `(year, value)`, i.e.
+   **scalar per year**. That confirms global aggregation is correct.
+   But the user's IMOGEN scientific intent may be different.
+
+#### I.B.2 Python Intermediary → LPJG-format adapter
+
+**Status: 🟡 Partial — the need is fully understood; the only
+ambiguity is the IIASA vs RCMIP question (II.1) which determines
+which Python output column maps to which LPJG file.**
+
+##### What needs to happen
+
+Convert the Python Intermediary's wide-format scenario CSV
+(`outputs/imogen_inputs/imogen_inputs_<SSP>.csv`, 201 rows × 10 cols
+per scenario) into the four narrow files the Fortran IMOGEN expects:
+
+| LPJG/IMOGEN file (`imogen_intermediary.ins` key) | Format | Source column in Python wide CSV | Unit conversion |
+|---|---|---|---|
+| `FILE_LPJG_FLUX` | 2-col `year flux` | `CO2_NEE_Mt` | `Mt CO2/yr → TgC/yr` = divide by `(44/12) × 1000` (the inverse of `PgC_to_MtCO2`) — i.e. `Mt CO2/yr / 3666.67 = PgC/yr × 1000 = TgC/yr × 1`. So `TgC/yr = Mt_CO2/yr / 3.66667`. Cross-check the engine's expected unit by inspecting `imogen_lpjg.f:766-794`. |
+| `FILE_LPJG_CH4_N2O_FLUX` | 3-col `year ch4 n2o` | `CH4_natural_Mt`, `N2O_natural_Mt` | Mt-of-gas/yr → Tg-of-gas/yr is **identity** (1 Mt = 1 Tg = 10⁹ kg); no conversion needed. |
+| `FILE_SCEN_EMITS` | 2-col `year flux` | `CO2_EFOS_Mt` (or `CO2_total_Mt − CO2_NEE_Mt` depending on II.10 framing) | `Mt CO2/yr → PgC/yr` — same conversion as above |
+| `FILE_CH4_N2O_EMITS` | 3-col `year ch4 n2o` | `CH4_anthro_Mt`, `N2O_anthro_Mt` | Identity |
+
+Plus a fifth file that the Python pipeline does *not* produce:
+
+| `FILE_NON_CO2_VALS` | 2-col `year W/m²` | not produced by Python pipeline | Would need to be sourced from FAIR ERF directly, or computed via FAIR step in the adapter |
+
+##### Why it is needed
+
+Without it, the Python Intermediary's `outputs/imogen_inputs/*.csv` are
+read by *no one*. The pipeline's `Quick_Start.md` lines 165-166 say
+explicitly:
+> *"please share the IMOGEN code so I can determine the input data
+> form/structure/format requirements and figure out how the 6
+> IMOGEN-input CSVs we produce should be transformed for ingestion
+> into IMOGEN."*
+
+This adapter is the answer to that request.
+
+##### Where in the codebase
+
+A new file `tools/imogen_inputs_to_lpjg_format.py` in the unified
+codebase. Single Python script, ~150 LOC. No new dependencies.
+
+##### How (proposed approach)
+
+See [Appendix A.2](#a2-python-intermediary--lpjg-format-adapter-sketch)
+for an implementation sketch.
+
+##### Knowledge gaps
+
+1. **Confirmation of unit expectations.** The Fortran's `C_LPJG`
+   variable has a `CONV` multiplier (`imogen_lpjg.f:768-783`) that
+   converts the read value before adding to `CO2_PPMV`. Reverse-engineering
+   `CONV` would confirm whether the engine wants TgC/yr, PgC/yr, or
+   ppm-equivalent. The audit did not trace this in detail; I should
+   re-read the apply block before committing.
+2. **`FILE_NON_CO2_VALS` source.** The Python pipeline does not
+   produce non-CO2 RF directly; the framework ships static IIASA
+   reference files at `Data/Imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/
+   nonco2_ch4_n2o_RF_historical_ssp126.txt`. For the unified codebase,
+   either keep the static file, or compute the FAIR ERF in the
+   adapter. The working paper §2.1.3 mentions FaIR v1.3 ERF integrated
+   upstream of IMOGEN (per Mathison 2025 PRIME). The Python pipeline
+   has FAIR ERF as `inputs/fair_erf/natural.csv`; the corresponding
+   anthropogenic FAIR ERF would need to come from FAIR upstream.
+
+#### I.B.3 Top-level coupled-run launcher
+
+**Status: 🟡 Partial — the structure is clear; the cluster-specific
+pieces depend on the user's HPC environment.**
+
+##### What needs to happen
+
+Two scripts:
+
+1. **`scripts/run_coupled.sh`** — workstation Linux launcher.
+   Self-contained. No external dependencies. One scenario per
+   invocation.
+2. **`scripts/run_coupled.sbatch`** — cluster SLURM template
+   (assumes the user's HPC uses SLURM; the existing
+   `landsymm_imogen/SSP1_RCP26/setup_run.sh` references an `owl`
+   cluster with `haswell`/`uc2` partition names that suggest LSA
+   Lund or KIT — confirm with user).
+
+##### Why it is needed
+
+The current shipped `setup_run.sh` calls
+`setup_run_owl_with_scratch_lpj_work.sh`, which is not in the repo.
+There is no functional launcher anywhere in either A or B
+(`[SA8 §1.3, §3]`).
+
+##### How (proposed approach)
+
+See [Appendix A.4](#a4-coupled-run-launcher-sketch) for an
+implementation sketch. The high-level flow:
+
+```
+1. Verify build artifacts (./guess, intermediary_py venv).
+2. If imogen_inputs_<SSP>.csv missing: run Python Intermediary.
+3. If LPJG-format files missing: run adapter (I.B.2).
+4. Stage gridlist + soil + Ndep + LU forcing into runs/<SSP>/.
+5. Set <DIR_COMMON> to a writable scratch dir; clean any stale
+   handshake files.
+6. Run ./guess -input imogencfx main.ins.
+7. Post-run: collect output, run the standard validation
+   (concentration RMSD vs observations).
+```
+
+##### Knowledge gaps
+
+1. **The user's HPC environment.** Specifically: which scheduler
+   (SLURM, PBS, LSF, none); which queue/partition naming
+   convention; which `module load` lines (gcc/cmake/netcdf-c/openmpi
+   versions); whether scratch is available and at which path; whether
+   MPI is required or single-node is fine; expected wall-clock for
+   a 251-year SSP run.
+2. **Is `setup_run_owl_with_scratch_lpj_work.sh` available
+   anywhere in the user's environment?** If the user has access to
+   the Lund LSA cluster, that script could be retrieved and adapted
+   — its design is presumably mature. Otherwise we write a fresh one.
+
+#### I.B.4 Stage-I yield-generation pipeline
+
+**Status (revised 5 May 2026): 🟢 Deferred for v1.0; documentation
+retained for future v2.0 PLUM-embedding scenario.**
+
+The user has confirmed:
+- **Yields already exist.** They have already run LPJ-GUESS with
+  `do_potyield=1` and factorial management treatments using the
+  LandSyMM fork (per integrated-LTS verification testing in the
+  prior integration project). The yield outputs were sent to the
+  PLUM modelling team.
+- **PLUM outputs already received.** The PLUM team produced scenario
+  land use (cropfracs, irrig, nfert) + activity data (livestock counts,
+  fertiliser application rates per country) and returned them. These
+  are already in `Data/Intermediary/PLUM_data/` (5 SSPs) plus the
+  newer `landsymm_py`-derived harmonised LU at `/media/bampoh-d/...
+  /plum_harm_lu/`.
+- **HILDA+ harmonisation already done.** The user has already
+  harmonised PLUM scenario LU with HILDA+ historic via the
+  `landsymm_py` codebase (the prior project).
+- **`do_potyield` is in `trunk_r13078`.** The user has confirmed
+  this; no need to merge from the integrated LTS for v1.0.
+
+So **Stage I is a deferred future capability**, not a current
+necessity:
+
+##### What stays in the documentation
+
+The working paper §2.4.3 framing of Stage I (open-loop factorial-
+management yield generation: 3 fertilisation × 2 irrigation × 251
+years × 0.5°-global) remains documented as the **scientific design
+intent**. The unified codebase's `docs/scientific_framework.md` and
+the paper's methodology section both retain the Stage I description
+as a complete protocol, so anyone reading either understands the
+two-stage closed-loop design.
+
+##### What is deferred
+
+The actual **operational machinery for re-running Stage I from
+scratch within the unified codebase** is deferred:
+
+- The `runs/stage1_potyield/` ins-file directory: deferred.
+- A `do_potyield`-enabled Stage I cluster run: deferred (the
+  existing yields are reused).
+- Wiring PLUM into the coupled framework as a runtime-callable
+  component: deferred to v2.0 (when PLUM may become procurable
+  by the user's group).
+
+##### Why preserved as a future-v2.0 capability
+
+If/when the user's group procures PLUM (per the user's note in this
+chat), the v2.0 unified codebase will:
+
+1. **Embed PLUM** as a runtime-invokable component in
+   `runs/stage1_potyield/`.
+2. **Activate the `do_potyield` mode** (already in `trunk_r13078`).
+3. **Run the closed-loop two-stage protocol** with PLUM in the inner
+   loop:
+   - Stage I: LPJ-GUESS factorial yields → PLUM scenario LU + activity → ...
+   - Stage II: ... LPJG with PLUM-supplied LU + Intermediary +
+     IMOGEN feedback (the v1.0 stage).
+4. **Refresh PLUM scenarios** when ESM forcing or LU assumptions
+   change.
+
+So preserving the Stage I documentation in v1.0 is forward-looking
+investment for v2.0 — the v2.0 work plan inherits a working v1.0
+Stage II, plus a documented Stage I specification, plus the existing
+yields-and-PLUM-outputs as a frozen reference snapshot.
+
+##### v1.0 implications
+
+For the v1.0 rebuild plan (Part V):
+
+- **Step 15 (Stage I yield generation): deferred for v1.0.** The
+  step is renamed from "Stage-I yield-generation pipeline integration"
+  to "Stage-I documentation preservation" and reduced to ~2 hours
+  (verifying that the existing PLUM outputs are usable as-is, plus
+  documenting the Stage I framing for v2.0).
+- **Step 6 (data import): use the existing PLUM outputs.** Either
+  the legacy `Data/Intermediary/PLUM_data/animals_ssp{1..5}.txt`
+  + `plum_land_use/` + `agg_land_use/`, or the newer
+  `landsymm_py`-derived `/media/bampoh-d/.../plum_harm_lu/` (per
+  Decision #10).
+- **Step 7-14 (the Stage II work): unchanged**. Stage II is the v1.0
+  focus.
+
+This significantly de-risks the v1.0 release timeline — no need to
+verify `do_potyield` (already confirmed present) or run a multi-day
+cluster yield-generation job before the coupled framework comes up.
+
+#### I.B.5 CMIP6 GCM-pattern operationalisation
+
+**Status: 🟢 Mapped — the conversion is well-defined; the only
+question is whether to do it offline (data-side only) or also extend
+the IMOGEN reader to consume NetCDF natively.**
+
+##### What needs to happen
+
+The 5 CMIP6 NetCDF GCM patterns at
+`Common-directory/IMOGEN-codebase/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/`
+must become consumable by the Fortran IMOGEN. The working paper's
+canonical GCM is **MRI-ESM2-0**, which is in this set.
+
+##### Why it is needed
+
+The current active `imogen_settings.txt` `DIR_PATT` points at
+`CEN_IPSL_MOD_IPSL-CM5A-MR/` (a CMIP5 GCM, not the working paper's
+chosen CMIP6 MRI-ESM2-0). Without this, the framework's runs cannot
+reproduce the working paper's claimed scenarios.
+
+##### How (proposed approach)
+
+Two options:
+
+**Option A (recommended): offline conversion.**
+1. Write `tools/cmip6_nc_to_cmip5_ascii.py`. For each of the 5 NetCDF
+   files (GFDL-ESM4, IPSL-CM6A-LR, MPI-ESM1-2-HR, MRI-ESM2-0,
+   UKESM1-0-LL):
+   - Read the 8 `_patt` variables (`tl1_patt`, `ql1_patt`,
+     `precip_patt`, `wind_patt`, `pstar_patt`, `swdown_patt`,
+     `lwdown_patt`, `range_tl1_patt`) from the 56×96 lat-lon grid.
+   - Bilinearly sample onto the 1631-cell IMOGEN HadCM3 land grid
+     (`patterns_gridlist.txt`).
+   - Write 12 month files (`jan`…`dec`) in the CMIP5 layout: header
+     `lon_min lat_min lon_max lat_max`, then `lon lat v1 v2 … v12`
+     per cell. Pad zero columns to 12 (matching the CMIP5 12-column
+     convention; the existing IPSL-CM5A-MR file has columns 6, 11, 13
+     identically zero).
+   - Write into a new directory `patterns/CEN_CMIP6_MOD_<gcm>/`.
+   - Convert the JSON `<gcm>_params.json` into a Fortran-readable
+     namelist for the EBM scalars.
+2. Switch `imogen_settings.txt` `DIR_PATT` to `CEN_CMIP6_MOD_MRI-ESM2-0/`.
+3. Done — Fortran IMOGEN needs zero changes.
+
+See [Appendix A.3](#a3-cmip6-netcdf--cmip5-ascii-converter-sketch).
+
+**Option B: native NetCDF in IMOGEN.**
+Adds NetCDF + JSON readers to the Fortran IMOGEN. More invasive
+(~500 LOC of Fortran + the gfortran-netcdf bindings); also requires
+on-the-fly regridding from 56×96 to 1631-cell. Long-term cleaner but
+not justified for v1.0.
+
+##### Knowledge gaps
+
+1. **The exact column-to-variable mapping in the CMIP5 ASCII format.**
+   Subagent 7 inferred 8 forcing variables in 12 columns (with 4
+   reserved/zero columns) based on the IPSL-CM5A-MR sample. The exact
+   mapping should be confirmed by reading `imogen_lpjg.f::GCM_ANLG`
+   `READ` statement at line 3226-3231 — done in §[CMI 4.7.2]:
+   `T, RH15M, U-wind, V-wind, LW, SW, DTEMP_day, rainfall, snowfall,
+    P*` — i.e. 10 visible. The 12-column layout has 2 extras that
+   are zero in the IPSL sample. We can write zeros for them safely.
+2. **The `imogen_drive` axis convention in the CMIP6 NetCDF.** Is
+   `imogen_drive(0)` January or December? `int64` and no CF `time`
+   metadata. Need to confirm with whoever generated the NetCDF
+   (likely available from the working paper's authors — it's the
+   PRIME framework Mathison 2025 deliverable).
+3. **Provenance of the 5 CMIP6 GCM patterns.** Are they all that's
+   needed, or will the user want a larger ensemble? CMIP6 itself has
+   ~30 GCMs participating in the relevant MIPs.
+
+#### I.B.6 Boundary-harmonisation algorithm
+
+**Status: 🟡 Partial — the algorithm to use is a documentation choice
+that the user makes and then the unified codebase implements. See
+§II for the choices.**
+
+##### What needs to happen
+
+A method to smooth the IIASA-pre-1961 → IPCC/LPJG-post-1961 boundary
+and the historic→scenario 2010/2020 boundary in the integrated
+emissions trajectory.
+
+##### Why it is needed
+
+Without boundary harmonisation, the integrated trajectory has
+discontinuities at 1961 (or 1990 for CMIP6) and at 2020 — visible
+in the Python pipeline's plots and acknowledged in HANDOFF.md §2.5
+as a 22 Mt CH4 / 117 Gg N2O step at 2020.
+
+##### Where in the codebase
+
+The Python pipeline currently implements **only segmented running
+mean smoothing** at the historical/scenario boundary
+(`Intermediary_py/.../HANDOFF.md` §8.6). The C++ Intermediary's
+`Adder.cpp:114-164` smoothing block is commented out;
+`centeredMovingAverage` is defined but never invoked.
+
+##### How (proposed approach — three options)
+
+| Option | Source | Description | Effort |
+|---|---|---|---|
+| 1 | Working paper §2.3.4 | **Backward Tapered Harmonisation** (B = 10 yr CO2, 30 yr CH4/N2O) + Regression-Based Trend Matching + 5-yr Centred Moving Average | 1-2 days Python |
+| 2 | `Emissions Handling Methodology.docx` (B-only) | **Univariate Spline ratio** of modelled total to IIASA total to align long-term trajectories | 1 day Python |
+| 3 | Python pipeline current | **Segmented running mean** at historical/scenario boundary only; no IIASA boundary smoothing | 0 (already done) |
+
+##### Knowledge gaps
+
+The user (and supervisor) wrote the working paper recommending Option
+1. The Python pipeline as it stands implements Option 3. Either:
+- Implement Option 1 in Python and update the paper to reflect the
+  validated outputs, or
+- Update the working paper to describe Option 3 (and justify it as
+  empirically validated against GCB/GMB/GNB).
+
+This is fundamentally the user's decision based on what the supervisor
+will accept.
+
+#### I.B.7 NEE/NBP code-vs-doc audit on the LPJG side
+
+**Status: 🟡 Partial — the documentation says the corrected formula
+is implemented; a code-level confirmation has not been done in this
+audit.**
+
+##### What needs to happen
+
+Confirm that LPJ-GUESS's `commonoutput.cpp` writes `cflux.out` with
+the **corrected** NEE/NBP formula per `NEE-NBP Changes Report.docx`
+(B-only):
+- `NEE = flux_veg − flux_repr + flux_soil + flux_fire`
+- `NBP = NEE + c_disturb`, where
+  `c_disturb = flux_est + flux_seed + flux_charvest + acflux_wood_harvest
+               + acflux_harvest_slow + acflux_clearing + acflux_landuse_change
+               + c_org_leach_gridcell`
+- Sign convention: positive = net flux to atmosphere = source.
+
+##### Why it is needed
+
+The downstream consumers of `cflux.out` — the Python Intermediary
+Component B, the C++ Intermediary's Adder, any LPJG-side writer for
+the IMOGEN handshake (I.B.1) — all assume this corrected formula.
+If the code disagrees with the doc, either the consumers must adapt
+or the code must be patched.
+
+##### How (proposed approach)
+
+1. Read `Integrations/trunk/trunk_r13078/modules/commonoutput.cpp`
+   line by line, looking for the `cflux.out` writer block.
+2. Cross-check the column order and formula against the
+   `NEE-NBP Changes Report.docx` text:
+   - The corrected formula explicitly *adds* `flux_fire` (positive
+     fire flux is a CO2 source).
+   - The older formula at `Adding NBP…docx` *subtracts* `flux_fire`
+     and is wrong.
+3. If the code matches the corrected formula, document confirmation
+   in the master doc. If not, patch the code to match.
+
+##### Knowledge gaps
+
+The user authored `NEE-NBP Changes Report.docx` (it's dated
+2026-03-21 and is in version B's References only, B-authored). They
+likely already know whether the code change was applied. Confirming
+this is a 5-minute task either by reading the code or asking.
+
+### I.C Data acquisition and staging
+
+These are the data dependencies. Most have been partially or fully
+staged in the framework's `Data/`; this subsection clarifies what is
+needed for a clean unified-codebase deployment.
+
+| Data | Source | Format | Location in current frameworks | Action for unified codebase |
+|---|---|---|---|---|
+| **PLUM v2 outputs** | Project-internal (PLUM modeller) | Custom text + zip | `Data/Intermediary/PLUM_data/animals_ssp{1..5}.txt`, `plum_land_use/`, `agg_land_use/`, plus zips for rice option B | Document acquisition path. Provide a converter from this format to `inputs/plum/plum_crop_s1.csv` + `Livestock_counts.txt` (the format the Python Intermediary expects). |
+| **HILDA+ v2 historical land use** | Public — Winkler 2021 ESSD | NetCDF | Not raw; pre-processed via `landsymm_py` into `Data/LU/SSP*_RCP*_concatenated/` | Document acquisition + cite `landsymm_py` for processing. |
+| **LPJ-GUESS yield surfaces (Stage I outputs)** | Internal (run by user) | LPJG `.out` files | Not on disk; needed for PLUM's input | Run Stage I (per I.B.4); cache outputs in `Data/Yields/`. |
+| **LPJ-GUESS coupled-run outputs (.gz files for Python Component B)** | Live coupled run | gzipped LPJ-GUESS standard outputs | `Intermediary_py/.../inputs/lpjg/{historical,scenarios/<ssp>}/lpjg_<var>.out_<tag>.gz` | These come *from* the coupled run itself. Document the gzip step (`gzip cflux.out` etc.) at end of LPJG run. |
+| **FAOSTAT bulk download** | Public — fao.org | wide CSV | `Data/Intermediary/Input/FAOSTAT.csv` (combined); `Production_Crops_Livestock_E_All_Data.csv` etc. (Python Intermediary) | Document download URL + version pinned (current is FAO 2025 release). |
+| **EDGAR 2025** | Public — JRC | xlsx | `Intermediary_py/.../inputs/edgar/EDGAR_{CH4,N2O}_1970_2024.xlsx` + the OLD ESSD release for 4D11 | Document. Note: requires `openpyxl` (bug C33). |
+| **IIASA SSP database** | Public — IIASA SSP DB v2.0 | XLSX + ZIP | `Data/Concentrations/IIASA/CMIP6/`, `Data/Emissions/IIASA/CMIP6/` | Document. **Decide IIASA vs RCMIP** (see §II.1). |
+| **RCMIP Phase 2 v5.1.0** | Public — rcmip.org | long CSV | `Intermediary_py/.../inputs/rcmip/rcmip-emissions-annual-means-v5-1-0.csv` | Document. The Python pipeline's substitution algebra uses this. |
+| **FAIR ERF v1.3** | Public — github.com/OMS-NetZero/FAIR | CSV | `Intermediary_py/.../inputs/fair_erf/natural.csv` | Document. Anthropogenic ERF would need to be computed if used. |
+| **IPCC 2019 Refinement V4** (parameter source) | Public — IPCC | PDF (parameter tables embedded as Python dicts in scripts) | `References/19R_V4_Ch{05,10,11}*.pdf` | Document. Parameter tables would benefit from being moved out of `.py` source into a YAML/JSON config (per [CMI §12.7]). |
+| **IMOGEN GCM patterns CMIP5** | Project-internal (Lund) | ASCII per-month files | `Common-directory/IMOGEN-codebase/patterns/CEN_*_MOD_*/` (34 GCMs) | Document. May not all be needed; the working paper uses MRI-ESM2-0 only. |
+| **IMOGEN GCM patterns CMIP6** | Project-internal (PRIME deliverable) | NetCDF + JSON | `Common-directory/IMOGEN-codebase/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/` (5 GCMs) | Convert to CMIP5-style ASCII per I.B.5; document. |
+| **CRUNCEP base climatology** | Public — Viovy 2018 | ASCII per-month-per-year | `Common-directory/IMOGEN-codebase/CRUNCEP_1960_1989/` | Document. |
+| **N-deposition (Lamarque)** | Public — Lamarque 2010+ | FastArchive binary | `Data/Ndep/ndep_cruncep/*.bin` | Document. Reproducible from upstream Lamarque NetCDF + `NdepFastArchive/` utility. |
+| **Soil map** | Project-internal | ASCII | `Data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat` | Document; provenance unclear. |
+| **NOAA GMD / AGAGE concentration observations** | Public — gml.noaa.gov, agage.mit.edu | NetCDF / CSV | Not in repo | Add for validation per [CMI §2.5] thresholds. |
+
+#### I.C.1 Land-use data strategy — Option D (save_state/restart) selected
+
+**Decision settled (5 May 2026, per Decisions table item #10):**
+the unified codebase uses LPJ-GUESS's `save_state`/`restart`
+machinery to keep historic and scenario LU data separate.
+
+##### The four LU strategies considered
+
+The framework had two candidate LU data sources at audit time:
+
+- **Legacy** (`Data/LU/SSP1_RCP26_concatenated/`): single per-category
+  files concatenated 1901-2100 (HILDA+ historic + PLUM scenario,
+  pre-harmonised at the 2020 boundary). 4-col schema:
+  `Lon Lat Year NATURAL CROPLAND PASTURE BARREN`. ~7.3 GB total.
+- **New `landsymm_py`-derived** (`/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/SSP1_RCP26/s1.HILDA+_remap_v10_old_62892_gL.harm.allow_unveg.forLPJG/`):
+  scenario-only files starting at 2021. 4-col schema:
+  `Lon Lat Year PASTURE CROPLAND NATURAL BARREN` (column order
+  swapped vs legacy). Plus a separate `landcover_peatland.txt`. ~3.5 GB total.
+
+Four strategies were considered:
+
+| Option | Approach | Effort | Pros / Cons |
+|---|---|---|---|
+| A | Concatenate HILDA+ historic 1901-2020 with new PLUM scenario 2021-2100 to produce framework-style 1901-2100 files. Apply 5-yr-window LUH2-style harmonisation at 2020. | 1-2 days Python in `landsymm_py` | Self-consistent with working paper §2.4.5; reproducible; single LU file per category. But adds a concatenation step and a column-order remap. |
+| B | Configure LPJ-GUESS to read HILDA+ historic and the new scenario as two separate sources, splicing at runtime in the input module. | 1-2 days C++ in `landcover.cpp`/`landcoverinput.cpp` | Flexible (swap historic source independently); requires non-trivial LPJ-GUESS code change that may interact with `LandcoverInput` design. |
+| C | Use the legacy concatenated 1901-2100 files for v1.0; defer the new data to v1.1. | 0 effort | Fastest path to working coupled run; downside is legacy data may be slightly older PLUM than the new. |
+| **D** | **Use `save_state`/`restart`: Phase 1 standalone LPJ-GUESS run with HILDA+ historic 1850-2020 → save state at 2020. Phase 2 coupled run starts from 2020 saved state with new PLUM scenario LU 2021-2100 (no concatenation needed).** | **2-3 hours: configure save_state in Phase 1 ins file; configure restart in Phase 2 ins file; verify saved-state file is compatible across runs** | **Avoids concatenation entirely. Avoids re-running 1850-2020 every time we test a scenario. Maps naturally to the working paper's two-stage protocol. The save_state machinery is already in LPJ-GUESS (used during the integrated-LTS work). Uses the new `landsymm_py` data without column-order remap.** |
+
+##### Why Option D is preferred
+
+1. **Architectural cleanliness.** Phase 1 run owns historic; Phase 2
+   run owns scenario + coupling. Each is independently testable. A
+   change to one doesn't force a re-run of the other.
+2. **Computational efficiency.** Once the historic state is saved,
+   any number of scenario or sensitivity runs can re-use it. For
+   ensemble scenario work this is dramatically faster than re-running
+   1850-2020 each time.
+3. **Reuse of existing infrastructure.** `save_state`/`restart` is
+   already in LPJ-GUESS and was used during the integrated-LTS
+   verification testing. No new code required.
+4. **Direct use of the new `landsymm_py` data without remapping.**
+   The new data starts at 2021 (no historic) and has the
+   `PASTURE CROPLAND NATURAL BARREN` column order; the Phase-2
+   ins file declares this column order and the data is consumable
+   as-is.
+5. **Reuses the working paper's two-stage protocol naturally.**
+   The "Stage I yield generation" step would itself use save_state
+   (Stage I ends with a saved 2020 state; Stage II coupled run
+   restarts from it). For v2.0 PLUM embedding, this is a natural
+   continuation.
+
+##### Phase 1 (historic) — standalone run setup
+
+```
+runs/historic/
+├── main.ins                     # imports global.ins, landcover.ins, etc.
+├── landcover.ins                # uses HILDA+ historic LU 1850-2020
+├── crop.ins, crop_n.ins, ...
+├── gridlist_in_62892_and_climate.txt
+└── (binaries via symlink to lpjguess/build/)
+```
+
+Key ins-file settings:
+```
+firsthistyear  1850
+lasthistyear   2020
+save_state     2020             ! save state at year 2020
+state_path     "saved_state_2020/"
+```
+
+Run via `./guess -input cfx main.ins` (no IMOGEN). Produces
+`saved_state_2020/` containing all LPJG state needed for restart.
+
+##### Phase 2 (coupled scenario) — restart setup
+
+```
+runs/SSP1-2.6/
+├── main.ins                     # imports imogen_intermediary.ins etc.
+├── imogen_intermediary.ins
+├── landcover.ins                # uses new landsymm_py PLUM scenario LU 2021-2100
+├── crop.ins, ...
+├── gridlist_in_62892_and_climate.txt
+└── (binaries via symlink + saved_state_2020/ symlinked from Phase 1)
+```
+
+Key ins-file settings:
+```
+restart           1
+restart_year      2020
+state_path        "../historic/saved_state_2020/"
+firsthistyear     2021
+lasthistyear      2100
+```
+
+Run via `./guess -input imogencfx main.ins`.
+
+##### Fallback
+
+If save_state proves more complex than expected at integration
+time (rare since the user has used it before), the fallback is
+**Option C** (legacy concatenated files). Both paths are documented;
+the user/successor can switch via a `runs/SSP1-2.6/main.ins`
+parameter change.
+
+### I.D Discipline on units and data-exchange integrity
+
+Most of the latent bugs surfaced by the audit (`[CMI §8]`) come from
+**undocumented unit assumptions at component boundaries**. A handful of
+representative cases:
+
+| Bug | Underlying issue |
+|---|---|
+| C7 — A's `calcNitrogenExcretion` off by 10⁶ | `rate*mass*1000/365` was written without comment about expected output unit (kg N animal⁻¹ yr⁻¹ vs g N animal⁻¹ day⁻¹) |
+| C32 — `Extractor::cdtarea(lat, lon, 1.25, 1.25)` hardcoded 1.25° resolution | LPJG default is 0.5°; resulting per-cell area was off by a factor of ~6.25 |
+| L18 — `F_WET_CLIM_OUT` silently bumps wet-day count to 1 when ≥ 0.5 µm | Unit of "0.5 µm" undocumented; threshold buried in the writer |
+| L14 — multiple `IYEAR vs IYEAR-1` TODOs | Year-indexing convention for LPJG-flux year matching unspecified |
+| L29 — Magic offset 160 in `Adder::startAddition` | Hardcodes `firstyear=1850` without documenting the assumption |
+| Unit-conversion drift between Mt CO2 / Pg C / Tg C / kg C m⁻² yr⁻¹ across LPJG, Intermediary, and IMOGEN | No central units-table; each component declares its own |
+
+The unified codebase enforces unit and data-exchange integrity through
+**six concrete disciplines**, applied universally:
+
+#### I.D.1 Per-file canonical units header
+
+Every numeric data file in `data/` and `runs/` and `outputs/` carries
+a header comment line (or a sidecar `<filename>.meta.yaml` for binary
+files) declaring:
+
+- Column names and order.
+- Per-column unit (SI where possible; Mt-of-gas/yr or Tg/yr for GHGs;
+  kg C m⁻² yr⁻¹ for per-area fluxes; PgC/yr for global C fluxes).
+- Sign convention (positive = source to atmosphere, or positive =
+  uptake by land/ocean — must be explicit).
+- Spatial resolution (degree × degree if gridded; "global aggregate"
+  if scalar).
+- Time resolution (annual, monthly, daily).
+- Year coverage (first-year, last-year, count).
+
+Example header for `imogen_lpjg_flux.txt`:
+
+```
+# imogen_lpjg_flux.txt
+# Per-year LPJ-GUESS-derived natural CO2 flux (NEE) for IMOGEN feedback.
+# Cols: year [int], flux_PgC_per_yr [PgC/yr; positive = source to atmosphere]
+# Spatial: global aggregate (LPJG gridcell sum × area_m2 × 1e-12)
+# Time:    annual 1850-2100 (251 rows when complete)
+# Source:  LPJ-GUESS commonoutput.cpp / imogenoutput.cpp (live tight-coupled)
+#          OR data/imogen/emiss/CMIP6/Co2/co2_pg_emissions_natural_*.txt (prescribed)
+1850   0.0540
+1851   0.0577
+...
+```
+
+(Header lines start with `#` so the Fortran `READ(*,*)` skips them
+without modification — a small change to the existing reader to skip
+`#`-prefixed lines.)
+
+#### I.D.2 Unit-checked adapter functions
+
+Every cross-component adapter (the I.B.2 Python adapter, the I.B.1
+LPJG-side writer, the I.B.5 CMIP6→CMIP5 converter) carries explicit
+unit-checking assertions at its boundaries. Examples:
+
+```python
+# tools/imogen_inputs_to_lpjg_format.py
+def write_lpjg_flux(df, outpath):
+    """
+    Convert Python Intermediary's CO2_NEE_Mt (Mt CO2/yr) to PgC/yr
+    and write to FILE_LPJG_FLUX format.
+
+    Pre-condition: df['CO2_NEE_Mt'] is in Mt CO2/yr (positive = source).
+    Post-condition: outfile has 'year flux_PgC_per_yr' columns.
+    """
+    PgC_to_MtCO2 = 44.0/12.0 * 1000.0   # 1 Pg C × (44 g CO2 / 12 g C) × 1000 Mt/Pg
+    assert abs(PgC_to_MtCO2 - 3666.6667) < 1e-3, "Conversion constant drift"
+    nee_pgc = df['CO2_NEE_Mt'] / PgC_to_MtCO2
+    # ... write ...
+```
+
+```cpp
+// lpjguess/modules/imogenoutput.cpp
+void ImogenOutput::outglobal_year(int calendar_year) {
+    // accum_NEE_kgC is per-year accumulation: kg C / yr (global sum)
+    // CONV is Pg C → ppm CO2 conversion baked into IMOGEN engine,
+    // so we must hand IMOGEN the value in PgC/yr (not kg C, not Mt CO2).
+    const double NEE_PgC_per_yr = accum_NEE_kgC * 1.0e-12;
+    assert(std::isfinite(NEE_PgC_per_yr));
+    assert(std::abs(NEE_PgC_per_yr) < 100.0);   // sanity: |NEE| < 100 PgC/yr
+    // ... write ...
+}
+```
+
+#### I.D.3 Central unit-conversion table
+
+A single Python module `intermediary_py/src/shared/units.py` and a
+single C++ header `lpjguess/include/units.h` declare the canonical
+conversion constants:
+
+```python
+# intermediary_py/src/shared/units.py
+"""
+Canonical unit conversions used across the coupled model framework.
+Edit this file — and only this file — when conversion conventions change.
+"""
+
+# CO2-related
+PG_C_PER_MT_CO2 = 12.0 / (44.0 * 1000.0)   # 1 Mt CO2 = (12/44)*1e-3 PgC
+MT_CO2_PER_PG_C = 1.0 / PG_C_PER_MT_CO2    # = 3666.67
+
+# CH4-related
+TG_CH4_PER_MT_CH4 = 1.0   # identity (1 Mt = 1 Tg)
+PPBV_CH4_PER_TG_CH4 = ...  # FAIR-derived
+
+# N2O-related
+TG_N2O_PER_TG_N = 44.0/28.0   # molar mass ratio
+
+# Geometric
+EARTH_RADIUS_KM = 6371.0
+DEG_TO_RAD = 3.14159265358979323846 / 180.0
+
+# Cell area at 0.5°
+def cell_area_m2(lat_deg, dlon_deg=0.5, dlat_deg=0.5):
+    """Area of a 0.5° × 0.5° grid cell at given latitude, in m²."""
+    R = EARTH_RADIUS_KM * 1000.0
+    dlat = dlat_deg * DEG_TO_RAD
+    dlon = dlon_deg * DEG_TO_RAD
+    return R * R * dlat * dlon * abs(math.cos(lat_deg * DEG_TO_RAD))
+```
+
+Both Python pipelines and the C++ Intermediary reference these
+constants exclusively; no inline magic numbers.
+
+#### I.D.4 Cross-component validation tests
+
+CI tests verify that the units math at component boundaries is
+self-consistent. Examples:
+
+- `tests/test_lpjg_to_intermediary_units.py`: produces a known
+  100 PgC/yr LPJG NEE; runs Python Intermediary B; asserts output
+  `CO2_NEE_Mt` ≈ 100 × MT_CO2_PER_PG_C ≈ 366667.
+- `tests/test_intermediary_to_imogen_units.py`: produces a known
+  100 PgC/yr in `imogen_lpjg_flux.txt`; runs IMOGEN one year;
+  asserts CO2 ppmv increase ≈ 100 × 0.471 = 47.1 ppm (the engine's
+  `CONV` constant).
+- `tests/test_n2o_units.py`: confirms 1 Tg N2O = 0.6364 Tg N
+  (= 28/44).
+
+#### I.D.5 Sign-convention banner at run start
+
+The `run_coupled.sh` launcher prints a startup banner that
+re-declares the active sign conventions and units, so a user
+running the system has them visible in the run log:
+
+```
+=================================================================
+LandSyMM-IMOGEN coupled run, scenario SSP2-4.5
+=================================================================
+Active conventions:
+  NEE / NBP        : positive = source to atmosphere
+  CO2 emissions    : Mt CO2/yr (Intermediary) → PgC/yr (IMOGEN), via 1/3666.67
+  CH4 / N2O        : Tg-of-gas/yr; 1 Mt = 1 Tg by mass identity
+  Year indexing    : LPJG year N flux drives IMOGEN year N+1 climate (IYEAR-1 lookup)
+  Cell area        : Earth radius 6371 km; 0.5° × 0.5° grid; spherical
+  Coupling mode    : tight (LPJG NEE feeds IMOGEN per-year live)
+=================================================================
+```
+
+#### I.D.6 Unit drift detection in CI
+
+After every bug fix or refactor, CI compares the run log's banner
+against a checked-in reference banner. Any drift (e.g. a constant
+that quietly changed from 3666.67 to 3666.67e3) fails the build.
+
+#### I.D.7 Reciprocal producer/consumer checks
+
+The Fortran-vs-C++ IMOGEN climate-output asymmetry the audit
+surfaced (Decision #12 in the table above) is a special case of a
+broader pattern: **producer and consumer for any data path can drift
+independently**. Examples:
+
+- IMOGEN engine writes `Rh_anom.dat` and `W_anom.dat` (in C++ only,
+  not Fortran); LPJ-GUESS-side `imogencfx` declares `param "file_relhum"`
+  / `param "file_wind"` but does not consume them. Producer wired,
+  consumer not.
+- LPJ-GUESS commonoutput writes `cflux.out` per the corrected
+  NEE-NBP formula (per `NEE-NBP Changes Report.docx`); the Python
+  Intermediary Component B reads it expecting the corrected schema.
+  If LPJG ever reverts the formula, the Python pipeline silently
+  produces wrong NEE.
+- The Intermediary writes `imogen_inputs_<SSP>.csv` in 10-column
+  wide format (Mt-of-gas/yr); the planned adapter (step 13) writes
+  4 narrow files in `Tg/yr` and `PgC/yr`. Three independent unit
+  conventions in three places.
+
+The unified codebase enforces reciprocal producer/consumer checks
+through:
+
+1. **Per-data-path test fixtures.** Every cross-component data
+   path (LPJG → handshake files → IMOGEN; Intermediary → adapter
+   → IMOGEN; LPJG output `.out` files → Python Intermediary B
+   ingestion) has at least one CI test fixture: producer writes a
+   known-value file; consumer reads it; assertion that the consumer's
+   parsed value matches the producer's intended value (modulo unit
+   conversion).
+2. **Schema files.** Each cross-component file format has a `.schema.yaml`
+   declaring columns, units, sign conventions, year coverage. The
+   producer and consumer both validate against the schema at run time.
+3. **Both-backend cross-validation for IMOGEN** (step 16 onwards):
+   any time the Fortran IMOGEN and C++ IMOGEN produce divergent
+   outputs at NGPOINTS=3, NSDMAX=1 inputs, the divergence is treated
+   as a regression and bisected. Phase 2 brings them to numerical
+   parity within a documented tolerance; Phase 1 onwards uses the
+   parity check as a regression gate.
+
+---
+
+## Part II — Strategic decisions
+
+These are the decisions that meaningfully change the paper's claims,
+the codebase's architecture, or the dataset universe. Each subsection
+states the decision, lists the alternatives, recommends one with
+justification, and flags the consequences.
+
+### II.1 IIASA vs RCMIP for the anthropogenic substitution backbone
+
+**This is the question the user explicitly raised.**
+
+#### II.1.1 What the two datasets are, and how they differ
+
+| Dataset | Source | What it provides | Coverage | Format |
+|---|---|---|---|---|
+| **IIASA SSP Database v2.0** | International Institute for Applied Systems Analysis | Per-SSP-RCP per-sector emissions trajectories for CH4, CO2 (sub-sector decomposition); N2O (totals only). The "official" CMIP6 forcing dataset for SSP-based ESMs. | 1850-2100 (some pre-1850). All 5 SSPs × 4 RCPs. | XLSX bulk download; per-sector individual CSVs. |
+| **RCMIP Phase 2 v5.1.0** | Reduced Complexity Model Intercomparison Project (Nicholls 2020) | Harmonised CMIP6 / SSP-aligned emissions in long-format CSV; designed for forcing reduced-complexity models like FaIR, MAGICC. **Built atop IIASA + CEDS + GFED** with version-controlled harmonisation. | 1750-2500 (huge timeframe). All scenarios. Single CSV. | Long-format CSV with `Variable, Region, Scenario, Y1750..Y2500`. |
+
+The crucial point: **RCMIP Phase 2 is largely a derivative of IIASA**.
+Per Nicholls 2020 §2:
+- Pre-2014 historical: harmonised CEDS (Hoesly 2018) + GFED (Randerson
+  2017) per gas per region.
+- 2015-2100 scenarios: IIASA SSP-RCP harmonised to historical at 2015.
+- Available aggregations: total `Emissions|<gas>`, sub-sectors
+  `Emissions|<gas>|MAGICC AFOLU`, `Emissions|<gas>|MAGICC Fossil and
+  Industrial`, etc.
+
+So RCMIP and IIASA are not exclusive: RCMIP repackages IIASA scenario
+data and adds CEDS-based historical + per-gas/sector decomposition
+that is convenient for substitution work. Anything you can substitute
+into RCMIP, you can in principle do with IIASA — RCMIP is a more
+operational form of IIASA + CEDS + GFED.
+
+#### II.1.2 What the C++ Intermediary actually uses
+
+`Intermediary/Code/config.txt` and `Adder.cpp::startAddition`
+(`[CMI §4.5.4, §9 D8]`) read from per-RCP files like:
+- `Data/Intermediary/Input/CMIP5/ch4_n2o_annual_historical_rcp{26,45,60,85}_lpjg_simulated.txt`
+- `Data/Intermediary/Input/CMIP5/ch4_n2o_annual_historical_rcp{26,45,60,85}_non_lpjg_simulated.txt`
+- `Data/Intermediary/Input/CMIP5/co2_emissions_annual_historical_rcp{26,45,60,85}_{lpjg,non_lpjg}.txt`
+
+These are pre-disaggregated **IIASA** files where someone (the user
+or upstream) has already split per-gas totals into "lpjg-simulated
+component" (the natural + agricultural fluxes that LPJG and IPCC
+tier-1 reproduce) and "non-lpjg-simulated component"
+(fossil/industrial/transport/etc.). The Adder substitutes the former
+with LPJG+IPCC outputs and keeps the latter at face value.
+
+This is the **explicit IIASA substitution path** the working paper
+documents.
+
+#### II.1.3 What the Python Intermediary actually uses
+
+`Intermediary_py/.../src/component_a_anthropogenic/rcmip_substitution/
+rcmip_substitution_processing.py` reads from
+`inputs/rcmip/rcmip-emissions-annual-means-v5-1-0.csv` and applies:
+
+```
+RCMIP_total = column "Emissions|<gas>"           filtered to (Region=World, Scenario=<SSP>)
+RCMIP_agri  = column "Emissions|<gas>|MAGICC AFOLU|Agriculture"   for CH4
+            = column "Emissions|<gas>|MAGICC AFOLU"               for N2O
+Our_agri    = (CH4 enteric + manure + rice) | (N2O manure + soils + synfert)  from Component A historical and scenarios
+RCMIP_nonagri = RCMIP_total - RCMIP_agri          (kept unchanged)
+
+New_total = RCMIP_nonagri + Our_agri = RCMIP_total - RCMIP_agri + Our_agri
+```
+
+In other words: `New_total = RCMIP_total − RCMIP_agri + Our_agri`.
+For 1900-1969 where Component A has no Tier-1 inventory,
+`Our_agri = RCMIP_agri` so `New_total = RCMIP_total` (identity).
+
+#### II.1.4 Side-by-side comparison
+
+| Aspect | C++ (IIASA) | Python (RCMIP) |
+|---|---|---|
+| Scenario coverage | RCP 2.6/4.5/6.0/8.5 (CMIP5 era) | SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP4-6.0, SSP5-8.5 (CMIP6) |
+| Aggregation | Pre-split lpjg/non_lpjg per-gas files | Live decomposition `MAGICC AFOLU` vs `total - AFOLU` |
+| Historical period | 1850-2010 / 2014 (depending on file) | 1750-2014 from CEDS, 2015+ from IIASA scenarios |
+| Sub-sector resolution | Pre-aggregated to "lpjg-simulated" lumps | Per-IPCC-2006-sub-sector resolved via `MAGICC AFOLU\|Agriculture\|...` keys |
+| Substitution validity test | None recorded | Pre-1970 Our_agri = RCMIP_agri = identity check |
+| Output | Per-RCP per-SSP `total_methane_nitrogen_rcp*ssp*.txt` | Per-SSP `imogen_inputs_<SSP>.csv` 10 cols |
+| Unit | Tg/yr per gas (consistent with IMOGEN engine) | Mt/yr per gas (Mt=Tg) |
+| Tested against | Pre-existing reference outputs in `Data/Intermediary/Emissions/` | Pre-existing reference outputs in `outputs/component_a/data/`, `_b/data/`, `_c/data/`, `imogen_inputs/`; 39/40 byte-identical reproducibility |
+| Documentation | Older, internally inconsistent (paper draft says IIASA + CMIP6, but C++ config has CMIP5) | Self-consistent (HANDOFF.md, TECHNICAL_MANUAL.md, paper-ready) |
+
+#### II.1.5 The user's flag: "in the paper we use IIASA but in the Python pipeline we use RCMIP"
+
+This is a real inconsistency that must be resolved before the paper
+can be submitted. There are three possible resolutions:
+
+##### Option A: Update the paper to RCMIP
+
+- Update working paper §2.3 to describe the substitution algebra as
+  `New_total = RCMIP_total − RCMIP_agri + Our_agri`, citing Nicholls
+  2020 RCMIP Phase 2.
+- Note that RCMIP Phase 2 is built atop IIASA + CEDS + GFED, so the
+  scientific content is largely preserved.
+- Cite both IIASA (the underlying scenario data source) and RCMIP
+  (the operational dataset).
+- Pro: Python pipeline already produces validated outputs with this
+  framing.
+- Pro: RCMIP is a more modern, citable, version-controlled dataset.
+- Pro: RCMIP's per-gas long-format CSV is much easier to maintain
+  than the C++ Intermediary's pre-split per-RCP file system.
+- Con: Requires re-running the working paper through the supervisor
+  for the methodology change.
+
+##### Option B: Operationalise IIASA in the Python pipeline
+
+- Add an alternative ingestion path in
+  `src/component_a_anthropogenic/iiasa_substitution/` parallel to
+  `rcmip_substitution/`. Reads the IIASA SSP DB XLSX downloads at
+  `Data/Concentrations/IIASA/CMIP6/`. Produces the same
+  `iiasa_substitution_{ch4,n2o}.csv` schema.
+- Document both modes; default to IIASA to match the paper.
+- Pro: Paper is unchanged.
+- Con: Significant Python work — re-implement what Component A's
+  RCMIP path does, against IIASA's different format and fewer
+  sub-sector keys (IIASA splits CO2/CH4 to component level but N2O
+  as totals only — see `Emissions Handling Methodology.docx` §2).
+- Con: Loses the Python pipeline's validated reproducibility against
+  RCMIP-based outputs.
+
+##### Option C: Use both (IIASA primary, RCMIP for validation)
+
+- Keep Python's RCMIP path for what it does best (validation against
+  `MAGICC AFOLU`).
+- Add an IIASA path for the substitution backbone the paper describes.
+- Document the two as alternative `--backbone IIASA|RCMIP` modes.
+- Pro: Maximum flexibility; paper can show both in supplementary
+  material.
+- Con: Most work; ongoing maintenance of two parallel pipelines.
+
+##### Recommendation
+
+**Option A — selected (5 May 2026).** RCMIP becomes the canonical
+substitution backbone in the unified codebase and the paper. RCMIP
+is the operational standard for FaIR-driven runs (which the working
+paper §2.1.3 explicitly adopts — *"follows the approach implemented
+in the PRIME framework (Mathison et al., 2025)"*); PRIME also uses
+RCMIP. Switching the paper to RCMIP brings it in line with the
+codebase, with PRIME, and with the forward-looking standard.
+
+The paper's methodology section will be revised to:
+1. Cite **Nicholls et al. 2020 RCMIP Phase 2** as the substitution
+   backbone for the anthropogenic CH4/N2O substitution algebra
+   (`New_total = RCMIP_total − RCMIP_agri + Our_agri`).
+2. Cite **IIASA SSP DB v2.0** as the upstream scenario data source
+   that RCMIP harmonises with CEDS + GFED.
+3. Document the substitution algebra explicitly with the per-gas
+   pre-1970 / 1970-2019 / 2020-2100 regime split (the existing
+   Python pipeline already implements this — see HANDOFF.md §2).
+
+If, during paper revision, the supervisor pushes back, **Option C**
+(support both IIASA and RCMIP via a `--backbone` selector) is the
+fallback that preserves the Python pipeline's validated outputs
+while honouring an IIASA paper claim. Implementation sketch is in
+Appendix A.5.
+
+The C++ Intermediary's IIASA-CMIP5 path (the source of the
+contradictions D3, D4, D5 in `[CMI §9.1]`) is retired alongside the
+broader retirement of the C++ Intermediary in favour of the Python
+pipeline.
+
+#### II.1.6 Implementation sketch for Option A or C
+
+See [Appendix A.5](#a5-rcmip-vs-iiasa-backbone-selector-sketch).
+
+#### II.1.7 Knowledge gaps
+
+1. **Did the supervisor specifically endorse IIASA in the review of
+   the working paper?** Or was IIASA the default the user used and
+   the supervisor did not push back?
+2. **Did the paper explicitly cite Nicholls 2020 RCMIP Phase 2?**
+   If yes, switching to RCMIP is a re-naming, not a re-methodology.
+3. **Are RCMIP's `MAGICC AFOLU|Agriculture` sub-sectors a
+   *strict subset* of what IIASA's per-sector `lpjg_simulated`
+   file contains?** This determines whether RCMIP can fully replace
+   IIASA without losing scenario-period CH4 detail. For CH4, RCMIP
+   has Agriculture sub-key. For N2O, RCMIP groups all of AFOLU into
+   one. This may matter if the substitution wants finer N2O detail.
+
+### II.2 Fortran IMOGEN vs C++ refactor
+
+**This is also a question the user explicitly raised.**
+
+#### II.2.1 The state of the two implementations
+
+| Aspect | Fortran (`Common-directory/IMOGEN-codebase/code/imogen_lpjg.f`) | C++ refactor (`IMOGENCXX/ImogenCXX/src/Main.cpp`) |
+|---|---|---|
+| Status | **Working** (after 7-line fix: remove `PAUSE`, fix `mkdir \`) | **Non-functional** (25 distinct bugs; never run end-to-end) |
+| LOC | 4 138 + 174 (`imogen_lpjg.f` + `nonco2.f`) | 2 631 (single TU, no headers) |
+| Build system | `Makefile` + `compile.sh` (gfortran) | None at all (no CMakeLists, no Makefile) |
+| Compilers tested | gfortran ≥ 7 | MSVC (Windows); never built on Linux |
+| Sub-daily disaggregation | `DAY_CALC` is 462 lines, complete | `DAY_CALC` is empty stub (lines 1149-1162) |
+| Solar position | `SOLPOS` is 60-line orbital-elements routine | `SOLPOS` is 1-line sinusoid placeholder |
+| `DTEMP_OUT` | Computed and written | Assignment commented out (line 1293) |
+| Year loop | proper `DO WHILE (KEEPRUNNING)` | `} while (KEEPRUNNING = true);` infinite loop (line 2626) |
+| `done`-file polarity | **Deletes** acknowledged file (correct) | **Creates** instead of deletes (line 784-792, polarity inverted) |
+| Spin-up state | `DO I=1,N_OLEVS; DTEMP_O(I)=0; ENDDO` | `for (i=1; i<N_OLEVS; i++) DTEMP_O.push_back(0)` — **appends instead of zeros** (line 2044-2058) |
+| Settings file path | `OPEN(81, FILE='imogen_settings.txt')` (relative, working dir) | `std::ifstream("C:\\GitHub\\dbampoh\\…\\imogen_settings.txt")` (Windows absolute, hardcoded) |
+| `system("pause")` / Windows API | `PAUSE` only (a Fortran intrinsic, easy to delete) | `system("pause")` (Windows shell call) AND `localtime_s` (Windows-only API) |
+| Output formatting | `WRITE(95,'(i10)', …)` for `WET.dat` (integer fixed-width) | `<< std::fixed << setprecision(3)` (float format, integer values lost) |
+| Files-on-disk-now from earlier runs | `Common-directory/IMOGEN/output/<YYYY>/` 230 dirs from 2025-06-16 (Fortran-produced) | None (never run end-to-end) |
+| Gridlist size | `PARAMETER NGPOINTS=3698` — recompile to change | `const int NGPOINTS = 3698` — recompile to change |
+| Memory model | Static / stack arrays | Heap (`std::vector`) — sidesteps Windows stack-overflow but doesn't enable runtime gridlist sizing |
+| Faithfulness to physics | 100% (it's the original) | Structurally faithful for ~80% of subroutines; functionally incomplete on the rest |
+
+#### II.2.2 The "larger gridlist" claim — corrected (5 May 2026)
+
+The user's original motivation for the C++ refactor was that the
+Fortran couldn't handle larger gridlists (the Fortran caps out around
+~3700 cells; the user has run 62000-cell gridlists with the C++).
+**An earlier draft of this document and `[CMI §4.3.3]` characterised
+the C++ benefit as "mostly false". That framing was technically true
+but practically misleading; the corrected analysis is below and is
+also reflected in the updated `[CMI §4.3.3]`.**
+
+The actual gridlist limitation has two components:
+
+- **Internal IMOGEN grid `GPOINTS=1631`** is a hard cap in *both*
+  Fortran and C++ tied to the underlying CMIP5 ASCII pattern files +
+  CRUNCEP base climatology files. Changing it requires regenerating
+  those files. In practice no one needs to.
+
+- **Output user-facing gridlist `NGPOINTS=3698`** is the limit that
+  matters. Both versions cap it via a compile-time constant. But the
+  practical consequence at large gridlist sizes is **completely
+  different** because of the memory-allocation strategy:
+
+  | Aspect | Fortran (current) | C++ (current) |
+  |---|---|---|
+  | Array declaration | `REAL T_OUT_M_REGRID(NGPOINTS, 12, 32, NSDMAX)` | `std::vector<...>(NGPOINTS, ...)` |
+  | Storage | BSS (uninitialised data segment) or stack | Heap |
+  | Size at NGPOINTS=3698 | ~273 MB per `_REGRID` array; ~1.1 GB total for 4 such | Same |
+  | Size at NGPOINTS=62000 | ~4.6 GB per array; ~14 GB total | Same |
+  | Behaviour at NGPOINTS=62000 | **Fails at link/startup/first-reference** (BSS reservation exceeds default; stack overflows) | **Works on a system with ≥32 GB RAM** (heap allocation succeeds) |
+  | Workarounds | `ulimit -s unlimited`, `-mcmodel=large`, hand-conversion to `ALLOCATABLE` (a real source-code change) | None needed |
+
+So the C++ refactor's "larger gridlist" benefit is **real and
+practical** — recompile with `const int NGPOINTS = 62000;` and run
+on a workstation with ≥32 GB RAM works. The Fortran with the same
+recompile dies at startup. That said, the benefit is *not* "runtime
+configurable" — both still require recompile.
+
+The right fix is not "keep C++ because of gridlist scalability"; it
+is **"fix the Fortran's static allocation"** by converting the ~30
+arrays that scale with `NGPOINTS` or `GPOINTS` into `ALLOCATABLE`
+declarations and adding `ALLOCATE` calls keyed off the gridlist file
+length. Modern gfortran (≥4.6) supports this fully. The Fortran-with-
+ALLOCATABLE then has the same heap-allocation scalability the C++
+already has, while keeping its complete and tested physics.
+
+#### II.2.3 Effort comparison to bring each to a working state
+
+**Fortran path:**
+- Fix `PAUSE` in `QSAT` (1 line).
+- Fix Windows `mkdir \\` paths (2 lines).
+- Replace `imogen_settings.txt` Windows paths with relative
+  paths or `$VARS` (10 lines + a setup script).
+- Optional: increase `NGPOINTS` parameter and recompile, validate
+  memory.
+- **Total: 1-4 hours.**
+
+**C++ refactor path:**
+- Port the empty `DAY_CALC` from Fortran (462 lines of Fortran →
+  ~600 lines of C++).
+- Port the placeholder `SOLPOS` (60 lines of Fortran → 80 lines C++).
+- Fix `DTEMP_OUT` assignment (1 line).
+- Fix infinite year loop (1 character: `=` → `==`).
+- Fix `done` polarity (replace `ofstream done(path)` with
+  `std::filesystem::remove(path)`, ~3 lines).
+- Fix spin-up vector init (replace `push_back(0)` with `std::fill`).
+- Fix `OCEAN_CO2` indexing (1 line).
+- Fix wrong flag passed to `FAIR_NON_CO2_GHG_BUDGET` (1 line).
+- Fix Windows path separators (~5 places).
+- Replace `localtime_s` and `system("pause")` (2 lines).
+- Fix `ofstream` lifetime for per-year append files (~10 places).
+- Fix `WET.dat` integer formatting (1 place).
+- Fix duplicate first entry in `ES[]` table (1 line).
+- Fix `SUNNY` off-by-one.
+- Add a build system (CMakeLists or Makefile, ~30 lines).
+- Add headers and split into multiple TUs (~200 lines of
+  refactoring).
+- Numerical-parity test against Fortran, gridcell-by-gridcell,
+  year-by-year. This is the long pole — debugging numerical
+  differences is hard.
+- **Total: 1-3 weeks of careful porting + testing.**
+
+#### II.2.4 Why the Fortran-with-ALLOCATABLE path is recommended (settled)
+
+1. **Already working physics.** The Fortran has 230 year-dirs of
+   validated output on disk; the C++ has none. All sub-daily
+   disaggregation, orbital geometry, and EBM dynamics are implemented
+   and have been used in published IMOGEN papers (Huntingford 2010,
+   Zelazowski 2018, Hayman 2021, Mathison 2025 PRIME). The C++ has
+   only ~80% of this — `DAY_CALC` is a 462-line empty stub.
+2. **Compilation is trivial.** Single `gfortran` line, no
+   dependencies, builds on every Linux distro and every HPC cluster.
+3. **The gridlist scalability gap is closeable in 1-2 days.** The
+   `ALLOCATABLE` refactor is bounded: identify the ~30 statically-
+   declared arrays in `imogen_lpjg.f` and `nonco2.f` (the audit
+   already lists them in `[SA3 §10]`), convert each declaration to
+   `ALLOCATABLE`, add an `ALLOCATE` block at the top of the year
+   loop or in `init` once `NGPOINTS` is known. Modern gfortran
+   handles this without difficulty.
+4. **The user's Linux-only declaration eliminates the Windows
+   stack-overflow rationale** that motivated the C++ rewrite — and
+   the heap-allocation benefit the C++ delivers can be replicated
+   in Fortran via `ALLOCATABLE` without any of the C++'s 25 bugs.
+
+#### II.2.5 The C++ refactor — preserved and brought to parity in Phase 2
+
+**(Revised 5 May 2026 — earlier framing said "archive". This
+recommendation has been updated to align with the user's preference
+to have both implementations available eventually.)**
+
+Phase 2 of the IMOGEN rebuild brings the C++ refactor to numerical
+parity with the Fortran-with-ALLOCATABLE, using Fortran outputs as
+the QC reference:
+
+1. **Numerical-parity test infrastructure first.** Build a script
+   that runs both backends on a 3-cell × 3-year smoke test, dumps
+   `T_anom.dat`, `P_anom.dat`, `SW_anom.dat`, `WET.dat`,
+   `DTEMP_anom.dat`, `CO2.dat` from each, and compares element-wise.
+   Any divergence > `EPSILON` (the Fortran's documented numerical
+   tolerance) is a regression.
+2. **Fix the 25 catalogued bugs in `Main.cpp`** ([CMI §4.3.4],
+   [SA4 §10] B1-B25). In priority order:
+   - B7 (infinite year loop): `KEEPRUNNING = true` → `KEEPRUNNING == true`.
+   - B1 (settings path): replace `C:\GitHub\dbampoh\…\imogen_settings.txt`
+     with `getenv("IMOGEN_SETTINGS")` fallback `"./imogen_settings.txt"`.
+   - B4 (DAY_CALC empty): port from Fortran `imogen_lpjg.f:1511-1972`.
+   - B5 (SOLPOS placeholder): port from Fortran `imogen_lpjg.f:2267-2330`.
+   - B6 (DTEMP_OUT not assigned): uncomment line 1293.
+   - B8 (done polarity inverted): change `ofstream(done_path)` to
+     `std::filesystem::remove(done_path)`.
+   - B9 (spin-up push_back): replace with `std::fill`.
+   - B10 (wrong flag passed to FAIR_BUDGET): pass
+     `NONCO2_EMISSIONS_LPJG` not `NONCO2_EMISSIONS`.
+   - B11 (Windows clim path separator): replace `\\` with `/`.
+   - B12 (ofstream lifetime for per-year append): open once outside
+     the IYEAR check.
+   - B14 (WET.dat float format): use `setw(10)` integer cast.
+   - B16 (ES table duplicated first entry): delete duplicate.
+   - C2-C3, C15, C20, C24-C28, C29-C30 from `[CMI §8.1]`: misc.
+3. **Add a build system.** A single `CMakeLists.txt` (~30 lines)
+   targeting C++17 (`std::filesystem` requires this).
+4. **Numerical parity check after each bug fix.** Run the smoke
+   test; commit each fix individually so any divergence introduction
+   can be bisected.
+5. **Gridlist-scalability check.** Recompile with
+   `const int NGPOINTS = 62000;`. Confirm 32-GB-RAM workstation runs
+   complete without OOM.
+6. **Both backends exposed via switchable parameter.** Add a
+   `imogen_backend "fortran"` or `imogen_backend "cxx"` setting
+   in `imogen_intermediary.ins`, or alternatively expose two
+   binaries `imogen_lpjg_fortran` and `imogen_lpjg_cxx` that
+   LPJ-GUESS picks between via the build configuration.
+
+Effort estimate: 1-3 weeks of careful porting + parity testing.
+Schedule for v1.1 or post-v1.0; not required for v1.0 release.
+
+#### II.2.6 Knowledge gaps
+
+1. **Did the user write the C++ refactor or inherit it?** If
+   inherited, the Phase 2 fixes are uncomplicated — port from
+   Fortran, fix bugs, parity test. If written by the user, Phase 2
+   is also fine: the user has full design authority.
+2. **Was the C++ refactor's Windows-only character a deliberate
+   restriction (for a Windows-based collaborator) or a bug?** The
+   user's Linux-only declaration suggests the latter; Phase 2 fixes
+   Windows-isms as part of the bug fixes.
+
+### II.3 CMIP5 vs CMIP6 emissions / GCM forcing
+
+#### II.3.1 The current state
+
+Across the framework:
+- Working paper: CMIP6 + SSP1-2.6 + SSP2-4.5 + ISIMIP-3b MRI-ESM2-0.
+- Older paper draft: CMIP5 + SSP1+SSP5 + IPSL-CM6-MR.
+- `imogen_settings.txt` (Fortran active): IPSL-CM5A-MR (CMIP5 GCM).
+- `imogen_intermediary.ins` A: `scenario "cmip6"` + SSP1-2.6 emiss files.
+- `imogen_intermediary.ins` B: `scenario "cmip5"` + RCP2.6 emiss files.
+- `Intermediary/Code/config.txt`: `scenario=cmip5, ssps=1,5, rcps=26,85`.
+- Python pipeline: RCMIP Phase 2 (CMIP6-aligned).
+- GCM patterns on disk: 34 CMIP5 + 1 CMIP3 + 5 CMIP6 (NetCDF).
+
+#### II.3.2 Resolution
+
+The framework should commit to **CMIP6 throughout**:
+- Fortran IMOGEN reads CMIP6-converted ASCII patterns (per I.B.5).
+- `imogen_intermediary.ins` is rewritten to consistent CMIP6/SSP1-2.6
+  + SSP2-4.5 paths.
+- `Data/Imogen/emiss/CMIP6/` becomes the canonical emissions input.
+- `Data/Imogen/emiss/CMIP5/` is archived.
+- The Python Intermediary is already CMIP6-aligned.
+
+This is a single-line update to two ins files plus a directory rename.
+The CMIP5 patterns can be retained for sensitivity studies but
+the default GCM in `imogen_settings.txt` becomes
+`CEN_CMIP6_MOD_MRI-ESM2-0/` after the conversion.
+
+### II.4 Tight (closed-loop) vs prescribed coupling default
+
+This is the decision flagged in `[CMI §3.7]` / Finding 4 of the
+re-investigation.
+
+#### II.4.1 The two modes
+
+**Tight coupling (the working paper's intent):**
+- LPJ-GUESS year N → produces NEE/CH4/N2O fluxes.
+- These flow to IMOGEN year N+1 via `imogen_lpjg_flux.txt`,
+  `imogen_lpjg_ch4_n2o_flux.txt`.
+- IMOGEN's climate trajectory is a function of LPJG's behaviour.
+
+**Prescribed coupling (the current default, by accident):**
+- `FILE_LPJG_FLUX` points at a static IIASA reference file.
+- IMOGEN reads the static file every year regardless of LPJG state.
+- LPJG's NEE/CH4/N2O do not influence the climate.
+- Useful for sensitivity studies (varying GCM patterns or atmospheric
+  parameters while keeping fluxes fixed) but **not what the paper
+  describes**.
+
+#### II.4.2 Recommendation
+
+The unified codebase should **default to tight coupling** and offer
+prescribed as an explicit, named, opt-in mode via a `coupling_mode`
+ins parameter:
+
+```
+coupling_mode "tight"        ! default: real two-way; LPJG fluxes feed back
+! coupling_mode "prescribed"   ! sensitivity mode: read static reference fluxes
+! coupling_mode "loose"        ! pre-generated IMOGEN climate; LPJG runs after
+```
+
+Implementation: a startup banner that prints the active mode, plus a
+runtime check that the mode's preconditions are satisfied (per
+`[CMI §3.7.6]`). For tight mode: `FILE_LPJG_FLUX` must be a relative
+filename, the LPJG-side writer (I.B.1) must be wired, and the file
+must start empty or with the spin-up year only. For prescribed mode:
+the override paths must exist with the right number of rows.
+
+#### II.4.3 Consequence
+
+This decision cleanly resolves bug C35. It also means the unified
+codebase has documented support for the **two scientifically
+distinct experimental setups** that the framework's current ad hoc
+configuration conflates.
+
+### II.5 IPCC 2006 vs 2019-Refinement parameter sets
+
+The Python Intermediary uses 2019 Refinement parameters for scenarios
+but 2006 Guidelines parameters for historical, producing a step at
+2020 (633 Gg N2O at 2020 historical vs 750.6 Gg SSP2 at 2020 scenario,
+HANDOFF.md §2.5). The C++ Intermediary's parameter year is undocumented
+in the code (the EFs are hardcoded in `Maps.h` without source citation
+beyond comments naming "Chapter 10").
+
+**Recommendation:** unify on **IPCC 2019 Refinement** for both
+historical and scenarios. Document the change in HANDOFF and TECH
+manuals. The 2006 → 2019 refinement updates are well-documented
+(IPCC AR5 → 2019 Refinement Vol 4 Chs 10/11) and the discontinuity
+disappears.
+
+If the supervisor prefers the current 2006-historical / 2019-scenario
+split, document it explicitly and add a `boundary_smoothing` step at
+2020 to mask the discontinuity (per I.B.6).
+
+### II.6 N2O sectoral disaggregation methodology
+
+`Brief Documentation of N2O Disaggregation Methodology.docx` (the
+OUTDATED doc) uses a static 59.81%/40.19% LPJG/non-LPJG split based
+on Ciais 2013 IPCC AR5 Ch6 Table 6.9.
+
+The working paper §2.3.2 prescribes a **dynamic temporal-based
+proportion** sourced from Tian 2024 GNB.
+
+The Python pipeline currently applies the dynamic method (per
+HANDOFF.md cross-references to Tian 2024 — see GNB references).
+
+**Recommendation:** stick with the dynamic Tian 2024 method (the
+working paper's choice); retire the static doc. The Tian 2024 PDF is
+already in `References/essd-16-2543-2024_GNB.pdf`.
+
+### II.7 Wetland CH4 framing
+
+Three potential framings:
+1. Working paper §2.2.7: LPJ-WHyMe (Wania 2010) wetlands >40°N;
+   tropical = IIASA residual (acknowledged bias); managed peatlands
+   disabled.
+2. Older `Imogen_paper_GMD.docx`: GSW DB max-water-extent static.
+3. Python pipeline: LPJG `mch4.out` + GMB IFW (+112) − DCC (−23)
+   constants applied uniformly 1901-2100.
+4. C++ Intermediary: GLWD3 area-based Tier 1 Eq 3A.1 with
+   year-broadcast — but already retired in the active C++ Adder
+   logic (`removed methane here since LPJG is producing it now |
+   30.05.2023` comment at `Adder.cpp:92,96`).
+
+**Recommendation:** working paper § 2.2.7 + Python pipeline's IFW/DCC
+correction = the most consistent picture. LPJ-WHyMe handles >40°N
+explicitly via the wetland PFTs (`wetlandpfts.ins`); IIASA non-modelled
+component covers tropical wetlands and other non-LPJG sources; GMB
+IFW/DCC corrections are applied at integration time as a constant
+adjustment.
+
+This is fundamentally what the Python pipeline already does. The
+unified codebase preserves this and the working paper §2.2.7 prose
+matches.
+
+### II.8 Year-indexing convention (IYEAR vs IYEAR-1)
+
+Multiple TODO comments in the Fortran (`imogen_lpjg.f:751,772;
+nonco2.f:107,127`) flag uncertainty over whether emissions/fluxes for
+IYEAR should be read from row IYEAR or IYEAR-1.
+
+**Why it matters:** affects C-budget closure between LPJG and IMOGEN.
+A one-year offset in the flux read could shift the cumulative
+atmospheric CO2 trajectory by ~0.5 ppm at end-of-century — small
+but detectable.
+
+**Recommendation:** **IYEAR-1 is the correct convention.** Reasoning:
+
+- LPJG completes its simulation of year N and writes
+  `imogen_lpjg_flux.txt` with row `<N> <flux_for_year_N>`.
+- IMOGEN, at the start of year N+1, reads the file and applies
+  `flux_for_year_N` as the previous year's land-atmosphere exchange,
+  influencing atmospheric CO2 entering year N+1.
+- So when IMOGEN is on `IYEAR=N+1`, the relevant LPJG flux is for
+  `IYEAR-1 = N`.
+
+The Fortran code's `IF(YR_LPJG(N).EQ.IYEAR-1) THEN` at `imogen_lpjg.f:751`
+is therefore correct. The duplicate commented `IF(YR_LPJG(N).EQ.IYEAR)`
+should be deleted.
+
+### II.9 Tier-1 vs Tier-2/Tier-3 ambition for v1.0
+
+The working paper §2.4.6 acknowledges Tier-1 limitations
+(rice +15-40%, managed-soil N2O −20-30%, blended EF1 −6-7%). The
+Python TECHNICAL_MANUAL §15 lists Tier-2/Tier-3 as future work.
+
+**Recommendation:** ship v1.0 with Tier-1 only and document the
+limitations. Add Tier-2 sectors (e.g. region-specific EFs for
+temperate vs tropical livestock) as a v1.1 / v2.0 enhancement.
+Building Tier-2 into v1.0 doubles the scope and delays the paper.
+
+### II.10 NEE/NBP unit and column definition
+
+The Fortran IMOGEN reads `<FILE_LPJG_FLUX>` as `(year, value)` where
+`value` enters as `C_LPJG(N)`. At the apply site (`imogen_lpjg.f:776-777`):
+
+```fortran
+C_LPJG_LOCAL = C_LPJG(N)
+D_LAND_ATMOS = CONV * C_LPJG_LOCAL
+CO2_PPMV = CO2_PPMV + D_LAND_ATMOS
+```
+
+`CONV = 0.471` is the `PgC → ppm CO2` conversion constant
+(`imogen_lpjg.f:73`: `1 PgC = 0.471 ppm CO2 atmospheric concentration`).
+
+**So the engine expects `C_LPJG` in PgC/yr.** Sign: positive flux to
+atmosphere = positive CO2 increment. If LPJG NEE is computed per
+`NEE-NBP Changes Report` with positive = source convention, the unit
+conversion from LPJG's typical `kg C m⁻² yr⁻¹` × area is:
+
+```
+Per-cell: flux_NEE_kgCm2yr × cell_area_m2 = kgC/yr/cell
+Global:   sum over cells = kgC/yr × 1e-12 = PgC/yr
+```
+
+The Python Intermediary's Component B handles this via the
+`PgC_to_MtCO2 = 44/12 × 1000 = 3666.67` constant. The adapter (I.B.2)
+needs to invert this to write PgC/yr to the flux file.
+
+**Recommendation:** explicitly document the unit in the unified
+codebase's `runs/<SSP>/imogen_intermediary.ins`:
+
+```
+! FILE_LPJG_FLUX: 2-col (year, flux_PgC_per_yr); positive = source to atmosphere
+FILE_LPJG_FLUX "imogen_lpjg_flux.txt"
+```
+
+For the CH4/N2O flux file, the Fortran reader at `nonco2.f:50` uses
+`CH4_LPJG(N)` and `N2O_LPJG(N)` directly in the box-model concentration
+update. Unit-checking at `nonco2.f:60-90` shows Tg/yr per gas (the
+FAIR Tg/yr → ppbv conversion uses molar masses of 16.04 g/mol CH4
+and 44.013 g/mol N2O). So:
+
+```
+! FILE_LPJG_CH4_N2O_FLUX: 3-col (year, ch4_TgCH4_per_yr, n2o_TgN2O_per_yr)
+FILE_LPJG_CH4_N2O_FLUX "imogen_lpjg_ch4_n2o_flux.txt"
+```
+
+### II.11 LPJ-GUESS fork choice — `trunk_r13078` vs integrated LTS
+
+**Decision settled (5 May 2026): `trunk_r13078` for v1.0; integrated LTS
+as a switchable Phase-2 backend.**
+
+#### II.11.1 The two LPJ-GUESS implementations available
+
+| Implementation | What it is | Status | Practical effect |
+|---|---|---|---|
+| **`trunk_r13078` (LandSyMM fork)** | The historical fork of LPJ-GUESS 4.1 that the coupled framework has always used. Source at `Integrations/trunk/trunk_r13078/`. **Verified additionally** to be byte-identical to the user's standalone `lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/` modulo 6 files (5 cosmetic, 1 critical: the `exit(200)` at `imogencfx.cpp:483`) and the build artefacts | Working with the framework's existing ins-files, gridlists, and data layout | Lower-risk Phase-1 choice |
+| **Integrated LTS** | The LandSyMM-fork features merged into a more recent LPJ-GUESS LTS, the user's prior integration project. Lives in the user's `lpjg_landsymm_integration/` parent area | Working as a standalone DGVM (per the user's prior work and the `landsymm_py` integration); not yet tested in the coupled framework's `imogencfx` mode | Eventual replacement for `trunk_r13078`; Phase-2 switchable backend |
+
+#### II.11.2 Why `trunk_r13078` for v1.0
+
+1. **Continuity.** The framework's ins-files, data paths, gridlists,
+   and the `imogencfx` input module specifically were designed
+   around `trunk_r13078`. Bringing that into the unified codebase
+   first reduces cross-cutting integration risk.
+2. **Audit coverage.** The 8 phase-2 subagent reports specifically
+   audited `trunk_r13078`; the integrated LTS was audited in the
+   user's prior work but not against the coupling-framework
+   integration points (`MiscOutput` IMOGEN stubs, `imogencfx::init`
+   linkage, etc.).
+3. **Bug-fix budget is bounded.** The 5 cosmetic + 1 critical
+   diff vs the standalone LandSyMM fork is well-characterised
+   ([CMI §4.1.10]). One-line revert of `exit(200)` plus 5 cosmetic
+   touches and `trunk_r13078` is in known-good state.
+
+#### II.11.3 Phase-2 integrated LTS backend
+
+After v1.0 ships:
+
+1. **Bring the integrated LTS into the unified codebase** under
+   `lpjguess_lts/` (parallel to the v1.0 `lpjguess/` which holds
+   `trunk_r13078`).
+2. **Audit the integrated LTS against the coupling integration
+   points:**
+   - `imogencfx::init` linkage (does the `IMOGENConfig` namespace
+     still bind from the ins file?)
+   - `RUN_IMOGEN_ENGINE` invocation (does `climatemodel.cpp` integrate?)
+   - The LPJG-side handshake writer (the I.B.1 module: must be
+     ported/adapted into the LTS).
+   - The corrected NEE/NBP formula (already in the integrated LTS
+     per the user's prior work).
+   - The `do_potyield` factorial-management mode (the user added
+     this; verify it's wired into the LTS).
+3. **Numerical-parity test.** Run a short SSP1-2.6 coupled
+   simulation against `trunk_r13078` and the integrated LTS. Compare
+   per-gridcell, per-year `cflux.out` outputs. Any divergence > a
+   documented tolerance is investigated.
+4. **Expose as a switchable backend.** Either `lpjguess_backend
+   "trunk_r13078"` or `lpjguess_backend "lts"` ins parameter, or
+   (more typically for LPJ-GUESS) the build target choice when
+   compiling the binary (`make GUESS_BACKEND=trunk` vs
+   `make GUESS_BACKEND=lts`).
+
+#### II.11.4 Knowledge gaps
+
+1. **Does `do_potyield` exist in `trunk_r13078`?** This is the
+   factorial-management mode for Stage I yield generation. The user
+   added it to the integrated LTS. The audit's `[CMI Open Q §11.1.4]`
+   flagged uncertainty about whether it's also in `trunk_r13078`.
+   If not, Stage I yield generation in v1.0 either reuses
+   pre-existing yield surfaces (cached from prior runs) or pulls in
+   the `do_potyield` patch from the integrated LTS as a one-file
+   merge.
+2. **Has the integrated LTS been tested with `imogencfx`?** The
+   integrated LTS was developed and tested as a standalone DGVM.
+   Whether the coupling-framework integration points still work
+   after the LTS merge is an open question for Phase 2.
+
+---
+
+## Part III — Open questions to the user
+
+These are the items where the user's project knowledge most likely
+trumps the audit. Listed in priority for the work in Part IV.
+
+### Operational / code
+
+1. **LPJG-side writer for the IMOGEN handshake files (I.B.1).**
+   Does it exist somewhere the audit missed? The integrated LTS work
+   may have it. If not, do the dead `MiscOutput` stubs
+   (`miscoutput.cpp:121-136, miscoutput.h:69-79,172`) represent a
+   started-but-abandoned scaffold that the user remembers, or were
+   they simply scaffolded for a future hand?
+2. **The HPC environment for Stage I and Stage II runs.** SLURM
+   confirmed (the `submit.sh` template uses `#SBATCH` and `srun`).
+   Cluster is **KIT IMK-IFU's owl** (the scripts directory name
+   `owl_hpc_cluster_scripts/` confirms this). Partition: `cclake`.
+   Default 2 nodes × 80 CPUs = 160 tasks. Walltime 3 days. Working
+   dir at `/bg/data/lpj/work/<user>/<runname>/`. **Module-load
+   conventions (gcc/cmake/netcdf/openmpi exact versions) — to be
+   confirmed via terminal back-and-forth with the user at step 16.**
+3. ~~**The `setup_run_owl_with_scratch_lpj_work.sh` helper.** Does the
+   user have access to it from Lund, or must we write a fresh
+   launcher?~~ **RESOLVED 5 May 2026: located at
+   `/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/owl_hpc_cluster_scripts/scripts/`
+   along with the full owl-cluster toolkit (mpi_run_guess_on_tmp.sh,
+   finishup_lpj_work_owl.sh, make_guess.sh, append_runfiles.sh, etc.).
+   Integrated at step 16 of the V.1 rebuild plan.**
+4. ~~**Does `do_potyield` mode exist in trunk_r13078, or only in the
+   user's integrated LTS work?**~~ **RESOLVED 5 May 2026: confirmed
+   present in `trunk_r13078` (per user). No merge from integrated
+   LTS needed for v1.0.**
+5. ~~**Stage I outputs.** Have the per-CFT × management-treatment
+   yield surfaces been generated and are they cached anywhere?~~
+   **RESOLVED 5 May 2026: yes; user has run Stage I previously
+   (during integrated-LTS verification testing); yields delivered
+   to PLUM team; PLUM team returned scenario LU + activity data;
+   activity data harmonised with HILDA+ via `landsymm_py`; new
+   harmonised LU at `/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/`
+   (Decision #10). Stage I deferred for v1.0; preserved in
+   documentation as v2.0 capability.**
+
+### Scientific
+
+6. **IIASA vs RCMIP for the paper backbone (II.1).** What does the
+   supervisor specifically want? RCMIP is the modern standard;
+   IIASA is the dataset the paper currently cites; the choice is
+   strategic.
+7. **Fortran vs C++ IMOGEN (II.2).** Does the user prefer the
+   working Fortran or want to invest 1-3 weeks in fixing the C++?
+8. **2006 vs 2019-Refinement IPCC parameters (II.5).** The Python
+   pipeline's hybrid (2006 historical + 2019 scenario) is
+   methodologically inconsistent; is the supervisor open to
+   unifying on 2019?
+9. **N2O scope.** Does the user accept the ~5-8% double-counting bias
+   between LPJG soil N2O and IPCC indirect (TECH §15.5), or do they
+   want explicit subtraction of LPJG's indirect-emissions component?
+10. **Working paper §2.3.4 boundary harmonisation (BTH+RBTM+5-yr MA)
+    vs Python pipeline's segmented running mean (I.B.6, II equivalent).**
+    Which does the supervisor want for v1.0?
+
+### Datasets
+
+11. **Is RCMIP Phase 2 v5.1.0 the right RCMIP version, or a newer
+    release available?** RCMIP releases periodically; v5.1.0 is from
+    2020. The current Phase 2 may have a newer minor version. (Also
+    I should note: searching `rcmip.org` for the latest is fine.)
+12. **PLUM v2 outputs format.** The Python pipeline expects
+    `inputs/plum/plum_crop_s1.csv`; the framework has
+    `Data/Intermediary/PLUM_data/animals_ssp{1..5}.txt` plus
+    `plum_land_use/` and `agg_land_use/` directories. Do these
+    contain the same content in different layouts, or different
+    content? An adapter would be needed for the latter.
+13. **GCM ensemble.** The CMIP6 NetCDF set has 5 GCMs. Is that the
+    full ensemble the user wants, or a subset (e.g. for sensitivity
+    studies the user wants 10-20)?
+
+### Repository
+
+14. **Target git remotes.** GitHub / KIT GitLab / Helmholtz GitLab?
+    Same conventions as the previous integrated-LTS and `landsymm_py`
+    work? Or a new GitHub org for the unified codebase?
+15. **Authorship convention.** The unified codebase will draw from
+    the user's previous work, the supervisor's contributions, and
+    upstream LPJ-GUESS / IMOGEN / PLUM communities. CITATION.cff
+    structure?
+
+---
+
+## Part IV — Recommended sequencing and effort estimates (deprecated; see Part V)
+
+> **Note (5 May 2026):** Part IV below is the original effort-estimate
+> sequencing written before the rebuild approach was settled. It is
+> **superseded by Part V**, which reformulates the same work as a
+> 16-step incremental-rebuild plan with explicit verification milestones
+> at each step. Part IV is retained for historical reference and
+> because some of its sub-totals (effort estimates per phase) are still
+> useful for planning. New work should follow Part V.
+
+
+
+Folded back into a phased plan (refined version of `[CMI §12]`). All
+estimates assume one engineer working focused.
+
+### Phase 0 — Strategic decisions (1-3 days)
+
+Decide:
+1. IIASA vs RCMIP backbone (II.1).
+2. Fortran vs C++ IMOGEN (II.2).
+3. Tight vs prescribed coupling default (II.4).
+4. 2006 vs 2019 IPCC parameters (II.5).
+5. Boundary harmonisation algorithm (I.B.6).
+
+These are mostly conversations with the supervisor.
+
+### Phase 1 — Code-level baseline (1-2 days)
+
+Apply the 35 🟢 bug fixes from `[CMI §8.1]` + I.A.
+
+### Phase 2 — Missing components (1-2 weeks)
+
+In dependency order:
+
+| Order | Task | Effort | Status |
+|---:|---|---|:---:|
+| 1 | Implement LPJG-side handshake writer (I.B.1) | 1-3 days | 🔴 |
+| 2 | Wire the FILE_LPJG_FLUX rewiring (C35) once I.B.1 ships | 5 min | 🟢 |
+| 3 | Write Python → LPJG-format adapter (I.B.2) | 4-8 hours | 🟡 |
+| 4 | Provide top-level launcher (I.B.3) | 4-8 hours | 🟡 |
+| 5 | Smoke test (3-cell × 3-year coupled run) | 2 hours | 🟢 |
+
+### Phase 3 — Forcing data canonicalisation (3-5 days)
+
+| Order | Task | Effort |
+|---:|---|---|
+| 1 | CMIP6 NetCDF → CMIP5 ASCII conversion (I.B.5 Option A) | 1 day |
+| 2 | Switch `imogen_settings.txt` to CMIP6 MRI-ESM2-0 | 5 min |
+| 3 | Rewrite `imogen_intermediary.ins` to consistent CMIP6/SSP1-2.6 + SSP2-4.5 paths | 2 hours |
+| 4 | Audit and confirm NEE/NBP code-vs-doc (I.B.7) | 2 hours |
+| 5 | If RCMIP backbone: Validate that Python pipeline's RCMIP-substitution outputs the right scenario set | 2 hours |
+| 6 | If IIASA backbone: Implement IIASA-substitution path in Python (II.1 Option B/C) | 3-5 days |
+
+### Phase 4 — Stage I yield generation (variable, days-weeks of cluster time)
+
+| Order | Task | Effort |
+|---:|---|---|
+| 1 | Verify `do_potyield` mode is in trunk_r13078 OR merge from integrated LTS | 1-2 days |
+| 2 | Provide Stage I run setup (`runs/stage1_potyield/`) | 4 hours |
+| 3 | Run Stage I on cluster (251 yr × 6 treatments × 0.5° global) | 2-7 days wall-clock |
+| 4 | Stage outputs in `Data/Yields/`; document for PLUM consumption | 2 hours |
+
+(Phase 4 may be skippable if the existing `Data/Intermediary/PLUM_data/`
+outputs are the result of a previous Stage I that the user can vouch
+for.)
+
+### Phase 5 — Validation (3-5 days)
+
+1. Run a full SSP1-2.6 coupled simulation 1850-2100.
+2. Verify atmospheric concentration trajectories meet `[CMI §2.5]`
+   thresholds:
+   - CO2 RMSD ≤ 5 ppm vs NOAA GMD 1958-present.
+   - CH4 RMSD ≤ 50 ppb vs NOAA GMD / AGAGE 1983-present.
+   - N2O RMSD ≤ 5 ppb vs NOAA GMD 1980-present.
+3. Verify sectoral inventory PBIAS ≤ ±15% vs FAO/EDGAR.
+4. Run SSP2-4.5 as a second validation.
+
+### Phase 6 — Documentation, CI, public release (1-2 weeks)
+
+1. Unified `docs/technical_manual.md`.
+2. CI/CD pipeline (GitHub Actions / GitLab CI).
+3. `paper/manuscript_draft.docx` updated with v1.0 results.
+4. Tag v1.0; mirror to GitHub / KIT / Helmholtz.
+5. Submit to GMD.
+
+### Total effort to v1.0
+
+Roughly **6-10 weeks of focused engineering**, plus cluster time for
+Phase 4 + 5. The variable is whether IIASA-substitution (Option B/C
+of II.1) is needed (+3-5 days) and whether `do_potyield` requires
+merging in (+1-2 days).
+
+---
+
+## Part V — Formal incremental rebuild plan
+
+This is the canonical work plan, superseding Part IV. It implements
+the rebuild approach settled on 5 May 2026 (see Decisions Settled
+table, item #5): build the unified codebase incrementally in
+`lpj-guess_imogen_landsymm/`, importing one component at a time from
+`version_A/B`, with each step ending in a verifiable working state.
+
+### V.0 Conventions for the rebuild
+
+- **Each step starts with a clean, verifiable predecessor state** and
+  ends with a clean, verifiable successor state. If a step's
+  verification fails, the prior state is restored and the step is
+  re-investigated before proceeding.
+- **Source preservation.** A and B remain untouched read-only
+  archives. We copy or rewrite into `lpj-guess_imogen_landsymm/`,
+  never modifying A or B.
+- **Per-step git commits.** Each step ends in a single git commit
+  with a descriptive message that names the verification milestone
+  passed.
+- **Per-step documentation.** Each step's verification protocol is
+  recorded in a `notes/STEP_<n>.md` file in the unified codebase, so
+  any reader (or successor) can reproduce the verification.
+- **Units integrity (per §I.D)** is enforced at every step that
+  involves cross-component data.
+- **Effort estimates** are wall-clock days for one focused engineer.
+  Cluster wall-clock for Stage I and validation runs is separate.
+
+### V.1 Step-by-step rebuild sequence
+
+| Step | What it does | Imported from | Verification milestone | Effort |
+|---:|---|---|---|---|
+| **0** | Initialise the unified repo. Create top-level structure per `[CMI §13]` (`lpjguess/`, `imogen/`, `intermediary_py/`, `tools/`, `runs/`, `data/`, `scripts/`, `ci/`, `archive/`, `docs/`, `paper/`). Add `.gitignore` excluding build artefacts, run output, large binaries. Add `README.md` (top-level navigation), `LICENSE` (MIT or equivalent), `CITATION.cff`, `CONTRIBUTING.md`, `CHANGELOG.md`. Move existing `COUPLED_MODEL_INVESTIGATION.md`, `EXECUTION_PLAN.md`, `_phase2_findings/` into the new structure. | (existing investigation docs) | `git init`; `git status` clean after first commit. Top-level `tree -L 2` shows clean structure. | 0.5 day |
+| **1** | Import LPJ-GUESS LandSyMM fork → `lpjguess/`. Source from **`lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/`** (NOT `Integrations/trunk/trunk_r13078/` — to avoid the `exit(200)` regression and 5 cosmetic touches). Bring in: `framework/`, `modules/`, `libraries/`, `command_line_version/`, `cmake/`, `CMakeLists.txt`, `data/ins/`, `tests/`, `reference/`. Skip: `windows_version/`, `parallel_version/aurora.tmpl` etc. (re-add only if needed in V.11). Skip: `build_imogen/` (it's a build artefact), `.vscode/`. | `lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/` | `cmake .. && make` produces `./guess` cleanly on Linux. Standalone CFX run (no IMOGEN) of `gridlist_test2.txt` (4 cells) for 3 years completes without warnings or errors. Output `cflux.out`, `mch4.out`, `ngases.out` produced. | 1 day |
+| **2** | Import Fortran IMOGEN → `imogen/`. From `Common-directory/IMOGEN-codebase/code/`: bring in `imogen_lpjg.f`, `nonco2.f`, `Makefile`, `compile.sh`, `imogen_settings.txt`, `imogen_settings_tmpl.txt`. Skip: `Original Imogen Modified for LPJG Coupling/` (backup; archive only), `qsat_output.txt` (debug dump), `.vscode/`. From the same dir: bring in `gridlist_global.txt`, `gridlist_3deg.txt`, `gridlist_hurtt_RNDM_midpoint_3698.txt`, `patterns_gridlist.txt`. Apply the small fixes immediately on import: delete `PAUSE` (line 4134), delete `qsat_output.txt` debug dump (lines 4120-4128), replace `\\` with `/` in `mkdir` calls (lines 435, 461). | `Common-directory/IMOGEN-codebase/code/` | `gfortran -ffixed-line-length-132 -O imogen_lpjg.f nonco2.f -o imogen_lpjg` builds clean. Standalone IMOGEN run on the 1631-cell native grid for 3 years (1871-1873) produces `Common-directory/IMOGEN/output/<YYYY>/{T_anom.dat, P_anom.dat, …, done}` matching the existing run on disk in A. | 1 day |
+| **3** | Convert Fortran static arrays to `ALLOCATABLE` (per Decisions #2 and §II.2). Identify the ~30 statically-declared arrays in `imogen_lpjg.f` (with `NGPOINTS` or `GPOINTS` dimensions): `T_OUT_M_REGRID`, `P_OUT_M_REGRID`, `SW_OUT_M_REGRID`, `DTEMP_OUT_M_REGRID`, `T_ANOM_AM`, `T_CLIM_AM`, ... see `[SA3 §10]` for the full list. Convert each declaration to `ALLOCATABLE`; add `ALLOCATE(...)` calls at the top of `PROGRAM IMOGEN` after `NGPOINTS` is read from `imogen_settings.txt` (a small parser change to read `NGPOINTS` as a runtime parameter rather than a `PARAMETER`). Apply the same to `nonco2.f` arrays. | (refactor) | Build still clean. Standalone IMOGEN run on 1631-cell native grid produces byte-identical output to step 2's output (proves the refactor is numerically equivalent). Then recompile with `NGPOINTS=62000` set in the settings file; run with a 62k-cell gridlist; confirm successful completion (no OOM, no segfault) on a 32-GB-RAM machine. | 2 days |
+| **4** | Import GCM patterns and CRUNCEP base climatology → `imogen/patterns/` and `imogen/CRUNCEP_1960_1989/`. From `Common-directory/IMOGEN-codebase/`: bring in all 36 `patterns/CEN_*_MOD_*` directories + `patterns/ukmo_hadcm3_rel/` + `patterns/CMIP6_IMOGEN_EBM_values_and_patterns/` + `patterns/readme.log`. Skip the contained build artefacts. From the same: `CRUNCEP_1960_1989/` (full 30 years × 12 months × 1631 cells). | `Common-directory/IMOGEN-codebase/{patterns,CRUNCEP_1960_1989}/` | Standalone IMOGEN run with default `DIR_PATT=patterns/CEN_IPSL_MOD_IPSL-CM5A-MR/` and `DIR_CLIM=CRUNCEP_1960_1989/` produces a sensible CO2 trajectory (e.g. ~286 ppm → ~530 ppm over 1850-2100 with default RCP-style emissions). | 0.5 day |
+| **5** | CMIP6 NetCDF → CMIP5 ASCII converter → `tools/cmip6_nc_to_cmip5_ascii.py`. Implement per Appendix A.3 of this doc. Run for all 5 GCMs (GFDL-ESM4, IPSL-CM6A-LR, MPI-ESM1-2-HR, MRI-ESM2-0, UKESM1-0-LL). Outputs land in `imogen/patterns/CEN_CMIP6_MOD_<gcm>/`. Convert `<gcm>_params.json` files into Fortran namelists at `imogen/patterns/<gcm>_ebm.nml`. | (new tool) | Standalone IMOGEN run with `DIR_PATT=patterns/CEN_CMIP6_MOD_MRI-ESM2-0/` produces a comparable CO2 trajectory to step 4's IPSL run (within reasonable inter-GCM scatter). The CMIP6 column-mapping caveat (§A.3) is documented in `notes/STEP_5.md`. | 1 day |
+| **6** | Import reference data → `data/`. Bring in: `Data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat` (3.5 MB), `Data/Gridlist/*.txt` (all 8 gridlists, 3.4 MB), `Data/Concentrations/{EPA,IIASA}/{CMIP5,CMIP6}/` (small files only — exclude raw XLSX downloads that can be re-fetched), `Data/Imogen/emiss/{CMIP5,CMIP6}/{Co2,CH4-N2O,Non-Co2-CH4-N2O-RF}/` (the static reference emissions, ~5 MB each), `Data/Ndep/ndep_cruncep/*.bin` (Lamarque archives, 501 MB). For the **HILDA+ historic LU**, import the legacy framework version 1850-2020 portion (or re-derive from `landsymm_py` historic outputs). For the **PLUM scenario LU**, point at the new `landsymm_py` outputs at `/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/<SSP>_<RCP>/s1.HILDA+_remap_v10_old_62892_gL.harm.allow_unveg.forLPJG/` per Decision #10 (Option D, save_state/restart strategy). Skip large legacy files: `Data/LU/SSP1_RCP26_concatenated/` (~7 GB; can be retained as a fallback for Option C). Skip: `Data/Intermediary/PLUM_data/` (~2 GB; reproducible from PLUM modeller; document). Add a `data/DATA.md` documenting how to obtain each large dataset. | `Data/{soil,Gridlist,Concentrations,Imogen,Ndep}/` plus `/media/bampoh-d/.../plum_harm_lu/` | A coupled-run smoke test (3 cells, 3 years) finds all needed input files; run completes (after step 7's coupling fixes). | 0.5 day |
+| **7** | Apply the 7 LPJ-GUESS coupling fixes (the seven from `[CMI §1.2]` plus C35) directly in the imported `lpjguess/`. In order: (a) delete `exit(200);` at `modules/imogencfx.cpp:483`; (b) restore `INQUIRE` for `done` at `modules/climatemodel.cpp:330-331`; (c) restore the 3 polling guards at lines 334, 341, 350; (d) uncomment `ndep.getndep(...)` at `modules/imogen_input.cpp:728`; (e) fix `IMOGEN/ouput/`→`IMOGEN/output/` typos in the ins file (×6) and `R_anom.dat`→`Rh_anom.dat` (×1); (f) (Fortran path / mkdir cleanups already applied at step 2 and won't show here). | (apply diffs) | Compile clean. `./guess -input imogencfx main.ins` over a 3-cell × 3-year smoke test runs without halting at `exit(200)`. Engine produces `IMOGEN/output/<YYYY>/{T_anom.dat,…,done}`. LPJ-GUESS proceeds to gridcell loop and produces `output/cflux.out`, `output/mch4.out`, `output/ngases.out`. | 1 day |
+| **8** | Implement the LPJG-side handshake writer (per Appendix A.1) → `lpjguess/modules/imogenoutput.cpp/h`. Register with the LPJ-GUESS output framework. Verify the new module reaches the per-year aggregation hook (step 7 audit may need to identify the right hook in `framework.cpp` — open question 4 in §I.B.1). Provide a `coupling_mode` ins parameter ("tight"/"prescribed"/"loose") that gates whether `imogenoutput` actually writes the handshake files. | (new module per Appendix A.1) | At end of each year of the smoke test, the writer produces non-empty `imogen_lpjg_flux.txt`, `imogen_lpjg_ch4_n2o_flux.txt`, `imogen_lpjg.txt`, and `done` files in `<DIR_COMMON>/LPJG_main/IMOGEN/`. Their content is sensible (NEE in PgC/yr is a small number of ~±5 PgC/yr; CH4_natural in TgCH4/yr is positive; etc.). Sanity-checks per §I.D enforced. | 2-3 days |
+| **9** | Rewrite `FILE_LPJG_FLUX` and `FILE_LPJG_CH4_N2O_FLUX` in `runs/SSP1-2.6/imogen_intermediary.ins` to relative filenames (`imogen_lpjg_flux.txt`, `imogen_lpjg_ch4_n2o_flux.txt`) so the engine reads what step 8's writer produces. Fix bug C35 (per `[CMI §3.7]`). Verify the `coupling_mode = tight` parameter is honoured; verify a `coupling_mode = prescribed` run with the original IIASA-style absolute paths still works. | (ins file edit) | Smoke test in tight mode: LPJG year 1 NEE feeds back into IMOGEN year 2 climate. Verifiable by perturbing an LPJG parameter (e.g. multiplying NEE by 2× in the writer) and confirming the resulting CO2 trajectory in `Common-directory/IMOGEN/output/2/CO2.dat` shifts by the expected amount. | 1 day |
+| **9.5** | **Climate-output enhancements (per Decisions #11 and #12):** (a) **Port C++ Rh+W writers back into Fortran** so both backends produce `Rh_anom.dat` and `W_anom.dat` (~20 LOC in `imogen_lpjg.f`'s writer block — copy the format from the existing T_anom.dat writer; output `RH15M_OUT_M(igp,imm,...)` and the wind variable in the same loop). (b) **Add Tmin/Tmax computation and output**: in both Fortran and C++, compute `Tmin = T_mean − DTEMP/2` and `Tmax = T_mean + DTEMP/2` per cell × month × sub-day step; write `Tmin_anom.dat` and `Tmax_anom.dat` alongside the existing files. (c) **Wire up the LPJG-side consumer**: in `imogencfx::init` add `file_relhum`, `file_wind`, `file_tmin`, `file_tmax` parameter reads (~6 LOC); in `imogencfx.h` add `drelhum[]`, `dwind[]`, `dtmin[]`, `dtmax[]`, `all_drelhum`, `all_dwind`, `all_dtmin`, `all_dtmax` declarations (~12 LOC); in `readenv()` add four `read_lines_from_file` calls (~12 LOC); in `get_climate_for_gridcell` populate the day arrays and set `climate.relhum`, `climate.u10`, `climate.tmin`, `climate.tmax` (~16 LOC). (d) **Restore the BLAZE check** at `imogencfx.cpp:792-794` (uncomment) — now that wind and humidity are wired, BLAZE can run safely. (e) **Verify units carefully** per §I.D: T in K (with K→°C for `climate.temp`); RH as fraction or % (LPJG `climate.relhum` convention is %); wind in m/s. | (Fortran + C++ refactor) | After this step: **Fortran and C++ IMOGEN produce parity output**, including `Rh_anom.dat`, `W_anom.dat`, `Tmin_anom.dat`, `Tmax_anom.dat`. LPJ-GUESS's `imogencfx` consumes all of these and populates the `Climate` struct. BLAZE fire model runs without silent zero-default for humidity/wind. | 0.5-1 day |
+| **10** | Import Python Intermediary → `intermediary_py/`. Source from `Intermediary_py/imogen_ghg_controller_SOURCE_ONLY/imogen_ghg_controller/` (the smallest complete copy). Bring in: `pyproject.toml`, `requirements.txt`, `run_all.py`, `src/`, `tests/`, `docs/`, top-level `.md` files. Skip: the FULL tree's populated `inputs/`, `outputs/`, `archive/` (reproducible from acquisition steps). Add `openpyxl>=3.0` to requirements (bug C33). Strip the 15-line chat excerpt from `Quick_Start.md` (bug K21). | `Intermediary_py/imogen_ghg_controller_SOURCE_ONLY/` | `pip install -r requirements.txt` (with openpyxl) clean. The 3 pytest tests pass (`test_unit_conversions.py`, `test_co2_option_a_validation.py` skips with no inputs, `test_imogen_export_schema.py` skips). | 0.5 day |
+| **11** | Stage Python Intermediary inputs from acquisition. Document in `intermediary_py/inputs/README.md` how to obtain (and acquire if not already on disk): FAOSTAT 3 CSVs, RCMIP Phase 2 v5.1.0 CSV, FAIR ERF natural baseline, EDGAR 2025 4 xlsx, PLUM v2 outputs (`plum_crop_s1.csv`, `Livestock_counts.txt`, rice scenario zips), LPJ-GUESS 18 .gz files for SSP1-2.6 + SSP2-4.5 (the natural-side feedback inputs). For the LPJG .gz files, since v1.0 will produce them at runtime via step 14, stage cached versions from a prior run if available, or acknowledge they will be generated by step 14. | (document) | `python run_all.py --dry-run` succeeds (43 ordered steps). | 1 day |
+| **12** | Run Python Intermediary on staged inputs to produce reference IMOGEN-bound outputs. `python run_all.py --component A B C D` for SSP1-2.6 + SSP2-4.5. Validates 39/40 reference CSVs and 13/14 reference plots against the `_FULL/outputs/` reference set (per HANDOFF.md §16). | (run) | All 3 pytest tests pass with full inputs. Output files at `outputs/imogen_inputs/imogen_inputs_SSP{1-2.6,2-4.5}.csv` exist with shape (201, 10) and no NaNs. | 1-2 hours wall-clock + 0.25 day verification |
+| **13** | Implement the Python → LPJG-format adapter (per Appendix A.2) → `tools/imogen_inputs_to_lpjg_format.py`. Per the Decisions table (item #1), build the RCMIP-backbone version. Apply unit-checked-adapter discipline (§I.D.2): explicit unit assertions at the function boundaries; references to `intermediary_py/src/shared/units.py`. | (new tool per Appendix A.2) | Adapter outputs land in `runs/<SSP>/inputs/`: `co2_anthro_emissions.txt`, `ch4_n2o_anthro_emissions.txt`, `imogen_lpjg_flux.txt` (seed for prescribed mode), `imogen_lpjg_ch4_n2o_flux.txt` (seed for prescribed mode). Files are valid 2/3-column ASCII the Fortran reader at `imogen_lpjg.f:565-571` accepts. | 0.5-1 day |
+| **14** | Top-level workstation launcher → `scripts/run_coupled.sh` (per Appendix A.4). Honours `coupling_mode = tight` by default; supports `prescribed` and `loose` via the same parameter. **Build-environment preference (Decision #8): use Anaconda3-provided NetCDF libraries on the user's workstation rather than native Ubuntu `libnetcdf-dev`**. The launcher's CMake invocation explicitly sets `NETCDF_INCLUDE_DIR=$ANACONDA_PREFIX/include` and `NETCDF_LIBRARY=$ANACONDA_PREFIX/lib/libnetcdf.so` if `$ANACONDA_PREFIX` is set or if `conda info` shows an active env, otherwise falls back to the native paths. This is documented in `docs/build.md` so any successor knows to activate the conda env before building. | (new) | A full SSP1-2.6 coupled run for the 4-cell `gridlist_test2.txt` for years 1850-1860 (11 years) completes successfully, end-to-end, on the user's workstation with Anaconda3 NetCDF. Outputs at `runs/SSP1-2.6/output/{cflux.out,mch4.out,ngases.out,...}` and `Common-directory/IMOGEN/output/<YYYY>/`. | 1 day |
+| **15** | **Stage I documentation preservation (NOT execution).** Per Decision #9, Stage I yield-generation is deferred for v1.0 (we use the already-produced PLUM outputs from the user's prior work). `do_potyield` is confirmed present in `trunk_r13078`; no merge from integrated LTS needed. This step reduces to: (a) document Stage I in `docs/scientific_framework.md` per working paper §2.4.3 framing (specification of the 6 management treatments, the 1850-2100 horizon, the ISIMIP-3b MRI-ESM2-0 prescribed climate, the yield-surface output schema), so the v2.0 PLUM-embedding effort has a complete specification to build to; (b) verify that the existing PLUM outputs at `Data/Intermediary/PLUM_data/animals_ssp{1..5}.txt` + `plum_land_use/` + `agg_land_use/` are usable as-is for the v1.0 Stage II coupled run; (c) preserve the v2.0 plan in `docs/v2_roadmap.md` for the eventual PLUM embedding. | (documentation only) | `docs/scientific_framework.md` includes a complete Stage I specification; the v2.0 roadmap document outlines the PLUM-embedding work plan. | 0.25 day (was 1-2 days) |
+| **16** | Cluster integration. The owl-cluster scripts toolkit was located at `/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/owl_hpc_cluster_scripts/` (Decision #7-supporting evidence). Import the scripts into the unified codebase at `scripts/cluster/`: (a) `setup_run_owl_with_scratch_lpj_work.sh` (the 174-line 12-arg run-setup; splits gridlist across MPI ranks via `split -a 4`; generates `submit.sh` and `startguess.sh` per-run); (b) `mpi_run_guess_on_tmp.sh` (per-rank scratch I/O wrapper; rsyncs ins+gridlist to `/scratch/${SLURM_JOBID}/output/runN/`, runs `./guess -parallel -input <module> <ins>`, rsyncs back); (c) `finishup_lpj_work_owl.sh` (post-run cleanup as a separate sbatch with `afterok:<guess_jobid>` dependency); (d) `make_guess.sh` (cluster-side build helper); (e) `append_runfiles.sh` / `append_files.sh` (concatenate per-run outputs after the parallel run). **Adapt for coupled-mode**: change `INPUTMETHOD=cfx` to `imogencfx`; ensure `<DIR_COMMON>` is a shared-filesystem path (not per-rank scratch) so the in-process IMOGEN engine handshake works correctly; document the `module load` lines (gcc, cmake, netcdf, openmpi — versions to be confirmed via terminal back-and-forth). Also write a top-level `scripts/run_coupled.sbatch` template that wraps the owl scripts with the `coupling_mode=tight` invocation. **Provide a workstation parallel test** that mimics the cluster setup (4-rank MPI on a small gridlist) so the owl-script logic can be validated before submitting to the actual cluster. | `owl_hpc_cluster_scripts/scripts/` (existing) + new wrappers | (a) The 4-rank MPI workstation parallel test of the 480-cell `gridlist_test480.txt` for 3 years completes successfully end-to-end; (b) the cluster `submit.sh` is generated correctly by the owl scripts; (c) when ready, a full SSP1-2.6 coupled run for the 62 538-cell gridlist for 1850-2100 completes on the cluster (validated via terminal back-and-forth with the user). | 1 day setup + 1 day workstation parallel test + 1-3 days cluster wall-clock for the production run |
+| **17** | Validation against working paper §2.5 thresholds. Run the standard validation: CO2 RMSD ≤ 5 ppm vs NOAA GMD; CH4 RMSD ≤ 50 ppb vs NOAA/AGAGE; N2O RMSD ≤ 5 ppb vs NOAA. Run SSP2-4.5 as a second validation. Document results in `validation/v1_results.md`. | (validation scripts) | All thresholds met; reference outputs cached. | 2-3 days |
+| **18** | Documentation harmonisation per `[CMI §12.6]`. Build the unified `docs/technical_manual.md` covering: scientific framework (per working paper), build instructions, run instructions (workstation + cluster, all 5 SSPs), output catalogue, known issues, validation procedure, troubleshooting. Retire OUTDATED docs into `archive/references/`. Update `paper/manuscript_draft.docx` to RCMIP backbone. | (consolidate) | One self-consistent technical manual; OUTDATED docs archived; paper draft updated; CHANGELOG.md captures the v1.0 changes. | 1-2 weeks |
+| **19** | CI/CD pipeline. `.github/workflows/ci.yml` (or `.gitlab-ci.yml`) builds LPJ-GUESS + Fortran IMOGEN, builds Python venv, runs the 3 pytest tests + the units-integrity tests (§I.D.4), runs the smoke coupled-run test, confirms reference outputs match expected (md5 or pandas tolerance). | (new) | CI passes on every commit. | 2-3 days |
+| **v1.0** | **Tag and release.** GitHub + KIT GitLab + Helmholtz GitLab. Submit paper to GMD. | (release) | v1.0 tagged; mirrors green; paper submitted. | 0.5 day |
+| **20+ (post-v1.0)** | Phase 2 additions: C++ IMOGEN brought to parity (per §II.2.5); integrated LTS as switchable backend (per §II.11.3); other §12.7 stretch goals. | (per §II.2, §II.11) | Both backends switchable; cross-validation passes. | 2-4 weeks |
+
+### V.2 Total effort to v1.0 (revised after 5 May 2026 decisions)
+
+| Phase | Step(s) | Effort |
+|---|---|---|
+| Phase 0 (strategic decisions) | settled | 0 days remaining |
+| Phase 1 (code-level baseline) | steps 1, 2, 3, 7, 10 | ~5-6 days |
+| Phase 2 (missing components + LU strategy) | steps 8, 9, 9.5, 13 | ~4-6 days |
+| Phase 3 (forcing data canonicalisation + climate-output enhancements) | steps 4, 5, 6, 9.5 | ~3 days |
+| Phase 4 (Stage I documentation, no run) | step 15 | ~0.25 day (was 1-2 days) |
+| Phase 5 (validation) | steps 14, 17 | ~3-4 days |
+| Phase 6 (cluster integration) | step 16 | ~2 days setup + 1-3 days cluster wall-clock |
+| Phase 7 (documentation harmonisation) | step 18 | ~1-2 weeks |
+| Phase 8 (CI/CD) | step 19 | ~2-3 days |
+| **Total** | | **~25-35 person-days** + **~3-4 days cluster wall-clock** |
+
+This is roughly 5-10 days less than the earlier estimate, primarily
+because Stage I has dropped from "1-2 day investigation + days of
+cluster runs" to "0.25 day documentation only" (Decision #9), and the
+HPC-environment + cluster-scripts uncertainties are resolved
+(Decisions #3 + Part III #2-#5).
+
+Calendar-time estimate at 3-4 productive days/week: **~7-10 weeks
+to v1.0**.
+
+### V.3 What can run in parallel
+
+Several steps are independent and can be done by separate engineers
+or in parallel:
+
+- Steps 0-1 (repo init + LPJ-GUESS import) and steps 4 (patterns) +
+  10 (Python Intermediary) + 11 (Python inputs) are independent of
+  each other.
+- Steps 2-3 (Fortran IMOGEN + ALLOCATABLE) and step 5 (CMIP6
+  conversion) are independent.
+- Steps 7 (LPJG fixes) and 8 (handshake writer) require steps 1-3
+  but are independent of steps 4-6.
+- Step 13 (adapter) requires steps 10+ but not 1-9.
+
+So with 2 engineers, total calendar time can probably halve to
+~6 weeks.
+
+### V.4 What must be sequential
+
+The critical-path dependency chain (revised to include step 9.5):
+
+```
+0 → 1 → 2 → 3 → 7 → 8 → 9 → 9.5 → 13 → 14 → 16 → 17 → 18 → 19 → v1.0
+                                  ↑
+                                 10 (parallel branch from step 0)
+                                  ↑
+                                 11
+                                  ↑
+                                 12
+                                                    ↑
+                                                   15 (deferred → 0.25 day documentation only)
+```
+
+i.e. roughly 13 sequential steps on the critical path, which is the
+~25-35 day total.
+
+### V.5 Re-investigation triggers
+
+If any step fails its verification milestone, the recovery protocol
+is:
+
+1. **Capture the failure state** in `notes/STEP_<n>_failure.md` —
+   what was expected, what happened, what `git diff` shows vs the
+   prior verified state.
+2. **Re-investigate the relevant subagent report** in
+   `_phase2_findings/`. The eight reports collectively cover every
+   subsystem at depth; the bug or gap may already be documented
+   there.
+3. **Spawn a focused investigation** of the specific area (e.g. via
+   another subagent or a manual deep-read).
+4. **Update `EXECUTION_PLAN.md`** with the new finding before
+   retrying the step.
+5. **Roll back the working-tree state** to the prior verified
+   commit; retry the step with the new understanding.
+
+This is the value of the rebuild approach: each step is small enough
+that a verification failure is bounded and recoverable.
+
+---
+
+## Appendix A — Implementation sketches
+
+### A.1 LPJG-side handshake writer (sketch)
+
+A new module `modules/imogenoutput.cpp/h` registered with the LPJ-GUESS
+output framework. ~150 LOC. Pseudocode:
+
+```cpp
+// modules/imogenoutput.h
+#ifndef LPJ_GUESS_IMOGEN_OUTPUT_H
+#define LPJ_GUESS_IMOGEN_OUTPUT_H
+
+#include "outputmodule.h"
+
+class ImogenOutput : public OutputModule {
+public:
+    void init();
+    void outannual(Gridcell& gridcell);   // accumulate per gridcell
+    void outglobal_year(int calendar_year); // write per year (NEW HOOK)
+
+private:
+    // Year-running accumulators
+    double accum_NEE_kgC;          // kg C / yr (positive = source to atmosphere)
+    double accum_CH4_kgCH4;        // kg CH4 / yr
+    double accum_N2O_kgN2O;        // kg N2O / yr
+    double accum_area_m2;
+    int    accum_year;
+    bool   first_call;
+};
+#endif
+```
+
+```cpp
+// modules/imogenoutput.cpp
+#include "imogenoutput.h"
+#include "framework.h"
+#include "parameters.h"
+#include <fstream>
+#include <iomanip>
+
+REGISTER_OUTPUT_MODULE("imogenoutput", ImogenOutput)
+
+void ImogenOutput::init() {
+    accum_year = -1;
+    accum_NEE_kgC = 0;
+    accum_CH4_kgCH4 = 0;
+    accum_N2O_kgN2O = 0;
+    accum_area_m2 = 0;
+    first_call = true;
+}
+
+void ImogenOutput::outannual(Gridcell& gridcell) {
+    // Called once per gridcell per year by framework.
+    // Per the corrected NEE-NBP formula:
+    //   NEE_per_m2 = flux_veg - flux_repr + flux_soil + flux_fire     (kg C / m2 / yr)
+    // Get from gridcell's accumulated annual fluxes.
+    const double nee_kgCm2 = gridcell.balance.aflux_veg
+                            - gridcell.balance.aflux_repr
+                            + gridcell.balance.aflux_soil
+                            + gridcell.balance.aflux_fire;
+
+    const double area_m2 = gridcell.area_m2();   // standard LPJ-GUESS gridcell area helper
+
+    accum_NEE_kgC   += nee_kgCm2 * area_m2;
+    accum_area_m2   += area_m2;
+
+    // CH4 from mch4.out columns (12 monthly, g CH4 / m2 / month)
+    double ch4_kgCH4_yr_m2 = 0;
+    for (int m = 0; m < 12; m++) ch4_kgCH4_yr_m2 += gridcell.mch4[m] * 1e-3;
+    accum_CH4_kgCH4 += ch4_kgCH4_yr_m2 * area_m2;
+
+    // N2O from N2O_soil + N2O_fire (kg N / ha / yr); convert to kg N2O / m2 / yr
+    const double n_kgNm2 = (gridcell.aflux_n2o_soil + gridcell.aflux_n2o_fire) * 1e-4;  // ha → m²
+    const double n2o_kgN2O_m2 = n_kgNm2 * 44.0/28.0;
+    accum_N2O_kgN2O += n2o_kgN2O_m2 * area_m2;
+}
+
+void ImogenOutput::outglobal_year(int calendar_year) {
+    if (!IMOGENConfig::tight_coupling) return;
+
+    const std::string dir = std::string((char*)IMOGENConfig::DIR_COMMON)
+                          + "/LPJG_main/IMOGEN/";
+
+    // Convert global accumulators to required units
+    const double NEE_PgC      = accum_NEE_kgC   * 1e-12;
+    const double CH4_TgCH4    = accum_CH4_kgCH4 * 1e-9;
+    const double N2O_TgN2O    = accum_N2O_kgN2O * 1e-9;
+
+    // 1. Append flux to imogen_lpjg_flux.txt
+    {
+        const auto mode = first_call ? std::ios::trunc : std::ios::app;
+        std::ofstream f(dir + "imogen_lpjg_flux.txt", mode);
+        f << calendar_year << "\t"
+          << std::fixed << std::setprecision(6) << NEE_PgC << "\n";
+    }
+
+    // 2. Append CH4/N2O to imogen_lpjg_ch4_n2o_flux.txt
+    {
+        const auto mode = first_call ? std::ios::trunc : std::ios::app;
+        std::ofstream f(dir + "imogen_lpjg_ch4_n2o_flux.txt", mode);
+        f << calendar_year << "\t"
+          << std::fixed << std::setprecision(6) << CH4_TgCH4 << "\t"
+          << N2O_TgN2O << "\n";
+    }
+
+    // 3. Re-write imogen_lpjg.txt for the next call
+    {
+        std::ofstream f(dir + "imogen_lpjg.txt", std::ios::trunc);
+        const int next = calendar_year + 1;
+        const bool done_all = (next > IMOGENConfig::lasthistyear);
+        const bool spinup = (next < IMOGENConfig::firsthistyear);
+        f << "YEAR1 "      << next << " !IN First year\n";
+        f << "IYEND "      << next << " !IN Stop year\n";
+        f << "YEAR1_LPJG " << IMOGENConfig::firsthistyear << " !IN LPJG start\n";
+        f << "SPINUP "      << (spinup   ? "TRUE" : "FALSE") << "\n";
+        f << "KEEPRUNNING " << (done_all ? "FALSE" : "TRUE") << "\n";
+        f << "FIRSTCALL "  << (first_call ? "TRUE" : "FALSE") << "\n";
+    }
+
+    // 4. Touch done file (last so engine doesn't see partial data)
+    {
+        std::ofstream f(dir + "done");
+        f << "Climate files written\n";  // Consistent with what IMOGEN writes
+    }
+
+    // Reset accumulators
+    accum_NEE_kgC   = 0;
+    accum_CH4_kgCH4 = 0;
+    accum_N2O_kgN2O = 0;
+    accum_area_m2   = 0;
+    first_call      = false;
+}
+```
+
+Open question: where in the LPJ-GUESS framework does
+`outglobal_year` get called from? The standard `OutputModule`
+interface (`outputmodule.h`) has `outannual` (per gridcell) and
+`outdaily` (per gridcell per day). A new "post-gridcell-loop, per-year"
+hook may need to be added — or the writer can hijack the last
+gridcell's `outannual` call (using `gridlist.last() == gridcell`).
+The user's framework knowledge would clarify the cleanest approach.
+
+### A.2 Python Intermediary → LPJG-format adapter (sketch)
+
+```python
+#!/usr/bin/env python3
+"""
+tools/imogen_inputs_to_lpjg_format.py
+
+Convert the Python Intermediary's wide-format CSV into the four
+narrow files the Fortran IMOGEN expects.
+
+Usage:
+    python tools/imogen_inputs_to_lpjg_format.py \
+        --input outputs/imogen_inputs/imogen_inputs_SSP2-4.5.csv \
+        --output runs/SSP2-4.5/inputs/
+
+The output directory will contain four files:
+    imogen_lpjg_flux.txt              (year, CO2_PgC_per_yr)
+    imogen_lpjg_ch4_n2o_flux.txt      (year, CH4_Tg, N2O_Tg)
+    co2_anthro_emissions.txt          (year, CO2_PgC_per_yr — for FILE_SCEN_EMITS)
+    ch4_n2o_anthro_emissions.txt      (year, CH4_Tg, N2O_Tg — for FILE_CH4_N2O_EMITS)
+"""
+
+import argparse
+import pandas as pd
+import sys
+from pathlib import Path
+
+# --- conversion constants --------------------------------------------------
+PgC_to_MtCO2 = 44/12 * 1000   # = 3666.6667
+MtCO2_to_PgC = 1.0 / PgC_to_MtCO2
+
+# --- main -----------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input",  required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args()
+
+    df = pd.read_csv(args.input)
+
+    expected_cols = {"Year", "CH4_anthro_Mt", "CH4_natural_Mt", "CH4_total_Mt",
+                     "N2O_anthro_Mt", "N2O_natural_Mt", "N2O_total_Mt",
+                     "CO2_EFOS_Mt", "CO2_NEE_Mt", "CO2_total_Mt"}
+    missing = expected_cols - set(df.columns)
+    if missing:
+        sys.exit(f"Input CSV missing columns: {missing}")
+
+    args.output.mkdir(parents=True, exist_ok=True)
+
+    # 1. FILE_LPJG_FLUX: year, NEE in PgC/yr
+    nee_pgc = df["CO2_NEE_Mt"] * MtCO2_to_PgC
+    out1 = args.output / "imogen_lpjg_flux.txt"
+    with open(out1, "w") as f:
+        for y, v in zip(df["Year"], nee_pgc):
+            f.write(f"{int(y)}\t{v:.6f}\n")
+
+    # 2. FILE_LPJG_CH4_N2O_FLUX: year, CH4_natural_Tg, N2O_natural_Tg
+    out2 = args.output / "imogen_lpjg_ch4_n2o_flux.txt"
+    with open(out2, "w") as f:
+        for y, ch4, n2o in zip(df["Year"], df["CH4_natural_Mt"], df["N2O_natural_Mt"]):
+            f.write(f"{int(y)}\t{ch4:.6f}\t{n2o:.6f}\n")
+
+    # 3. FILE_SCEN_EMITS: year, CO2_anthro in PgC/yr (= EFOS only)
+    efos_pgc = df["CO2_EFOS_Mt"] * MtCO2_to_PgC
+    out3 = args.output / "co2_anthro_emissions.txt"
+    with open(out3, "w") as f:
+        for y, v in zip(df["Year"], efos_pgc):
+            f.write(f"{int(y)}\t{v:.6f}\n")
+
+    # 4. FILE_CH4_N2O_EMITS: year, CH4_anthro_Tg, N2O_anthro_Tg
+    out4 = args.output / "ch4_n2o_anthro_emissions.txt"
+    with open(out4, "w") as f:
+        for y, ch4, n2o in zip(df["Year"], df["CH4_anthro_Mt"], df["N2O_anthro_Mt"]):
+            f.write(f"{int(y)}\t{ch4:.6f}\t{n2o:.6f}\n")
+
+    print(f"Wrote 4 IMOGEN-format files to {args.output}")
+    print(f"  {out1}: {len(df)} rows, NEE PgC/yr")
+    print(f"  {out2}: {len(df)} rows, CH4/N2O Tg/yr")
+    print(f"  {out3}: {len(df)} rows, EFOS PgC/yr")
+    print(f"  {out4}: {len(df)} rows, anthro CH4/N2O Tg/yr")
+
+if __name__ == "__main__":
+    main()
+```
+
+The corresponding update to `imogen_intermediary.ins`:
+```
+FILE_LPJG_FLUX           "imogen_lpjg_flux.txt"
+FILE_LPJG_CH4_N2O_FLUX   "imogen_lpjg_ch4_n2o_flux.txt"
+FILE_SCEN_EMITS          "co2_anthro_emissions.txt"
+FILE_CH4_N2O_EMITS       "ch4_n2o_anthro_emissions.txt"
+```
+
+(All relative to `<DIR_COMMON>/LPJG_main/IMOGEN/`. Both flux files
+become *seeds* that LPJG then appends to; the engine reads them at
+the start of each year-loop iteration.)
+
+### A.3 CMIP6 NetCDF → CMIP5 ASCII converter (sketch)
+
+```python
+#!/usr/bin/env python3
+"""
+tools/cmip6_nc_to_cmip5_ascii.py
+
+Convert IMOGEN CMIP6 NetCDF patterns into CMIP5-style ASCII directories
+that the Fortran IMOGEN reader can consume directly.
+
+Usage:
+    python tools/cmip6_nc_to_cmip5_ascii.py \
+        --nc Common-directory/IMOGEN-codebase/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/mri-esm2-0_patterns.nc \
+        --json Common-directory/IMOGEN-codebase/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/mri-esm2-0_params.json \
+        --gridlist Common-directory/IMOGEN-codebase/code/patterns_gridlist.txt \
+        --output Common-directory/IMOGEN-codebase/patterns/CEN_CMIP6_MOD_MRI-ESM2-0/
+"""
+import argparse, json, sys
+import numpy as np
+import xarray as xr
+from pathlib import Path
+from scipy.interpolate import RegularGridInterpolator
+
+MONTH_NAMES = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
+
+# CMIP5-ASCII column order (per imogen_lpjg.f::GCM_ANLG line 3226-3231 read):
+#    T, RH15M, U-wind, V-wind, LW, SW, DTEMP_day, rainfall, snowfall, P*
+# Plus 2 reserved columns observed-zero in IPSL-CM5A-MR sample.
+# Total 12 columns.
+CMIP6_TO_CMIP5_COLUMN_MAP = [
+    "tl1_patt",         # col 1: T
+    "ql1_patt",         # col 2: RH15M (specific humidity → relative humidity? need to confirm)
+    None,               # col 3: U-wind (CMIP6 has only wind speed magnitude in wind_patt, not vector)
+    None,               # col 4: V-wind (same)
+    "lwdown_patt",      # col 5: LW
+    "swdown_patt",      # col 6: SW
+    "range_tl1_patt",   # col 7: DTEMP_day
+    "precip_patt",      # col 8: rainfall (combined in CMIP6)
+    None,               # col 9: snowfall (CMIP6 has only total precip)
+    "pstar_patt",       # col 10: P*
+    None,               # col 11: reserved
+    None,               # col 12: reserved
+]
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--nc",       required=True, type=Path)
+    parser.add_argument("--json",     required=True, type=Path)
+    parser.add_argument("--gridlist", required=True, type=Path)
+    parser.add_argument("--output",   required=True, type=Path)
+    args = parser.parse_args()
+
+    # 1. Read NetCDF
+    ds = xr.open_dataset(args.nc)
+    # ds has dims (imogen_drive=12, lat=56, lon=96)
+    src_lon = ds.lon.values   # 0..360 ascending
+    src_lat = ds.lat.values   # -90..90 ascending or descending — confirm
+
+    # 2. Read target IMOGEN HadCM3 land gridlist (1631 cells)
+    target = []
+    with open(args.gridlist) as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                tlon, tlat = float(parts[0]), float(parts[1])
+                if tlon < 0: tlon += 360   # normalise to 0..360 if needed
+                target.append((tlon, tlat))
+    target = np.array(target)
+    assert len(target) == 1631, f"Expected 1631 cells, got {len(target)}"
+
+    # 3. Read JSON params
+    with open(args.json) as f:
+        params = json.load(f)
+    # params is {model_name: {kappa_o, lambda_l, lambda_o, mu, f_ocean}}
+
+    # 4. Per-month: bilinear interpolate each of 8 _patt vars onto target grid
+    args.output.mkdir(parents=True, exist_ok=True)
+    for m_idx, mname in enumerate(MONTH_NAMES):
+        rows = []
+        # Header: bbox of source grid
+        lon_min, lon_max = float(src_lon.min()), float(src_lon.max())
+        lat_min, lat_max = float(src_lat.min()), float(src_lat.max())
+        rows.append(f"{lon_min:8.2f}{lat_min:8.2f}{lon_max:8.2f}{lat_max:8.2f}")
+
+        # Build interpolators for each variable (12 columns)
+        interps = []
+        for col_var in CMIP6_TO_CMIP5_COLUMN_MAP:
+            if col_var is None:
+                interps.append(None)   # zero column
+            else:
+                arr = ds[col_var].isel(imogen_drive=m_idx).values
+                # arr shape (lat, lon); RegularGridInterpolator wants (lat, lon)
+                interps.append(RegularGridInterpolator(
+                    (src_lat, src_lon), arr,
+                    method="linear", bounds_error=False, fill_value=0.0))
+
+        # Interpolate per target cell
+        for tlon, tlat in target:
+            row = [f"{tlon:7.2f}", f"{tlat:7.2f}"]
+            for ip in interps:
+                if ip is None:
+                    row.append("0.0000")
+                else:
+                    v = float(ip([[tlat, tlon]]))
+                    row.append(f"{v:9.5f}")
+            rows.append("  ".join(row))
+
+        # Write
+        outfile = args.output / mname
+        with open(outfile, "w") as fout:
+            fout.write("\n".join(rows) + "\n")
+        print(f"Wrote {outfile} ({len(target)+1} lines)")
+
+    # 5. Write Fortran namelist for EBM scalars
+    model_name = list(params.keys())[0]
+    p = params[model_name]
+    nl = args.output.parent.parent / f"{model_name}_ebm.nml"
+    with open(nl, "w") as fout:
+        fout.write(f"&IMOGEN_EBM\n")
+        fout.write(f"  KAPPA_O  = {p['kappa_o']:.6f}\n")
+        fout.write(f"  LAMBDA_L = {p['lambda_l']:.6f}\n")
+        fout.write(f"  LAMBDA_O = {p['lambda_o']:.6f}\n")
+        fout.write(f"  MU       = {p['mu']:.6f}\n")
+        fout.write(f"  F_OCEAN  = {p['f_ocean']:.6f}\n")
+        fout.write(f"/\n")
+    print(f"Wrote {nl}")
+
+if __name__ == "__main__":
+    main()
+```
+
+Caveats:
+- The CMIP6 → CMIP5 column mapping above has open questions (U/V wind
+  vector not directly available; specific vs relative humidity may
+  need a unit conversion). To be settled with the author of the
+  CMIP6 NetCDF (likely PRIME / Mathison 2025).
+- The `imogen_drive` axis convention (Jan..Dec or Dec..Jan?) needs to
+  be confirmed against the upstream pattern-generation code.
+
+### A.4 Coupled-run launcher (sketch)
+
+```bash
+#!/bin/bash
+# scripts/run_coupled.sh  —  workstation Linux launcher
+# Usage:
+#   ./scripts/run_coupled.sh <SCENARIO> [<GRIDLIST>]
+# Examples:
+#   ./scripts/run_coupled.sh SSP1-2.6
+#   ./scripts/run_coupled.sh SSP2-4.5 gridlist_test480.txt
+set -euo pipefail
+
+SCENARIO=${1:-SSP1-2.6}
+GRIDLIST=${2:-gridlist_in_62892_and_climate.txt}
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RUN_DIR="${ROOT}/runs/${SCENARIO}"
+LOG_DIR="${ROOT}/logs"
+SCRATCH="${RUN_DIR}/scratch"
+mkdir -p "${LOG_DIR}" "${SCRATCH}/IMOGEN" "${SCRATCH}/LPJG_main/IMOGEN"
+
+echo "[$(date '+%F %T')] Starting coupled run: SCENARIO=${SCENARIO}, GRIDLIST=${GRIDLIST}"
+
+# === Step 1: build LPJ-GUESS if needed ===
+if [ ! -x "${ROOT}/lpjguess/build_imogen/guess" ]; then
+  echo "[$(date '+%F %T')] Building LPJ-GUESS"
+  cd "${ROOT}/lpjguess/build_imogen"
+  cmake .. > "${LOG_DIR}/cmake.log"
+  make -j$(nproc) > "${LOG_DIR}/make.log"
+fi
+
+# === Step 2: ensure Python Intermediary venv ===
+if [ ! -d "${ROOT}/intermediary_py/.venv" ]; then
+  echo "[$(date '+%F %T')] Creating Python venv"
+  cd "${ROOT}/intermediary_py"
+  python3 -m venv .venv
+  .venv/bin/pip install -r requirements.txt openpyxl
+fi
+
+# === Step 3: run Python Intermediary if outputs missing ===
+PY_OUT="${ROOT}/intermediary_py/outputs/imogen_inputs/imogen_inputs_${SCENARIO}.csv"
+if [ ! -f "${PY_OUT}" ]; then
+  echo "[$(date '+%F %T')] Running Python Intermediary"
+  cd "${ROOT}/intermediary_py"
+  .venv/bin/python run_all.py 2>&1 | tee "${LOG_DIR}/intermediary_${SCENARIO}.log"
+fi
+
+# === Step 4: run adapter ===
+echo "[$(date '+%F %T')] Running Python → LPJG-format adapter"
+"${ROOT}/intermediary_py/.venv/bin/python" \
+  "${ROOT}/tools/imogen_inputs_to_lpjg_format.py" \
+  --input "${PY_OUT}" \
+  --output "${SCRATCH}/LPJG_main/IMOGEN/" \
+  2>&1 | tee "${LOG_DIR}/adapter_${SCENARIO}.log"
+
+# === Step 5: stage non-CO2 RF (currently from static IIASA file) ===
+cp "${ROOT}/data/imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_${SCENARIO,,}_1850_2100.txt" \
+   "${SCRATCH}/LPJG_main/IMOGEN/non_co2_rf.txt"
+
+# === Step 6: clean stale IMOGEN run output ===
+rm -rf "${SCRATCH}/IMOGEN"/output 2>/dev/null
+rm -f "${SCRATCH}/LPJG_main/IMOGEN/done" 2>/dev/null
+
+# === Step 7: run LPJ-GUESS ===
+echo "[$(date '+%F %T')] Running LPJ-GUESS coupled (-input imogencfx)"
+cd "${RUN_DIR}"
+DIR_COMMON="${SCRATCH}" \
+  "${ROOT}/lpjguess/build_imogen/guess" \
+  -input imogencfx main.ins \
+  2>&1 | tee "${LOG_DIR}/coupled_${SCENARIO}.log"
+
+# === Step 8: collect results ===
+echo "[$(date '+%F %T')] Coupled run complete; outputs at ${RUN_DIR}/output/"
+ls -la "${RUN_DIR}/output/"
+
+echo "[$(date '+%F %T')] Run summary in ${LOG_DIR}/coupled_${SCENARIO}.log"
+```
+
+```bash
+#!/bin/bash
+# scripts/run_coupled.sbatch  —  cluster SLURM template
+# Replace {{...}} placeholders with cluster-specific values
+
+#SBATCH --job-name=landsymm-imogen-{{SCENARIO}}
+#SBATCH --partition={{PARTITION}}                # e.g. owl, haswell
+#SBATCH --nodes={{NODES}}                        # e.g. 2
+#SBATCH --ntasks-per-node={{TASKS}}              # e.g. 40
+#SBATCH --time=72:00:00                           # 3 days
+#SBATCH --output=logs/%x-%j.out
+#SBATCH --error=logs/%x-%j.err
+
+# Cluster-specific module setup:
+module load gcc/14 cmake/3.29 netcdf-c/4.9 netcdf-fortran/4.6 openmpi/5.0
+# Or, if the cluster uses Spack / EnvironmentModules / Lmod, adapt:
+# spack load gcc@14 cmake netcdf-c netcdf-fortran openmpi
+
+# Use scratch
+export DIR_COMMON="/scratch/${USER}/landsymm-imogen-${SLURM_JOB_ID}"
+mkdir -p "${DIR_COMMON}"
+
+# Run
+srun ./scripts/run_coupled.sh {{SCENARIO}} {{GRIDLIST}}
+
+# Copy results back to permanent storage
+rsync -av runs/{{SCENARIO}}/output/ \
+       /work/${USER}/landsymm_imogen_runs/{{SCENARIO}}-${SLURM_JOB_ID}/
+```
+
+### A.5 RCMIP-vs-IIASA backbone selector (sketch)
+
+If the user chooses Option C of II.1 (support both):
+
+```python
+# Intermediary_py/.../src/component_a_anthropogenic/__init__.py
+"""
+Adds a --backbone CLI option to run_all.py that selects either
+RCMIP or IIASA as the substitution backbone.
+"""
+import argparse
+import os
+
+BACKBONE = os.environ.get("INTERMEDIARY_BACKBONE", "rcmip")
+assert BACKBONE in ("rcmip", "iiasa"), \
+    f"Unknown backbone: {BACKBONE}. Use 'rcmip' (default) or 'iiasa'."
+
+def get_substitution_module():
+    if BACKBONE == "rcmip":
+        from .rcmip_substitution import rcmip_substitution_processing as mod
+    else:
+        from .iiasa_substitution import iiasa_substitution_processing as mod
+    return mod
+```
+
+The `iiasa_substitution/` directory would contain:
+```
+iiasa_substitution/
+├── iiasa_substitution_processing.py   # Reads Data/Concentrations/IIASA/CMIP6/*.xlsx
+├── iiasa_lpjg_simulated_decomposer.py  # Splits IIASA per-gas total into lpjg/non-lpjg
+└── iiasa_comparison_plotting.py        # Validation plots vs RCMIP backbone
+```
+
+Internal logic:
+
+```python
+# iiasa_substitution/iiasa_substitution_processing.py
+"""
+Reads IIASA SSP DB v2.0 CMIP6 emissions and produces the
+'lpjg-simulated' and 'non-lpjg-simulated' decomposition files
+the C++ Adder expected.
+
+Outputs in same schema as rcmip_substitution_*.csv for downstream
+compatibility with Component C.
+"""
+import pandas as pd
+from pathlib import Path
+from src.shared.paths import IIASA_INPUTS_DIR, OUT_A_DATA
+
+# IIASA per-sector classifications:
+#   "AFOLU|Agriculture" → LPJG/IPCC simulates (substitute)
+#   "AFOLU|Land Use Change" → LPJG simulates via NEE (substitute for CO2)
+#   "Energy", "Industry", "Transport", "Waste" → not modelled (keep)
+LPJG_SIMULATED_SECTORS = ["AFOLU|Agriculture", "AFOLU|Land Use Change"]
+
+def decompose(scenario, gas):
+    df = pd.read_excel(IIASA_INPUTS_DIR / f"{scenario.lower()}.xlsx")
+    df_lpjg = df[df["Sector"].isin(LPJG_SIMULATED_SECTORS)].sum()
+    df_non = df[~df["Sector"].isin(LPJG_SIMULATED_SECTORS)].sum()
+    # ... write to outputs/component_a/data/iiasa_substitution_{gas}.csv
+```
+
+This is ~200 lines of Python; not difficult but takes a day to write
+and validate.
+
+---
+
+*End of execution plan.*
+
+*This document is a working instrument: please mark items as resolved
+or annotate corrections in-place. The sequencing in Part IV is a
+suggestion; reorder as the supervisor's priorities dictate.*

@@ -1,0 +1,105 @@
+cff-version: 1.2.0
+message: "If you use this software or the LandSyMM-IMOGEN coupled framework, please cite both the GMD paper and this software repository."
+type: software
+title: "LandSyMM-IMOGEN: A coupled model framework for bottom-up agricultural, land use, and management emissions on climate-ecosystem interactions"
+abstract: >
+  A closed-loop coupled model framework combining LPJ-GUESS 4.1 (LandSyMM
+  fork; dynamic global vegetation model with managed land), PLUM v2 (land
+  use and management economic optimisation; external), the IPCC 2019
+  Refinement Tier-1 Intermediary Controller (Python imogen_ghg_controller
+  for anthropogenic CH4/N2O agricultural emissions and RCMIP Phase 2
+  substitution), and IMOGEN (pattern-scaled climate emulator with
+  FaIR v1.3 ERF). Implements a two-stage protocol: open-loop yield
+  generation feeding PLUM, and closed-loop emissions/feedback at annual
+  cadence over 1850-2100 on a 0.5° × 0.5° global grid. Validated against
+  GMB 2025, GNB 2024, GCB 2025 reference budgets and NOAA GMD / AGAGE
+  atmospheric concentration observations.
+authors:
+  - family-names: Bampoh
+    given-names: Daniel Kojo
+    affiliation: "KIT IMK-IFU"
+    # ORCID: https://orcid.org/...   # to be filled in
+license: MIT
+repository-code: "https://github.com/dbampoh/lpj-guess_imogen_landsymm"
+# Mirror remotes:
+# - https://gitlab.imk-ifu.kit.edu/<user>/lpj-guess_imogen_landsymm
+# - https://<helmholtz-gitlab>/<user>/lpj-guess_imogen_landsymm
+keywords:
+  - "coupled model"
+  - "LPJ-GUESS"
+  - "IMOGEN"
+  - "PLUM"
+  - "LandSyMM"
+  - "IPCC Tier-1 emissions"
+  - "RCMIP"
+  - "FAIR ERF"
+  - "GHG emissions"
+  - "climate-ecosystem interactions"
+  - "SSP-RCP scenarios"
+  - "GMD"
+preferred-citation:
+  type: article
+  title: "A novel coupled model framework to explore the influence of bottom-up agricultural, land use, and management emissions on climate-ecosystem interactions"
+  authors:
+    - family-names: Bampoh
+      given-names: Daniel Kojo
+      affiliation: "KIT IMK-IFU"
+  # journal: "Geoscientific Model Development"
+  # year: 2026
+  # doi: 10.5194/gmd-...
+  # status: in preparation
+  notes: "GMD paper currently in preparation; final citation details will be added when accepted."
+references:
+  - type: article
+    title: "Hyland: A coupled vegetation, climate model"
+    authors:
+      - family-names: Huntingford
+        given-names: Chris
+    year: 2010
+    journal: "Geoscientific Model Development"
+    notes: "Foundational IMOGEN paper"
+  - type: article
+    title: "Adaptation of global land use and management intensity to changes in climate and atmospheric carbon dioxide"
+    authors:
+      - family-names: Alexander
+        given-names: Peter
+    year: 2018
+    journal: "Global Change Biology"
+    notes: "Foundational PLUM v2 paper"
+  - type: article
+    title: "Impacts of future agricultural change on ecosystem service indicators"
+    authors:
+      - family-names: Rabin
+        given-names: Sam
+    year: 2020
+    journal: "Earth System Dynamics"
+    notes: "Foundational LandSyMM ecosystem-services paper"
+  - type: article
+    title: "Climate pattern-scaling set for an ensemble of 22 GCMs — adding uncertainty to the IMOGEN version 2.0 impact system"
+    authors:
+      - family-names: Zelazowski
+        given-names: Przemyslaw
+    year: 2018
+    journal: "Geoscientific Model Development"
+  - type: article
+    title: "PRIME: a probabilistic emulator framework for evaluating climate impact and adaptation responses"
+    authors:
+      - family-names: Mathison
+        given-names: Camilla
+    year: 2025
+    journal: "Geoscientific Model Development"
+    notes: "FaIR-driven IMOGEN approach this framework follows"
+  - type: article
+    title: "Reduced Complexity Model Intercomparison Project Phase 2: Synthesising Earth system knowledge for probabilistic climate projections"
+    authors:
+      - family-names: Nicholls
+        given-names: Zebedee
+    year: 2020
+    notes: "RCMIP Phase 2 — substitution backbone"
+  - type: article
+    title: "FAIR v1.3: A simple emissions-based impulse response and carbon cycle model"
+    authors:
+      - family-names: Smith
+        given-names: Christopher J.
+    year: 2018
+    journal: "Geoscientific Model Development"
