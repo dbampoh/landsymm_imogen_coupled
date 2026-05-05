@@ -1,0 +1,36 @@
+# IMOGEN reference data manifest
+# ==============================
+#
+# Authoritative description of the IMOGEN reference data tarballs that
+# the unified codebase needs at run-time. Used by tools/fetch_imogen_data.sh
+# to download, verify, and extract the data.
+#
+# Manifest format: one record per tarball, blank-line- or '#'-prefixed
+# lines are ignored. Each record has 5 fields, whitespace-separated:
+#
+#   <component>  <filename>  <sha256>  <size_bytes>  <extract_to>
+#
+# - component:    short name used by the fetch script's --component flag
+# - filename:     the tarball filename (relative; the URL/path base is
+#                 supplied at fetch time via $IMOGEN_DATA_BASE)
+# - sha256:       lowercase hex digest, computed via `sha256sum`
+# - size_bytes:   exact byte count from `stat -c %s` (sanity check)
+# - extract_to:   path RELATIVE to the repo root where the tarball
+#                 should be extracted; should leave the repo at the
+#                 layout expected by imogen/code/imogen_settings.txt
+#                 default DIR_PATT and DIR_CLIM values.
+#
+# All entries below were generated on 2026-05-05 from
+# version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Common-directory/IMOGEN-codebase/
+# at step 4 of the unified-codebase rebuild.
+#
+# To regenerate (e.g. when adding a new GCM):
+#   1. rsync source data into imogen/patterns/<NEW_DIR>/
+#   2. cd imogen && tar -czf ../../../../lpj-guess_imogen_landsymm_data/imogen-<new>-v<X.Y>.tar.gz patterns/<NEW_DIR>
+#   3. sha256sum that tarball; stat -c %s ; update this file
+#
+# component                filename                                       sha256                                                            size_bytes  extract_to
+patterns-cmip5             imogen-patterns-cmip5-v1.0.tar.gz             aaafdf8002da1af22515b31918666d7b78ebb0da2b87ae9a65571856785eb635  19458460    imogen/
+patterns-cmip6             imogen-patterns-cmip6-v1.0.tar.gz             e6e6c08218a20d024e9e1a8b8ffaa15fc1c863ee30ca520f3c91c13ae9f47e40  19636509    imogen/
+patterns-cmip3-legacy      imogen-patterns-cmip3-legacy-v1.0.tar.gz      f566bc01c8d16b15a55f85a7710a81c105fd58183d3f77b76995901ce6efd72b  546260      imogen/
+cruncep                    imogen-cruncep-1960-1989-v1.0.tar.gz          ef2181433cdc51d0a6c89a4b3d7b682c3be5d47e7dff66b17817f7c45f40426b  10938406    imogen/

@@ -1,10 +1,12 @@
 # `imogen/` — IMOGEN climate emulator (Fortran, working IMOGEN)
 
 The Fortran IMOGEN climate emulator with the LPJ-GUESS coupling
-extensions. Imported and minimally fixed at **step 2** of the rebuild
-plan; refactored to support run-time-configurable gridlist sizing at
-**step 3** (see `EXECUTION_PLAN.md` §V; `../notes/STEP_2.md` and
-`../notes/STEP_3.md` for verification records).
+extensions. Imported and minimally fixed at **step 2**; refactored to
+support run-time-configurable gridlist sizing at **step 3**; reference
+data (GCM patterns + CRUNCEP base climatology) acquisition automated
+at **step 4**, where the binary first produced real per-year output
+(years 1871, 1872 of the standalone smoke run). See `EXECUTION_PLAN.md`
+§V; `../notes/STEP_{2,3,4}.md` for per-step verification records.
 
 The C++ refactor (`IMOGENCXX/`) gets brought to numerical parity
 against this Fortran in **Phase 2** of the IMOGEN rebuild
@@ -145,19 +147,49 @@ discipline rule "startup banners" (`CONTRIBUTING.md`).
 
 `nonco2.f` references none of these constants — no changes there.
 
+## Step-4 IMOGEN reference data + standalone smoke milestone
+
+Step 4 added the GCM-pattern + CRUNCEP-base-climatology data acquisition
+infrastructure. **The data lives outside git** (49 MB compressed → 161 MB
+extracted); it's fetched at workstation/cluster setup time via:
+
+```bash
+tools/fetch_imogen_data.sh --base <DATA_LOCATION>
+```
+
+See `imogen/patterns/README.md` and `imogen/CRUNCEP_1960_1989/README.md`
+for the full layout, and `tools/README.md` for fetch-script usage.
+
+**Verification milestone hit at step 4**: with the data staged plus
+the small workaround for bug C2/C3 (pre-staging an empty `done` file
+in `imogen/code/LPJG_main/IMOGEN/`), the Fortran IMOGEN binary produced
+sensible per-year output for 1871, 1872 (`T_anom.dat`, `P_anom.dat`,
+`SW_anom.dat`, `DTEMP_anom.dat`, `WET.dat`, `dtemp_o.dat`, `fa_ocean.dat`,
+`CO2.dat`, `done`). Sample T values are physically plausible
+(231–276 K Arctic-summer-to-winter swing at lat=82.5°). See
+`notes/STEP_4.md` for the comparison against `version_A`'s reference.
+
 ## What's NOT in this step
 
-- No CMIP6 patterns. Step 4 imports them; step 5 converts them to
-  CMIP5 ASCII format.
-- No live coupling with LPJ-GUESS. The `imogen` binary is
-  standalone-Fortran here; the in-process IMOGEN engine that
-  `lpjguess/modules/climatemodel.cpp` invokes is a separate (C++)
-  port that gets brought to parity in Phase 2 (post-v1.0).
-- The standalone IMOGEN-only run (Fortran writing
-  `Common-directory/IMOGEN/output/<YYYY>/{T_anom.dat, ..., done}`
-  for 1871-1873 over the 1631-cell native grid) is still **deferred
-  to step 4**: it requires the patterns and CRUNCEP base climatology
-  imported there.
+- **`Rh_anom.dat` and `W_anom.dat`** are still missing in the Fortran
+  output (confirms `[SA3 §10]`; will be ported back from C++ at step 9.5
+  per Decision #11).
+- **Bug C2/C3** (the polling-loop `DONE_EXIST` check) is **worked around
+  via runtime stub files** but not yet fixed in the source. The
+  source-level fix lands at step 7 of the rebuild plan.
+- **No live coupling with LPJ-GUESS** yet — the `imogen_lpjg` binary
+  is run standalone here. Coupled-mode validation (LPJ-GUESS calling
+  the in-process C++ IMOGEN engine via `imogencfx`) is steps 6-9 of
+  the rebuild plan.
+- **CMIP6 patterns are staged but not yet consumable by the binary**:
+  it expects the CMIP5 ASCII format. The CMIP6 NetCDF → CMIP5 ASCII
+  converter (`tools/cmip6_nc_to_cmip5_ascii.py`) is step 5.
+- **Numerical parity between Fortran and C++ IMOGEN** has not been
+  established — that's itself the Phase-2 milestone (Decision #2).
+  Step 4's smoke run shows ours produces sensibly-shaped output but
+  diverges from `version_A`'s C++-produced reference by 0.1–8 K on
+  T_anom for some cells; the systematic Fortran-vs-C++ comparison is
+  deferred to Phase 2.
 
 ## Settings file convention
 

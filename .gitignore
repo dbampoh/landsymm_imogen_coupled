@@ -117,12 +117,40 @@ data/ndep/*.bin
 data/concentrations/IIASA/CMIP*/XLSX/
 data/concentrations/IIASA/CMIP*/ZIP/
 
-# IMOGEN auxiliary
-imogen/CRUNCEP_*/
-imogen/patterns/CMIP6_*/   # NetCDF patterns; staged via DATA.md
-imogen/patterns/CEN_*/     # CMIP5 ASCII patterns; staged via DATA.md (preserve readme.log)
+# IMOGEN auxiliary (large reference data; acquired via tools/fetch_imogen_data.sh
+# at step 4 of unified-codebase rebuild; never committed to git).
+# NOTE 1: gitignore does NOT support inline comments after a pattern; keep
+# all comments on their own lines.
+# NOTE 2: a file under an EXCLUDED parent directory cannot be re-included via "!".
+# So when we want to keep a README.md within an otherwise-excluded subdir,
+# we must exclude the dir's *contents* (using "<dir>/*") rather than the dir
+# itself, then re-include the README.
+#
+# 30-year base climatology (CRUNCEP 1960-1989, ~60 MB; preserve README.md)
+imogen/CRUNCEP_1960_1989/*
+# 5 CMIP6 NetCDF patterns (~20 MB)
+imogen/patterns/CMIP6_*/
+# 34 CMIP5 ASCII patterns (~82 MB)
+imogen/patterns/CEN_*/
+# 1 CMIP3 legacy pattern (~2 MB)
+imogen/patterns/ukmo_hadcm3_rel/
+# Reference emission files (~20 KB historical RCP8.5; staged in step 4 for the
+# standalone smoke test; will be moved into a tarball at step 6; preserve README.md)
+imogen/emiss/*
+# Run-time state for standalone IMOGEN smoke runs from imogen/code/
+# (binary writes CO2_all.dat, RF_all.dat, VARYEAR.dat, output/<YYYY>/ here, plus
+# stub LPJG_main files needed to satisfy the polling loop until step 7's source fix).
+imogen/code/IMOGEN/
+imogen/code/runtime/
+imogen/code/LPJG_main/
+# Fortran scratch files (gfortran writes fort.<unit> when an OPEN uses a numeric
+# unit without an explicit FILE=)
+fort.[0-9]*
+# Allow-list overrides — small upstream/internal docs we DO want to track
 !imogen/patterns/readme.log
 !imogen/patterns/README.md
+!imogen/CRUNCEP_1960_1989/README.md
+!imogen/emiss/README.md
 
 # Intermediate emission files
 **/co2_emissions_*.txt

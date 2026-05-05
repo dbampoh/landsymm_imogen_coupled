@@ -3,6 +3,52 @@
 Stand-alone scripts that bridge or transform data between the three
 model components and the user-facing run setup.
 
+## Implemented tools (live; committed to git)
+
+### `fetch_imogen_data.sh` — IMOGEN reference data acquisition (step 4)
+
+Downloads (or copies from a local directory), SHA256-verifies, and
+extracts the GCM-pattern + CRUNCEP base-climatology tarballs into
+`imogen/patterns/` and `imogen/CRUNCEP_1960_1989/`. Reads the
+authoritative manifest at `tools/imogen_data_manifest.txt`.
+
+Quick recipes:
+
+```bash
+# Inspect available components
+tools/fetch_imogen_data.sh --list
+
+# Fetch everything from a local sibling directory (workstation case):
+tools/fetch_imogen_data.sh --base /path/to/lpj-guess_imogen_landsymm_data
+
+# Fetch only what's needed for a smoke run:
+tools/fetch_imogen_data.sh --base ... --component patterns-cmip5 --component cruncep
+
+# Verify a previous fetch:
+tools/fetch_imogen_data.sh --base ... --verify-only
+```
+
+The data location can also be an `https://` URL prefix once the
+tarballs are uploaded to a permanent host (Zenodo / GitHub Releases /
+institutional bucket — see `notes/STEP_4.md` §3).
+
+### `imogen_data_manifest.txt` — authoritative tarball manifest
+
+Plain-text, hash-keyed list of the 4 IMOGEN tarballs with SHA256
+checksums and exact byte sizes. Used by `fetch_imogen_data.sh` to
+verify integrity before extraction. Generated 2026-05-05 from
+`version_A/.../IMOGEN-codebase/`. Format:
+
+```text
+<component>  <filename>  <sha256>  <size_bytes>  <extract_to>
+```
+
+Adding a new GCM pattern requires:
+
+1. `tar -czf …new….tar.gz -C imogen patterns/<NEW_DIR>`
+2. `sha256sum …new….tar.gz` and `stat -c %s …new….tar.gz`
+3. Append a row to this manifest.
+
 ## Planned tools (per `EXECUTION_PLAN.md` Part V)
 
 | Tool | Step | Role |
