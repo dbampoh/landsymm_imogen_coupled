@@ -8,6 +8,7 @@ FILE_LPJG_FLUX extended_lpjg_only_cfluxrcp85.txt
 FILE_GRIDLIST gridlist_hurtt_RNDM_midpoint_3698.txt
 FILE_LPJG_CH4_N2O_FLUX ch4_n2o_annual_historical_ssp5rcp85_lpjg_simulated_real.txt
 FILE_SCEN_CO2_PPMV
+NGPOINTS 3698		!IN Number of grid points in the regridding gridlist (FILE_GRIDLIST). Must equal the line count of that file. Step 3 of unified-codebase rebuild made this run-time configurable; previously a hard-coded PARAMETER. - DKB 2026-05-05
 STEP_DAY 1 		!IN Number of daily timesteps of IMPACTS_MODEL !NOTE: Formerly set to 24 - TP 13.07.15
 T_OCEAN_INIT 289.28	!IN Initial ocean temperature (K)
 KAPPA_O 280.0		!IN Ocean eddy diffusivity (W/m/K)

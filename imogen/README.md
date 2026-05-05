@@ -2,8 +2,9 @@
 
 The Fortran IMOGEN climate emulator with the LPJ-GUESS coupling
 extensions. Imported and minimally fixed at **step 2** of the rebuild
-plan (`EXECUTION_PLAN.md` §V.1; see `../notes/STEP_2.md` for
-verification record).
+plan; refactored to support run-time-configurable gridlist sizing at
+**step 3** (see `EXECUTION_PLAN.md` §V; `../notes/STEP_2.md` and
+`../notes/STEP_3.md` for verification records).
 
 The C++ refactor (`IMOGENCXX/`) gets brought to numerical parity
 against this Fortran in **Phase 2** of the IMOGEN rebuild
@@ -20,18 +21,20 @@ foundational IMOGEN papers in `docs/`); Zelazowski 2018 for the
 Mathison 2025 PRIME for the FaIR ERF integration approach the
 working paper adopts.
 
-## Layout (post-step-2)
+## Layout (post-step-3)
 
 ```
 imogen/
 ├── README.md                          (this file)
 ├── code/                              ← imported from
 │   ├── imogen_lpjg.f                   Common-directory/IMOGEN-codebase/code/
-│   ├── nonco2.f                        in step 2 (~470 KB)
+│   ├── nonco2.f                        in step 2 (~470 KB);
+│   │                                   step 3: NGPOINTS-arrays converted to ALLOCATABLE
 │   ├── Makefile                       Build with: make
 │   ├── compile.sh                     Alternative: bash compile.sh
 │   ├── imogen_settings.txt            Linux-relative-path defaults (rewritten
-│   │                                   from Windows C:\GitHub\... paths in step 2)
+│   │                                   from Windows C:\GitHub\... paths in step 2);
+│   │                                   step 3: new NGPOINTS key for run-time grid sizing
 │   ├── imogen_settings_tmpl.txt       Shell-variable template (upstream)
 │   ├── gridlist_global.txt            13-cell tiny test grid
 │   ├── gridlist_3deg.txt              2 371-cell 3° grid
@@ -100,18 +103,61 @@ and CRUNCEP base climatology that get imported at step 4. The
 step-2 verification reduces to "build succeeds" + "binary starts up
 and parses settings file" (both confirmed; see `notes/STEP_2.md`).
 
+## Step-3 `ALLOCATABLE` refactor — what changed
+
+Per Decision #2 and `EXECUTION_PLAN.md` §V step 3, the **6 `NGPOINTS`-dimensioned
+arrays** in `PROGRAM IMOGEN` were converted from static to `ALLOCATABLE`,
+and `NGPOINTS` was promoted from a `PARAMETER` to a run-time setting:
+
+| Array | Old declaration | New declaration |
+|---|---|---|
+| `T_OUT_M_REGRID` | `REAL T_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)` (static) | `REAL, ALLOCATABLE :: T_OUT_M_REGRID(:,:,:,:)` |
+| `P_OUT_M_REGRID` | static `(NGPOINTS,MM,32,NSDMAX)` | `ALLOCATABLE (:,:,:,:)` |
+| `SW_OUT_M_REGRID` | static `(NGPOINTS,MM,32,NSDMAX)` | `ALLOCATABLE (:,:,:,:)` |
+| `DTEMP_OUT_M_REGRID` | static `(NGPOINTS,MM,32)` | `ALLOCATABLE (:,:,:)` |
+| `F_WET_CLIM_REGRID` | static INTEGER `(NGPOINTS,MM)` | `INTEGER, ALLOCATABLE (:,:)` |
+| `LON_OUT`, `LAT_OUT` | static `(NGPOINTS)` | `ALLOCATABLE (:)` |
+
+`NGPOINTS` itself moved from `PARAMETER(NGPOINTS=3698)` to a regular
+`INTEGER` populated by `SETTIN` from a new `NGPOINTS 3698` line in
+`imogen_settings.txt`. A sentinel value (`-1`) plus post-loop
+validation in `SETTIN` aborts cleanly if the line is missing or
+non-positive.
+
+**To run with a 62 000-cell gridlist** (the original motivation, from
+`COUPLED_MODEL_INVESTIGATION.md` §4.3.3):
+
+1. Edit `imogen_settings.txt`: change `NGPOINTS 3698` to `NGPOINTS 62000`.
+2. Edit `FILE_GRIDLIST` to point to your 62 000-line gridlist file.
+3. Run `./imogen_lpjg`. **No recompile needed.**
+
+The startup banner `IMOGEN: ALLOCATEd regrid arrays for NGPOINTS=…`
+prints the actual value at runtime, supporting the units-integrity
+discipline rule "startup banners" (`CONTRIBUTING.md`).
+
+### What stayed `PARAMETER` (deferred)
+
+| Constant | Value | Why kept static |
+|---|---:|---|
+| `GPOINTS` | 1631 | Hard-coupled to the pattern + CRUNCEP file structure (those files have exactly 1631 cells); changing requires regenerating upstream files. ~30 arrays affected; pure heap-vs-BSS tweak with no functional benefit at the current value. |
+| `NFARRAY` | 10000 | Caps a single coupled-run segment to 500 yr at NCALLYR=20; sufficient for v1.0 251-yr scenarios. |
+| `N_OLEVS` | 254 | Ocean column resolution; a science choice, not a memory bottleneck. |
+
+`nonco2.f` references none of these constants — no changes there.
+
 ## What's NOT in this step
 
-- No `ALLOCATABLE` array refactor yet. That's **step 3**, where the
-  ~30 statically-declared arrays in `imogen_lpjg.f` and `nonco2.f`
-  that scale with `NGPOINTS` or `GPOINTS` get converted to
-  `ALLOCATABLE`, removing the practical 3 698-cell gridlist cap.
 - No CMIP6 patterns. Step 4 imports them; step 5 converts them to
   CMIP5 ASCII format.
 - No live coupling with LPJ-GUESS. The `imogen` binary is
   standalone-Fortran here; the in-process IMOGEN engine that
   `lpjguess/modules/climatemodel.cpp` invokes is a separate (C++)
   port that gets brought to parity in Phase 2 (post-v1.0).
+- The standalone IMOGEN-only run (Fortran writing
+  `Common-directory/IMOGEN/output/<YYYY>/{T_anom.dat, ..., done}`
+  for 1871-1873 over the 1631-cell native grid) is still **deferred
+  to step 4**: it requires the patterns and CRUNCEP base climatology
+  imported there.
 
 ## Settings file convention
 
@@ -125,6 +171,8 @@ DIR_CLIM ../CRUNCEP_1960_1989/
 FILE_SCEN_EMITS ../emiss/co2_emissions_annual_historical_rcp85_allsources.txt
 FILE_NON_CO2_VALS ../emiss/nonco2_ch4_n2o_RF_historical_rcp85.txt
 FILE_CH4_N2O_EMITS ../emiss/ch4_n2o_annual_historical_rcp85_non_lpjg_simulated.txt
+NGPOINTS 3698        # NEW in step 3: number of grid points; must
+                     # match line count of FILE_GRIDLIST.
 ...
 ```
 

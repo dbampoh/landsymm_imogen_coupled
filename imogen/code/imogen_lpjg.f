@@ -287,18 +287,19 @@ C                                  !name of the climate data directory
       CHARACTER(LEN=4) LASTYEAR !WORK string version of IYEAR-1 for use in locating input/output files - TP 04.08.15
 
       INTEGER NGPOINTS !Number of grid points in new gridlist used for nearest-neighbour regridding - TP 06.08.15
-      PARAMETER(NGPOINTS=3698) !NOTE: Needs to be hard-coded consistent with gridlist file - TP 06.08.15
+C [Step 3 of unified-codebase rebuild: NGPOINTS is now read from
+C  imogen_settings.txt at run-time (was a hard-coded PARAMETER=3698).
+C  This unblocks 62k+ cell gridlists without source recompile, per
+C  Decision #2 of EXECUTION_PLAN.md. - DKB 2026-05-05]
 
-      REAL
-     & T_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)    !OUT Regridded calculated temperature for 365 day year - TP 06.08.15
-     &,P_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)    !OUT Regridded calculated total precipitation for 365 day year - TP 06.08.15
-     &,SW_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)   !OUT Regridded calculated shortwave radiation for 365 day year - TP 06.08.15
-     &,DTEMP_OUT_M_REGRID(NGPOINTS,MM,32)       !OUT Regridded calculated daily temperature range for 365 day year - TP 03.02.16
-      INTEGER F_WET_CLIM_REGRID(NGPOINTS,MM)
+      REAL, ALLOCATABLE :: T_OUT_M_REGRID(:,:,:,:)    !OUT Regridded calculated temperature for 365 day year - TP 06.08.15
+      REAL, ALLOCATABLE :: P_OUT_M_REGRID(:,:,:,:)    !OUT Regridded calculated total precipitation for 365 day year - TP 06.08.15
+      REAL, ALLOCATABLE :: SW_OUT_M_REGRID(:,:,:,:)   !OUT Regridded calculated shortwave radiation for 365 day year - TP 06.08.15
+      REAL, ALLOCATABLE :: DTEMP_OUT_M_REGRID(:,:,:)  !OUT Regridded calculated daily temperature range for 365 day year - TP 03.02.16
+      INTEGER, ALLOCATABLE :: F_WET_CLIM_REGRID(:,:)
 
-      REAL
-     & LON_OUT(NGPOINTS)    !IN/OUT Longitude array to perform regridding to (read from file) - TP 06.08.15
-     &,LAT_OUT(NGPOINTS)    !IN/OUT Latitude array to perform regridding to (read from file) - TP 06.08.15
+      REAL, ALLOCATABLE :: LON_OUT(:)    !IN/OUT Longitude array to perform regridding to (read from file) - TP 06.08.15
+      REAL, ALLOCATABLE :: LAT_OUT(:)    !IN/OUT Latitude array to perform regridding to (read from file) - TP 06.08.15
 
       LOGICAL REGRID        !IN If true use nearest-neighbour regridding - TP 06.08.15
 
@@ -322,7 +323,20 @@ C Now call the subroutine to read in the input settings file - TP 13.07.15
      & FILE_LPJG_FLUX,NYR_LPJG_FLUX,DIR_COMMON,REGRID,
      & FILE_CH4_N2O_EMITS,CH4_INIT_PPBV,N2O_INIT_PPBV,TAU_DECAY_CH4,
      & TAU_DECAY_N2O,NONCO2_EMISSIONS,NONCO2_EMISSIONS_LPJG,FILE_LPJG_CH4_N2O_FLUX,
-     & CO2_RF_FAIR)
+     & CO2_RF_FAIR,NGPOINTS) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05
+
+C [Step 3 of unified-codebase rebuild: ALLOCATE NGPOINTS-dimensioned
+C  arrays now that NGPOINTS has been parsed from imogen_settings.txt.
+C  This converts compile-time sizing to run-time sizing.]
+      ALLOCATE(T_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
+      ALLOCATE(P_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
+      ALLOCATE(SW_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
+      ALLOCATE(DTEMP_OUT_M_REGRID(NGPOINTS,MM,32))
+      ALLOCATE(F_WET_CLIM_REGRID(NGPOINTS,MM))
+      ALLOCATE(LON_OUT(NGPOINTS))
+      ALLOCATE(LAT_OUT(NGPOINTS))
+      PRINT *,'IMOGEN: ALLOCATEd regrid arrays for NGPOINTS=',NGPOINTS
+      CALL FLUSH(6)
 
 C**************************************************************************
 C Now start the business
@@ -1076,6 +1090,17 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
 
       ENDDO !End of KEEPRUNNING loop - TP 29.07.15
 
+C [Step 3 of unified-codebase rebuild: deallocate the NGPOINTS-dimensioned
+C  arrays (good hygiene; prevents leak warnings under valgrind/sanitisers).
+C  - DKB 2026-05-05]
+      IF(ALLOCATED(T_OUT_M_REGRID))     DEALLOCATE(T_OUT_M_REGRID)
+      IF(ALLOCATED(P_OUT_M_REGRID))     DEALLOCATE(P_OUT_M_REGRID)
+      IF(ALLOCATED(SW_OUT_M_REGRID))    DEALLOCATE(SW_OUT_M_REGRID)
+      IF(ALLOCATED(DTEMP_OUT_M_REGRID)) DEALLOCATE(DTEMP_OUT_M_REGRID)
+      IF(ALLOCATED(F_WET_CLIM_REGRID))  DEALLOCATE(F_WET_CLIM_REGRID)
+      IF(ALLOCATED(LON_OUT))            DEALLOCATE(LON_OUT)
+      IF(ALLOCATED(LAT_OUT))            DEALLOCATE(LAT_OUT)
+
       STOP
       END
 
@@ -1213,7 +1238,7 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
      & FILE_LPJG_FLUX,NYR_LPJG_FLUX,DIR_COMMON,REGRID,
      & FILE_CH4_N2O_EMITS,CH4_INIT_PPBV,N2O_INIT_PPBV,TAU_DECAY_CH4,
      & TAU_DECAY_N2O,NONCO2_EMISSIONS,NONCO2_EMISSIONS_LPJG,FILE_LPJG_CH4_N2O_FLUX,
-     & CO2_RF_FAIR)
+     & CO2_RF_FAIR,NGPOINTS) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05
 
       IMPLICIT NONE
 
@@ -1226,6 +1251,7 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
       INTEGER NYR_EMISS     !IN Number of years of emission data in file.
       INTEGER NYR_EMISS_NONCO2 !IN Number of years of CH4 and N2O emission data in file.
       INTEGER NYR_LPJG_FLUX !IN Number of years of emission data in LPJ-GUESS C flux file
+      INTEGER NGPOINTS      !OUT Number of grid points in regridding gridlist (FILE_GRIDLIST). Added Step 3 of unified-codebase rebuild - DKB 2026-05-05
 
       REAL KAPPA_O      !IN Ocean eddy diffusivity (W/m/K)
       REAL F_OCEAN      !IN Fractional coverage of the ocean
@@ -1276,6 +1302,9 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
       FILE_SCEN_CO2_PPMV=' '
       FILE_LPJG_FLUX=' '
       FILE_LPJG_CH4_N2O_FLUX=' '
+C [Step 3 of unified-codebase rebuild: sentinel value for NGPOINTS so we
+C  can detect a missing setting after the parse loop completes.]
+      NGPOINTS=-1
 
       OPEN(81,FILE='imogen_settings.txt') !TODO: Update folder path appropriately - TP 03.08.15
 
@@ -1419,6 +1448,9 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
             CASE('CO2_RF_FAIR')
               READ(BUFFER,*,IOSTAT=IOS) CO2_RF_FAIR
               PRINT *,'Read CO2_RF_FAIR: ',CO2_RF_FAIR
+            CASE('NGPOINTS')
+              READ(BUFFER,*,IOSTAT=IOS) NGPOINTS
+              PRINT *,'Read NGPOINTS: ',NGPOINTS
             CASE DEFAULT
               PRINT *,'Skipping invalid label "',LABEL,'" at line ',LINE
           ENDSELECT
@@ -1427,6 +1459,18 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
 
       CLOSE(81)
       CALL FLUSH(6)
+
+C [Step 3 of unified-codebase rebuild: validate NGPOINTS was actually set.
+C  If absent or non-positive, abort with a clear message rather than letting
+C  ALLOCATE() fail or (worse) allocate a garbage size and segfault later.]
+      IF(NGPOINTS.LE.0) THEN
+        PRINT *,'ERROR: imogen_settings.txt is missing or has invalid'
+        PRINT *,'       NGPOINTS line. Add e.g. "NGPOINTS 3698" matching'
+        PRINT *,'       the line count of your FILE_GRIDLIST.'
+        PRINT *,'       Got NGPOINTS=',NGPOINTS
+        CALL FLUSH(6)
+        STOP 1
+      ENDIF
 
       RETURN
       END

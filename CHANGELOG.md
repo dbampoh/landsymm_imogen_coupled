@@ -19,6 +19,115 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.3.0-fortran-allocatable] — 2026-05-05 — step 3
+
+### Changed — Fortran IMOGEN: `ALLOCATABLE` array refactor (`NGPOINTS` runtime)
+
+Per Decision #2 (Fortran-with-`ALLOCATABLE`-first IMOGEN strategy)
+and `EXECUTION_PLAN.md` §V step 3, the 6 `NGPOINTS`-dimensioned
+arrays in `imogen/code/imogen_lpjg.f` `PROGRAM IMOGEN` were
+converted from static to Fortran-90 `ALLOCATABLE`, and the
+`PARAMETER(NGPOINTS=3698)` was promoted to a run-time setting:
+
+- `T_OUT_M_REGRID(:,:,:,:)`, `P_OUT_M_REGRID(:,:,:,:)`,
+  `SW_OUT_M_REGRID(:,:,:,:)`, `DTEMP_OUT_M_REGRID(:,:,:)`,
+  `F_WET_CLIM_REGRID(:,:)`, `LON_OUT(:)`, `LAT_OUT(:)` are now
+  `ALLOCATABLE`, allocated in `PROGRAM IMOGEN` immediately after
+  `CALL SETTIN(...)` returns the run-time `NGPOINTS` value.
+- `imogen/code/imogen_settings.txt` gains a new
+  `NGPOINTS 3698` key; `SUBROUTINE SETTIN` reads it via a new
+  `CASE('NGPOINTS')` branch (signature now ends `…,CO2_RF_FAIR,NGPOINTS)`).
+- A sentinel value (`NGPOINTS = -1`) plus post-loop validation in
+  `SETTIN` aborts with a clear error message if the new key is
+  missing or non-positive — preventing silent failure.
+- A matching `DEALLOCATE(...)` block before `STOP` in `PROGRAM IMOGEN`
+  ensures clean shutdown (with `IF(ALLOCATED(...))` guards to remain
+  safe under any future early-error path).
+- A startup banner `IMOGEN: ALLOCATEd regrid arrays for NGPOINTS=…`
+  prints the actual value at run time, supporting the units-integrity
+  rule "startup banners".
+
+### Verification
+
+- Build with `gfortran -ffixed-line-length-132 -O` succeeds clean (no
+  warnings).
+- **Positive smoke probe** (`NGPOINTS=3698`, default): parser reads,
+  ALLOCATEs ~33 MB heap, terminates at later runtime input read
+  (`IMOGEN/CO2_all.dat`) — same termination signature as step 2 →
+  no regression.
+- **Negative smoke probe** (`NGPOINTS` line removed from settings):
+  validation fires, clean abort with helpful error message,
+  `STOP 1`.
+- **Scaling probe** (`NGPOINTS=10000`): parser reads new value,
+  ALLOCATEs ~90 MB heap, terminates at same later runtime input
+  read → confirms the run-time configurability works.
+
+### Deferred (not in this release)
+
+- `GPOINTS`-dimensioned arrays (~30 of them) remain `PARAMETER`-sized
+  at 1631; conversion to `ALLOCATABLE` is a marginal heap-vs-BSS
+  tweak with no functional benefit and is deferred to a future
+  cleanup step. Changing `GPOINTS` itself requires regenerating the
+  pattern + CRUNCEP files (1 631 cells locked in by upstream).
+- `NFARRAY` (10 000) and `N_OLEVS` (254) likewise remain `PARAMETER`
+  — neither is a memory bottleneck nor user-facing.
+- `nonco2.f` references none of these constants → no changes needed
+  there.
+
+### Files touched
+
+- `imogen/code/imogen_lpjg.f` — 7 ALLOCATABLE decls, ALLOCATE block,
+  DEALLOCATE block, SETTIN signature/decl/sentinel/CASE/validation.
+- `imogen/code/imogen_settings.txt` — added `NGPOINTS 3698` line.
+- `notes/STEP_3.md` — full per-edit verification record.
+- `imogen/README.md` — step-3 layout + ALLOCATABLE-refactor section
+  + how to scale to 62 000 cells.
+
+### Documentation updates
+
+- `EXECUTION_PLAN.md` Part V step 3 marked ✅ complete.
+
+---
+
+## [v0.2.0-imports] — 2026-05-05 — steps 1 + 2
+
+### Added — LPJ-GUESS LandSyMM fork (step 1)
+
+- `lpjguess/` populated with the upstream LPJ-GUESS LandSyMM fork
+  (`trunk_r13078`-equivalent, chosen over upstream `trunk_r13078`
+  to avoid the `exit(200)` regression).
+- Build configured with Anaconda3 NetCDF (per Decision #8) — works
+  cleanly on the user's workstation where the native Ubuntu HDF5
+  has a `curl_global_init@CURL_OPENSSL_4` ABI mismatch with libcurl
+  4.
+- All 162 unit tests pass post-import; CFX smoke test deferred to
+  step 6.
+- Documented in `notes/STEP_1.md`.
+
+### Added — Fortran IMOGEN with immediate fixes (step 2)
+
+- `imogen/code/` populated with `imogen_lpjg.f`, `nonco2.f`,
+  `Makefile`, `compile.sh`, gridlists, etc.
+- Step-2 fixes applied immediately on import:
+  - **C10**: removed `PAUSE` statement in `QSAT` (halted
+    non-interactive runs).
+  - **C11**: removed `qsat_output.txt` debug-dump (file-handle
+    leak; O(GB) of unused output).
+  - **C12**: replaced Windows `\IMOGEN\output\` mkdir paths with
+    forward slashes.
+  - **C13**: rewrote Windows absolute paths in `imogen_settings.txt`
+    to relative paths.
+  - **Makefile**: replaced Windows `del` with `rm -f`; renamed
+    target from `imogen` to `imogen_lpjg`.
+  - **compile.sh**: removed `.exe` Windows convention.
+- Build with `gfortran` succeeds clean; functional probe confirms
+  startup + settings parsing.
+- Standalone IMOGEN-only run deferred to step 4 (requires patterns
+  + CRUNCEP).
+- Documented in `notes/STEP_2.md`.
+
+---
+
 ## [v0.1-skeleton] — 2026-05-05
 
 ### Added — initial repository scaffolding (step 0 of the rebuild plan)
