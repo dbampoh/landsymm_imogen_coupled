@@ -19,6 +19,151 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.8.0-imogenoutput] — 2026-05-06 — step 8
+
+### Added — LPJG-side handshake writer + `coupling_mode` ins parameter
+
+Per `EXECUTION_PLAN.md` V.1 step 8 + Appendix A.1. Implements a new
+LPJ-GUESS output module that writes per-year handshake control files
+the IMOGEN engine consumes, completing the LPJG → IMOGEN feedback
+flow that step 7's polling-loop fixes had un-blocked.
+
+#### New module — `lpjguess/modules/imogenoutput.cpp/h` (~470 lines total)
+
+A `GuessOutput::ImogenOutput` class derived from `OutputModule`,
+registered via `REGISTER_OUTPUT_MODULE("imogenoutput", ImogenOutput)`.
+Writes 4 files at `<DIR_COMMON>/LPJG_main/IMOGEN/`:
+
+- `imogen_lpjg_flux.txt` — `(year, NEE_PgC)` timeseries (append per year)
+- `imogen_lpjg_ch4_n2o_flux.txt` — `(year, CH4_TgCH4, N2O_TgN2O)` timeseries
+- `imogen_lpjg.txt` — control state for IMOGEN's next year (overwritten)
+- `done` — handshake marker (touched LAST, after data writes finish)
+
+Cadence: per-gridcell accumulation in `outannual()`; year-change
+detection at start of `outannual` triggers `flush_year(prev_year)`
+and accumulator reset; final-year flush in destructor.
+
+Mode-gated by `IMOGENConfig::coupling_mode`:
+- `"tight"` (default) — all 4 files written; IMOGEN engine consumes them
+- `"prescribed"` — all 4 files written; IMOGEN engine reads from
+  static path in ins file (handshake files act as diagnostics only)
+- `"loose"` — NO files written; LPJG runs against pre-baked IMOGEN
+  climate library on disk
+
+Unit conversions emit canonical IPCC units:
+- NEE: kgC across all gridcells × 1e-12 → PgC/yr (positive = source)
+- CH4: g(CH4-C) × (16/12) × 1e-12 → TgCH4/yr
+- N2O: kgN × (44/28) × 1e-9 → TgN2O/yr
+
+Spherical-Earth gridcell-area approximation (R=6 371 km, 0.5° resolution).
+
+#### `coupling_mode` ins parameter
+
+Three small additions to plumb the new parameter through:
+- `lpjguess/framework/parameters.h` — `extern xtring coupling_mode;` decl
+- `lpjguess/framework/parameters.cpp` — definition with `"tight"` default
+- `lpjguess/modules/imogencfx.cpp` — `declare_parameter("coupling_mode", ...)` registration
+
+#### Build-system update
+
+`lpjguess/modules/CMakeLists.txt` extended with `imogenoutput.h` and
+`imogenoutput.cpp` so both `guess` and `runtests` targets pick up the
+new module.
+
+### Removed — dead `getImogenData()` placeholder helper
+
+In `lpjguess/modules/miscoutput.h`:
+- Deleted the `getImogenData(int lower, int upper)` static helper
+  (~12 lines) that returned non-deterministic random values from a
+  `std::random_device`-seeded `std::uniform_real_distribution<>`. It
+  was defined but never invoked anywhere in the codebase, and was
+  semantically misleading (a "data getter" that returned randomness).
+- Removed unused `#include <random>` (was the only consumer).
+
+The 12 `xtring file_*_anom` and `Table out_*_anom` declarations
+remain in place — they're inert at runtime and are tracked
+separately as follow-up F-9 (climate-input diagnostic outputs;
+distinct concern from step 8's handshake-writer scope).
+
+### Documented — major architectural finding F-10 (extensive)
+
+Step 8's investigation surfaced what is arguably the most important
+architectural finding of the entire investigation phase: the
+LPJ-GUESS framework's `framework.cpp` lines 411-516 implement a
+**per-gridcell-outer / per-day-inner across all years** loop. Each
+gridcell processes ALL its years before the next gridcell starts.
+
+This is **fundamentally incompatible** with proper per-year-globally-
+synchronized tight coupling. When gridcell-1 finishes year-N and the
+handshake fires, gridcell-2 has not yet started year-N. Step 8's
+writer therefore emits **per-gridcell-rolling** values (which meet
+V.1's stated step-8 milestone — non-empty, sensible files), but the
+values are NOT globally synchronized.
+
+This finding is the formal explanation for why [CMI §1.1] notes the
+predecessor framework "never ran end-to-end." The predecessor's
+polling loops were "neutered" by bugs C2/C3 to mask the
+synchronization gap; step 7's un-neutering and step 8's writer
+expose it.
+
+**Phase-2 recommendation** (per user guidance 2026-05-06): when we
+implement proper synchronized tight coupling, do NOT alter the
+existing `framework.cpp` loop. Instead, add a runtime parameter
+(e.g. `framework_loop_mode = "year_outer"`) that gates a NEW
+per-year-outer code path which lives ALONGSIDE the default
+per-gridcell-outer path. This mirrors the LandSyMM-fork-into-LTS
+integration pattern from earlier in the chat history — additive
+parameter-gated code, no behavioral change to the default path.
+
+Full extensive write-up in `notes/FOLLOWUPS.md` F-10 (~150 lines)
+and cross-referenced from `notes/STEP_8.md`,
+`lpjguess/modules/imogenoutput.h`, and `EXECUTION_PLAN.md`.
+
+### Documented — F-9 (half-scaffolded miscoutput climate-input diagnostics)
+
+Cross-reference to the surviving 12 `file_*_anom` table stubs in
+miscoutput. These are the climate-input diagnostic outputs (T_anom,
+P_anom, Tmin/Tmax_anom etc. — what IMOGEN supplied to LPJG) — a
+distinct concern from step 8's handshake-writer scope. Best timing
+to complete is step 9.5 alongside Rh_anom / W_anom output parity.
+
+### Verification
+
+```text
+$ cd lpjguess/build && make
+[ 83%] Building CXX object CMakeFiles/runtests.dir/modules/imogenoutput.cpp.o
+[100%] Built target runtests
+
+$ ./runtests
+All tests passed (162 assertions in 25 test cases)
+```
+
+✅ Build clean; all 162 unit tests still pass; no regression from
+the 6 source-code edits. Per-year file-write verification is gated
+on step 9 (run-config setup); step 8 establishes the writer
+infrastructure and registration.
+
+### Files modified / added
+
+```text
+Added:
+  lpjguess/modules/imogenoutput.h          ~150 lines
+  lpjguess/modules/imogenoutput.cpp        ~310 lines
+  notes/STEP_8.md                          ~440 lines
+
+Modified:
+  lpjguess/framework/parameters.h          +9 lines (coupling_mode decl)
+  lpjguess/framework/parameters.cpp        +4 lines (coupling_mode defn)
+  lpjguess/modules/imogencfx.cpp           +7 lines (declare_parameter)
+  lpjguess/modules/CMakeLists.txt          +2 lines (header + source)
+  lpjguess/modules/miscoutput.h            -16 lines / +5 lines (kill dead helper)
+  notes/FOLLOWUPS.md                       +200 lines (F-9 + F-10 entries)
+  CHANGELOG.md                             this entry
+  EXECUTION_PLAN.md                        step 8 row marked ✅
+```
+
+---
+
 ## [v0.7.0-coupling-fixes] — 2026-05-06 — step 7
 
 ### Fixed — LPJ-GUESS coupling source-level bugs (C2, C3, C4) + closes F-4

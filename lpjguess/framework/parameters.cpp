@@ -273,6 +273,10 @@ namespace IMOGENConfig {
 	 xtring simulation_mode;
 	 xtring feedback_mode; //default
 	 xtring interpolation_mode; //can either be nearest neighbour/ inverse weighted distance
+
+	// [Step 8 of unified-codebase rebuild: coupling-mode gate; default "tight".
+	//  See followup F-10 for v1.0 caveats. - DKB 2026-05-06]
+	 xtring coupling_mode = "tight";
 	 xtring ssprcp;
 
 	 //LPJG-IMOGEN Coupling config params

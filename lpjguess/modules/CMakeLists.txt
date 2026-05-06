@@ -38,6 +38,7 @@ set(headers
   intermediary.h
   climatemodel.h
   imogenlogger.h
+  imogenoutput.h
   )
 
 set(source  
@@ -78,6 +79,7 @@ set(source
   intermediary.cpp
   climatemodel.cpp
   imogenlogger.cpp
+  imogenoutput.cpp
   )
 
 include(add_guess_sources)

@@ -13,7 +13,8 @@
 #include "outputmodule.h"
 #include "outputchannel.h"
 #include "gutil.h"
-#include <random>
+// [Step 8 of unified-codebase rebuild: removed unused <random> include that
+//  was only used by the now-deleted getImogenData() dead helper. - DKB 2026-05-06]
 
 namespace GuessOutput {
 
@@ -66,17 +67,16 @@ private:
     void openlocalfiles_ggcmi();
     void closelocalfiles_ggcmi();
 
-	double getImogenData(int lower, int upper) {
-		// Create a random device and seed the Mersenne Twister engine
-		std::random_device rd;
-		std::mt19937 gen(rd());
-
-		// Define the range using uniform_real_distribution
-		std::uniform_real_distribution<> distrib(static_cast<double>(lower), static_cast<double>(upper));
-
-		double number = distrib(gen);
-		return std::round(number * 1000.0) / 1000.0;
-	}
+	// [Step 8 of unified-codebase rebuild: removed dead helper getImogenData()
+	//  that returned non-deterministic random placeholder values from
+	//  uniform_real_distribution. It was defined but never called anywhere
+	//  in the codebase, and is misleading semantically (a "data getter"
+	//  that emits randomness). The half-scaffolded miscoutput IMOGEN
+	//  diagnostic-output stubs (the 12 file_*_anom + Table out_*_anom
+	//  declarations below this block and at lines 122-135 of miscoutput.cpp)
+	//  are tracked separately as follow-up F-9 in notes/FOLLOWUPS.md;
+	//  step 8 only owned the handshake-writer concern, implemented in
+	//  the new lpjguess/modules/imogenoutput.cpp/h. - DKB 2026-05-06]
 
 	// Output file names ...
 	xtring file_yield, file_yield1, file_yield2, file_sdate1, file_sdate2,

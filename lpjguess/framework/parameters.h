@@ -496,6 +496,13 @@ namespace IMOGENConfig {
 	extern xtring feedback_mode;
 	extern xtring interpolation_mode;
 
+	// [Step 8 of unified-codebase rebuild: gates ImogenOutput's per-year
+	//  handshake-file writes. Values: "tight" | "prescribed" | "loose".
+	//  Default at parameters.cpp is "tight". See followup F-10 in
+	//  notes/FOLLOWUPS.md for the framework-loop ordering caveat that
+	//  applies to "tight" in v1.0. - DKB 2026-05-06]
+	extern xtring coupling_mode;
+
     //LPJG-IMOGEN Coupling config params
     extern int  YEAR1; //!IN First year of the numerical experiment
     extern int  IYEND;  //!IN Stop year of the ENTIRE run

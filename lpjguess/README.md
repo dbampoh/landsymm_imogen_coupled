@@ -94,6 +94,7 @@ lpjguess/
 │   ├── imogencfx.cpp/h      `-input imogencfx` tight-coupling
 │   ├── climatemodel.cpp/h   In-process IMOGEN engine (linked into ./guess)
 │   ├── imogenlogger.cpp/h   IMOGEN logger
+│   ├── imogenoutput.cpp/h   LPJG-side handshake writer (added at step 8)
 │   ├── intermediary.cpp/h   IMOGENConfig namespace
 │   └── (process modules: canexch, vegdynam, soilwater, ...)
 ├── libraries/               Bundled support: gutil/, plib/, guessnc/
@@ -125,38 +126,44 @@ lpjguess/
 
 ## Coupling-relevant code
 
-The IMOGEN integration with LPJ-GUESS is in five `modules/` files
+The IMOGEN integration with LPJ-GUESS is in **six** `modules/` files
 that get **statically linked** into the same `./guess` binary (no
 separate IMOGEN process; no IMOGEN/COUPLED CMake flag — the IMOGEN
-sources are listed unconditionally in `modules/CMakeLists.txt:36-41,
-76-81`):
+sources are listed unconditionally in `modules/CMakeLists.txt`):
 
 | File | Role |
 |---|---|
 | `imogen_input.cpp/h` | `-input imogen` loose-coupling: reads pre-generated IMOGEN ASCII climate from disk |
-| `imogencfx.cpp/h` | `-input imogencfx` tight-coupling: invokes `RUN_IMOGEN_ENGINE()` in-process; consumes `param "file_temp"`, `file_prec`, `file_insol`, `file_wetdays`, `file_dtr`, `file_co2` from the ins file |
+| `imogencfx.cpp/h` | `-input imogencfx` tight-coupling: invokes `RUN_IMOGEN_ENGINE()` in-process; consumes `param "file_temp"`, `file_prec`, `file_insol`, `file_wetdays`, `file_dtr`, `file_co2` from the ins file. Owns the `coupling_mode` ins parameter (added at step 8). |
 | `climatemodel.cpp/h` | The in-process IMOGEN engine (C++ port of the Fortran's pattern-scaling, year loop, ocean-CO2 box model, FAIR ERF) |
 | `imogenlogger.cpp/h` | Singleton text logger used by the engine |
+| `imogenoutput.cpp/h` | **LPJG-side handshake writer (added at step 8)**. Registered as `OutputModule "imogenoutput"` via `REGISTER_OUTPUT_MODULE`. Writes per-year `imogen_lpjg_flux.txt`, `imogen_lpjg_ch4_n2o_flux.txt`, `imogen_lpjg.txt`, `done` to `<DIR_COMMON>/LPJG_main/IMOGEN/`. Mode-gated by `IMOGENConfig::coupling_mode`. **F-10 caveat applies for tight mode in v1.0** — see `notes/FOLLOWUPS.md`. |
 | `intermediary.cpp/h` | `IMOGENConfig::*` namespace globals shared across the engine + LPJG |
 
-Per `[CMI §3.7]` and the rebuild plan, these will be modified at:
+Per `[CMI §3.7]` and the rebuild plan, these have been / will be modified at:
 
-- **Step 7:** apply the seven coupling break-point fixes
-  (`exit(200);` removal — already absent in the imported source;
-  `IMOGEN/ouput/` typo in the ins file; polling-loop guards in
-  `climatemodel.cpp:330-350`; `ndep.getndep` uncomment at
-  `imogen_input.cpp:728`; ...).
-- **Step 8:** add a new module `imogenoutput.cpp/h` for the
-  LPJG-side handshake writer (annual NEE + wetland CH4 + soil/fire
-  N2O global aggregation; writes `imogen_lpjg_flux.txt`,
-  `imogen_lpjg_ch4_n2o_flux.txt`, `imogen_lpjg.txt`, `done` files
-  in `<DIR_COMMON>/LPJG_main/IMOGEN/`).
+- **Step 7 ✅:** applied the LPJ-GUESS coupling source-level fixes
+  (C2/C3 polling-loop guards in `climatemodel.cpp:330-353`; C4
+  `ndep.getndep` uncomment at `imogen_input.cpp:728`; cross-reference
+  comment in `imogencfx.cpp:895`).
+- **Step 8 ✅:** added `imogenoutput.cpp/h` module for the LPJG-side
+  handshake writer + `coupling_mode` ins parameter declared in
+  `IMOGENConfig` and registered via `imogencfx.cpp` `declare_parameter`.
+  **Architectural caveat F-10 documented**: the framework loop's
+  per-gridcell-outer / per-day-inner ordering means the writer emits
+  per-gridcell-rolling values (not globally-synchronized); v1.0 meets
+  the V.1 milestone but the Phase-2 follow-up is to add a runtime
+  `framework_loop_mode` parameter that gates an additive year-outer
+  code path alongside the existing one (mirroring the LandSyMM-into-LTS
+  integration pattern).
 - **Step 9.5:** wire up the consumer side for `Rh_anom.dat`,
   `W_anom.dat`, `Tmin_anom.dat`, `Tmax_anom.dat` IMOGEN outputs
   (currently unconsumed by `imogencfx::get_climate_for_gridcell`
   even though `Rh_anom`/`W_anom` ARE produced by the C++ engine —
   see `[CMI §4.3.4a]`); restore the `firemodel == BLAZE`
-  incompatibility check at `imogencfx.cpp:792-794`.
+  incompatibility check at `imogencfx.cpp:792-794`. Plus complete
+  the half-scaffolded miscoutput climate-input diagnostic outputs
+  (follow-up F-9, opened by step 8).
 
 See the rebuild plan in `EXECUTION_PLAN.md` Part V for the
 step-by-step sequence and verification milestones.

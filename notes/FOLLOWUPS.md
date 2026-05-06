@@ -138,6 +138,209 @@ see DONE section.)
 - **Timing**: medium priority; same authoring contact as F-6 so can
   be batched with that.
 
+### F-9 — Complete the half-scaffolded miscoutput IMOGEN climate-input diagnostic outputs
+
+- **Trigger**: step 8 (`notes/STEP_8.md` §2.1, §3.5). While
+  investigating where step 8's LPJG-side handshake writer should live,
+  discovered that `lpjguess/modules/miscoutput.cpp/h` already contains
+  **half-scaffolded IMOGEN diagnostic-output stubs**: 12 file-name
+  parameters declared via `declare_parameter("file_t_anom",
+  &file_t_anom, ...)` (and 11 other variables: file_p_anom,
+  file_sw_anom, file_dtemp_anom, file_wet, file_fa_ocean,
+  file_dtemp_o, file_co2, file_relhum_anom, file_tmin_anom,
+  file_tmax_anom, file_wind_anom), 12 corresponding `Table out_*_anom`
+  member declarations in the header — **but no `create_output_table()`
+  calls in `define_output_tables()` and no `add_value()` calls in
+  `outannual()`**. The whole pipeline is inert. A `// FIXME: DKB`
+  marker at line 122 of miscoutput.cpp explicitly flags the
+  work-in-progress state.
+- **What scope F-9 covers**:
+  - Add `create_output_table(out_t_anom, file_t_anom, ...)` calls
+    in `MiscOutput::define_output_tables()` for the 12 diagnostic
+    tables.
+  - Add per-gridcell `outlimit(out, out_t_anom, ...)` calls in
+    `MiscOutput::outannual(Gridcell&)` that write the actual IMOGEN
+    climate values (T_anom, P_anom, etc. — the variables IMOGEN
+    supplied to LPJ-GUESS for each year × each cell). The data source
+    is `imogencfx`'s per-cell `dtemp[]`, `dprec[]`, `dinsol[]`,
+    `ddtr[]`, `drelhum[]`, `dwind[]` arrays (see imogencfx.h:128-148).
+- **Difference from step 8 (already implemented)**: step 8's
+  `imogenoutput.cpp/h` writes the LPJG → IMOGEN handshake control
+  files (`imogen_lpjg_flux.txt`, `imogen_lpjg_ch4_n2o_flux.txt`,
+  `imogen_lpjg.txt`, `done`). F-9's miscoutput stubs would write the
+  IMOGEN → LPJG climate-input diagnostics (`t_anom.out`, `p_anom.out`,
+  etc.) as standard `.out` tabular files for users to inspect what
+  climate IMOGEN supplied. **Different output channels for different
+  purposes.**
+- **Cleanup pre-completed**: step 8 already removed the dead
+  `getImogenData(int, int)` random placeholder helper from
+  `miscoutput.h` (it returned non-deterministic random values from
+  `std::random_device`; was never invoked anywhere; misleading
+  semantically). Plus removed the unused `#include <random>`. F-9
+  starts from a slightly cleaner base.
+- **Best timing**: step 9.5 of the formal V.1 plan, alongside the
+  Rh_anom / W_anom / Tmin_anom / Tmax_anom output parity work
+  (climate-output enhancements per Decisions #11 and #12). Both
+  concern climate-output diagnostics; bundling them shares review
+  effort.
+
+### F-10 — Framework-loop ordering vs proper tight-coupling synchronization (significant)
+
+- **Trigger**: step 8 (`notes/STEP_8.md` §2.4 + §4). While
+  investigating where step 8's `imogenoutput.cpp` should hook into
+  the LPJ-GUESS framework's per-year aggregation flow, discovered
+  the canonical loop structure of `lpjguess/framework/framework.cpp`
+  lines 411-516:
+
+  ```cpp
+  while (true) {                                           // outer: per-gridcell
+      Gridcell gridcell;
+      if (!input_module->getgridcell(gridcell)) break;
+      // ... setup ...
+      while (input_module->getclimate(gridcell)) {         // inner: per-day, ALL years
+          simulate_day(gridcell, input_module.get());
+          output_modules.outdaily(gridcell);
+          if (date.islastday && date.islastmonth) {
+              output_modules.outannual(gridcell);          // year-end, per gridcell
+          }
+          date.next();
+      }
+      // End of all-years loop for THIS gridcell
+  }
+  ```
+
+  `getclimate()` returns false when ALL years have been simulated for
+  the current gridcell. So **each gridcell processes ALL its years
+  before moving to the next gridcell**. This is per-gridcell-outer /
+  per-day-inner across all years.
+
+- **The architectural problem**: Tight coupling (per-year-globally-
+  synchronized handshake — IMOGEN's year-N+1 climate uses LPJ-GUESS's
+  year-N globally-aggregated NEE feedback) **fundamentally cannot be
+  cleanly implemented** with this loop ordering. When gridcell-1
+  finishes year-1, gridcell-2 hasn't yet started year-1 (it's still
+  on the next gridcell setup phase). When gridcell-1's `outannual`
+  fires for year-1 and our handshake writer flushes, the flushed NEE
+  represents only gridcell-1's contribution. Subsequent gridcells'
+  year-1 contributions arrive at later wall-clock times, after the
+  IMOGEN engine has already consumed the (incomplete) handshake.
+
+- **Why this surfaced now and not earlier**: The predecessor framework
+  already has this issue — but [CMI §1.1] specifically notes "the
+  system has never run end-to-end." The predecessor's coupled mode
+  was **scaffolded but never validated**; the polling loop in
+  `imogen_lpjg.f` and `climatemodel.cpp` had been "neutered" (bugs
+  C2/C3) to make standalone runs work, masking the synchronization
+  problem from ever surfacing in practice. With step 7's fixes
+  un-neutering those polling loops + step 8 actually writing the
+  handshake files, the architectural gap is now exposed.
+
+- **Implication for v1.0**:
+  - `imogenoutput.cpp` (step 8) writes per-gridcell-rolling values:
+    each `outannual` call adds this gridcell's contribution to the
+    per-year accumulator, and the year-change-detection flushes
+    whenever the year-N+1 first gridcell triggers it. The flushed
+    values are non-empty, sensible per-gridcell-rolling, but NOT
+    globally-synchronized.
+  - V.1's stated step-8 verification milestone (*"non-empty handshake
+    files; sensible NEE in PgC/yr"*) is met — the values look right
+    in magnitude.
+  - V.1's step-17 validation milestone (*"CO2 RMSD ≤ 5 ppm vs NOAA
+    GMD"*) **may show systematic bias** from the non-synchronized
+    feedback. We will discover empirically at step 17 whether the
+    bias is significant. If yes → F-10 becomes blocking for v1.0
+    publication-quality runs. If no → F-10 can stay deferred.
+
+- **Phase-2 recommended approach (per user guidance 2026-05-06)**:
+
+  Three principles, in order of importance:
+
+  1. **DO NOT alter the existing framework.cpp loop**. The
+     per-gridcell-outer ordering is correct and battle-tested for
+     standalone, loose-coupling, prescribed-coupling, and parallel
+     (HPC) runs. Restructuring it would risk breaking all of those.
+
+  2. **DO add a runtime parameter** that gates a NEW per-year-outer /
+     per-gridcell-inner code path which lives ALONGSIDE the existing
+     code path. Example parameter:
+     `framework_loop_mode = "year_outer" | "gridcell_outer"` (default
+     `"gridcell_outer"` to preserve backward compatibility).
+
+  3. **DO implement the new code path as an additive extension**,
+     mirroring the **LandSyMM-fork-into-LPJ-GUESS-LTS integration
+     pattern** from the predecessor project earlier in the chat
+     history. In that integration: new fork-specific behavior was
+     gated behind `do_potyield`, `landsymm_*`, etc. ins parameters
+     that activated alternative code paths; the upstream LTS
+     behavior was preserved as the default and untouched.
+
+  Concrete implementation sketch (subject to refinement at Phase 2):
+
+  ```cpp
+  // framework.cpp -- new alternative loop, gated on framework_loop_mode
+  if (loop_mode == "year_outer") {
+      // Phase-2 path: per-year-outer / per-gridcell-inner
+      load_all_gridcells_into_memory(gridlist);  // up-front
+      for (int year = first_year; year <= last_year; ++year) {
+          for (auto& gridcell : gridcells) {
+              simulate_year(gridcell, year);
+              output_modules.outannual(gridcell);
+          }
+          // ALL gridcells now done for year N; flush handshake here
+          imogenoutput.flush_pending_year();
+          // Trigger IMOGEN engine for year N+1's climate
+          if (coupling_mode == "tight") {
+              climatemodel.run_year(year + 1);
+          }
+      }
+  } else {  // default gridcell_outer
+      // Existing loop unchanged
+      while (true) {
+          Gridcell gridcell;
+          if (!input_module->getgridcell(gridcell)) break;
+          while (input_module->getclimate(gridcell)) { /* ... */ }
+      }
+  }
+  ```
+
+  Trade-offs for the year-outer path:
+  - Memory: must hold all gridcells in memory simultaneously
+    (vs streaming one at a time). For 62 538 cells × ~MB-each
+    in-memory state → ~tens of GB. Workable on workstation, large
+    on cluster nodes. Mitigation: per-rank gridlist subsetting
+    in MPI mode (existing predecessor cluster pattern).
+  - I/O: per-year `outannual` calls happen at very different wall-
+    clock times in the existing path; bundled tightly in the new
+    path. Disk I/O patterns shift; may need re-tuning.
+  - Determinism: the new path is deterministically per-year; the old
+    path is per-gridcell-with-eventual-aggregation. Outputs would
+    differ in subtle ways; cross-validation is essential.
+
+  Both paths sharing the same `imogenoutput.cpp::outannual` and
+  `flush_pending_year` interfaces means the writer code itself
+  doesn't need to change. Only the framework's call orchestration
+  changes.
+
+- **Action timing**:
+  - **Now (v1.0)**: documented in this F-10 entry; cross-referenced
+    from `notes/STEP_8.md`, `lpjguess/modules/imogenoutput.h` doc
+    block, `EXECUTION_PLAN.md` step 8 row.
+  - **Step 17** (validation): empirically test whether the
+    per-gridcell-rolling handshake passes V.1's RMSD thresholds.
+    Document outcomes.
+  - **Phase 2 (post-v1.0)**: implement the parameter-gated
+    additive year-outer code path. Estimated effort 1-2 weeks
+    full-time including cross-validation.
+
+- **Cross-references**:
+  - `notes/STEP_8.md` §2.4 (the investigation finding), §4 (the
+    detailed Phase-2 recommendation)
+  - `lpjguess/modules/imogenoutput.h` doc block (mirrors this
+    architectural caveat in the source code itself)
+  - `EXECUTION_PLAN.md` V.1 step 8 row (marked ✅ with F-10 caveat)
+  - `[CMI §1.1]` (the original "never ran end-to-end" note that
+    F-10 formalizes the cause of)
+
 ### F-8 — Revisit CMIP6 wind-magnitude split + precip rain/snow partition at step 9.5
 
 - **Trigger**: step 5 CAVEAT-B and CAVEAT-C. The CMIP6 NetCDF doesn't

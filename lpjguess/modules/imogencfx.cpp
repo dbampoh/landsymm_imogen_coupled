@@ -331,6 +331,13 @@ IMOGENCFXInput::IMOGENCFXInput()
 	declare_parameter("simulation_mode", &IMOGENConfig::simulation_mode, 20, "Whether to do an online or offline run"); //add a check here
 	declare_parameter("feedback_mode", &IMOGENConfig::feedback_mode, 20, "lpjg_offset or moving average feedback");//add a check here
 	declare_parameter("interpolation_mode", &IMOGENConfig::interpolation_mode, 20, "Interpolation mode for regridding/finding climate data");//add a check here
+
+	// [Step 8 of unified-codebase rebuild: coupling-mode ins parameter.
+	//  Gates ImogenOutput's per-year handshake-file writes. Values:
+	//  "tight" (default) | "prescribed" | "loose". See followup F-10
+	//  for the framework-loop-ordering caveat affecting "tight" in v1.0.
+	//  - DKB 2026-05-06]
+	declare_parameter("coupling_mode", &IMOGENConfig::coupling_mode, 20, "Coupling mode: tight | prescribed | loose (default tight)");
 	
 
 	declare_parameter("ssprcp", &IMOGENConfig::ssprcp, 10, "SSP RCP Scenario");//add a check here
