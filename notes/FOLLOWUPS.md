@@ -341,6 +341,51 @@ see DONE section.)
   - `[CMI §1.1]` (the original "never ran end-to-end" note that
     F-10 formalizes the cause of)
 
+### F-11 — Backport all `lpjguess/` changes to `trunk_r13078` for paper-stage consistency
+
+- **Trigger**: user clarification 2026-05-06. Per Decision #3
+  (`EXECUTION_PLAN.md` II.11), our v1.0 rebuild operates on the
+  `LandSyMM_LPJ-GUESS/` fork (which the user calls the "integrated
+  LTS" per terminology established in their integration project
+  before this coupled-model project began — same artifact, two
+  names). The **separate** `trunk_r13078` fork inside
+  `version_A/Integrations/trunk/` and `version_B/Integrations/trunk/`
+  was used in the working paper's **Stage 1 PLUM yield runs**, so for
+  Stage-2 / paper consistency, both forks must eventually be
+  fully-coupled-model-capable and runtime-switchable.
+- **Action**: at the end of Phase-1 (after step 19's V.1
+  verification), execute the **Backport Sprint** described in
+  `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §4. In short:
+  1. Import `version_A/Integrations/trunk/trunk_r13078/` as a
+     parallel tree under our repo (e.g. `lpjguess_trunk_r13078/`).
+  2. Reconcile the 6-file baseline diff (cosmetic + the critical
+     `exit(200)` removal at `imogencfx.cpp:483`).
+  3. Walk each ledger entry in `TRUNK_R13078_BACKPORT_LEDGER.md` §3
+     in step order and replicate the recorded edit in
+     `lpjguess_trunk_r13078/`.
+  4. Add a build-time switch
+     (`-DLPJGUESS_BACKEND=landsymm_fork|trunk_r13078`, default
+     `landsymm_fork`) so users / CI tests can pick either backend.
+  5. Run V.1's full verification (steps 1-19 milestones) against
+     the `trunk_r13078` backend; cross-check outputs match within
+     numerical tolerance.
+- **Estimated effort**: 1-2 days of focused work.
+- **Maintenance discipline (immediate, not deferred)**: every commit
+  that touches `lpjguess/` C++ source files **must add a
+  corresponding entry to `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3**
+  with step-N / commit-hash / date / file / line range / description
+  / backport-guidance fields. This is what makes the eventual sprint
+  mechanical instead of archaeological.
+- **Cross-references**:
+  - `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (the running ledger;
+    populated retroactively for steps 1-8 at creation time)
+  - `EXECUTION_PLAN.md` II.11 (Decision #3 + the terminology
+    clarification 2026-05-06)
+  - `notes/STEP_1.md` §A (the import audit that established the
+    6-file baseline diff)
+  - `_phase2_findings/02_lpjguess_trunk_r13078.md` (Phase-2
+    investigation of `trunk_r13078`'s coupling surface area)
+
 ### F-8 — Revisit CMIP6 wind-magnitude split + precip rain/snow partition at step 9.5
 
 - **Trigger**: step 5 CAVEAT-B and CAVEAT-C. The CMIP6 NetCDF doesn't

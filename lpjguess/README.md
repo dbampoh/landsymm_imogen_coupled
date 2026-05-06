@@ -8,13 +8,33 @@ items.
 
 ## Provenance
 
-Imported from the user's standalone LandSyMM-LPJ-GUESS at
-`/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/`
-(the predecessor `version_A`/`version_B` framework's
-`Integrations/trunk/trunk_r13078/` was deliberately NOT used — it
-carries an `exit(200);` regression at `modules/imogencfx.cpp:483` plus
-five cosmetic comment touches that the standalone LandSyMM-LPJ-GUESS
-does not have; see `[CMI §4.1.10]`).
+Imported from the user's `LandSyMM_LPJ-GUESS/` fork at
+`/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/`.
+
+> **Terminology note**: the user calls this fork the **"integrated
+> LTS"** (per their integration-project terminology, which predates
+> this coupled-model rebuild). The directory name and the user's
+> spoken term refer to the **same artifact**. See `EXECUTION_PLAN.md`
+> II.11.0 for the full terminology clarification.
+
+The predecessor `version_A`/`version_B` framework's
+`Integrations/trunk/trunk_r13078/` was **deliberately NOT used** for
+v1.0 — it carries an `exit(200);` regression at
+`modules/imogencfx.cpp:483` plus five cosmetic comment touches that
+`LandSyMM_LPJ-GUESS/` does not have; see `[CMI §4.1.10]`. However,
+**`trunk_r13078` IS the backport target** for the working paper's
+Stage-1/Stage-2 consistency: at the end of Phase-1, the **Backport
+Sprint** (follow-up F-11) brings it to functional parity with the
+`LandSyMM_LPJ-GUESS/` base by replicating every source-level edit
+recorded in `notes/TRUNK_R13078_BACKPORT_LEDGER.md`.
+
+**Maintenance discipline**: every commit that modifies C++ source
+under `lpjguess/{framework,modules,libraries,cmake}/` MUST add a
+matching entry to `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3
+(step-N / commit-hash / file / line range / description /
+backport-guidance). Documentation-only edits to `*.md` files and
+build artefacts under `build/` are exempt. This discipline keeps
+the eventual sprint mechanical instead of archaeological.
 
 **Import excluded:** `build/`, `build_landsymm_imogen/` (build
 artefacts, ~39 MB combined); `windows_version/` (Linux-only project

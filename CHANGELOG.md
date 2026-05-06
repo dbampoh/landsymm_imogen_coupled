@@ -19,6 +19,101 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.8.1-backport-ledger] — 2026-05-06 — terminology + backport-ledger documentation
+
+### Documented — `LandSyMM_LPJ-GUESS/` ≡ "integrated LTS" terminology synonymy
+
+Per user clarification 2026-05-06, the user calls our v1.0
+development base — `LandSyMM_LPJ-GUESS/` — the **"integrated LTS"**
+because that's the working name from their preceding
+integration-project. The directory name and the spoken term refer
+to the **same artifact**. There is a separate
+`lpjg_landsymm_integration/LPJ-GUESS-integrated/` directory that is
+NOT what we imported and is NOT what the user calls "the integrated
+LTS"; out-of-scope for v1.0.
+
+Updated:
+- `EXECUTION_PLAN.md` II.11.0 — new "Terminology" subsection with
+  the synonymy explicitly documented.
+- `EXECUTION_PLAN.md` II.11.1 — table headers updated to match.
+- `EXECUTION_PLAN.md` II.11.2 — "Why ... for v1.0" reframed
+  ("integrated LTS" instead of "trunk_r13078" with rationale
+  preserved).
+- `EXECUTION_PLAN.md` II.11.3 — Phase-2 backend section reframed
+  as the **Backport Sprint** with explicit reference to
+  `notes/TRUNK_R13078_BACKPORT_LEDGER.md`.
+- `EXECUTION_PLAN.md` II.11.4 — knowledge-gap #2 updated to
+  reflect that v1.0 IS testing the integration-LTS coupling
+  integration in real-time.
+- `README.md` (top-level) — repository-structure section + Lineage
+  section updated.
+- `lpjguess/README.md` — Provenance section adds the terminology
+  note + Maintenance Discipline subsection.
+
+### Added — `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (~370 lines)
+
+New running source-of-truth catalogue of every C++ source-level
+change in `lpjguess/` that needs replication in `trunk_r13078` at
+the end of Phase-1 (the **Backport Sprint**, follow-up F-11). The
+ledger:
+
+- §1 documents the policy (which fork is which, the workflow, what
+  the ledger covers and doesn't).
+- §2 lists the **6-file baseline diff** between the two forks
+  (cosmetic + the critical `exit(200)` removal at
+  `imogencfx.cpp:483`).
+- §3 retroactively populates the change set for steps 1-8 with
+  step / commit-hash / file / line range / description / backport-
+  guidance fields per entry. Step 7's C2/C3/C4 fixes and step 8's
+  imogenoutput module + coupling_mode parameter + miscoutput
+  cleanup are all catalogued.
+- §4 lays out the 1-2 day Backport Sprint plan (5 phases:
+  setup → reconcile baseline → replicate ledger → verify →
+  document).
+- §6 establishes the maintenance discipline: every commit that
+  touches `lpjguess/{framework,modules,libraries,cmake}/` C++
+  source MUST add a matching ledger entry.
+
+### Added — follow-up F-11 in `notes/FOLLOWUPS.md`
+
+The Backport-Sprint task itself, with cross-references to the
+ledger, EXECUTION_PLAN.md II.11, notes/STEP_1.md §A, and
+`_phase2_findings/02_lpjguess_trunk_r13078.md`. Estimated 1-2 days
+focused work, executed at end of Phase-1.
+
+### Updated — `notes/README.md`
+
+Filesystem layout updated to include `TRUNK_R13078_BACKPORT_LEDGER.md`
+alongside `FOLLOWUPS.md`, with a "When to use which" subsection
+explaining the distinction between the two trackers (FOLLOWUPS
+tracks open tasks; the ledger tracks the change log feeding the
+eventual backport sprint task).
+
+### Files modified / added
+
+```text
+Added:
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md   ~370 lines (new ledger)
+
+Modified:
+  EXECUTION_PLAN.md                       II.11 reframing (~80 LOC)
+  README.md                               structure + lineage sections
+  lpjguess/README.md                      provenance + discipline note
+  notes/FOLLOWUPS.md                      +F-11 (~45 LOC)
+  notes/README.md                         layout + when-to-use subsection
+  CHANGELOG.md                            this entry
+```
+
+### Why this is a documentation-only release (no code changes)
+
+The terminology-synonymy clarification + backport ledger don't
+modify any C++/Fortran source. Tagged separately from
+`v0.8.0-imogenoutput` (the step-8 functional milestone) so the
+documentation churn doesn't get hidden in the code milestone's
+release notes.
+
+---
+
 ## [v0.8.0-imogenoutput] — 2026-05-06 — step 8
 
 ### Added — LPJG-side handshake writer + `coupling_mode` ins parameter

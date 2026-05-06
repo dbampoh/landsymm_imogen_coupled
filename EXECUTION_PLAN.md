@@ -1640,76 +1640,140 @@ and 44.013 g/mol N2O). So:
 FILE_LPJG_CH4_N2O_FLUX "imogen_lpjg_ch4_n2o_flux.txt"
 ```
 
-### II.11 LPJ-GUESS fork choice — `trunk_r13078` vs integrated LTS
+### II.11 LPJ-GUESS fork choice — `LandSyMM_LPJ-GUESS` (v1.0) vs `trunk_r13078` (backport target)
 
-**Decision settled (5 May 2026): `trunk_r13078` for v1.0; integrated LTS
-as a switchable Phase-2 backend.**
+**Decision settled (5 May 2026, terminology clarified 6 May 2026):
+v1.0 development happens on `LandSyMM_LPJ-GUESS/` (the user's
+"integrated LTS" per their integration-project terminology).
+`trunk_r13078` is the **backport target** for paper-stage
+consistency; both forks become switchable backends after the
+end-of-Phase-1 Backport Sprint (follow-up F-11; ledger at
+`notes/TRUNK_R13078_BACKPORT_LEDGER.md`).**
 
-#### II.11.1 The two LPJ-GUESS implementations available
+#### II.11.0 Terminology — important
 
-| Implementation | What it is | Status | Practical effect |
+The user's integration project (predating this coupled-model
+project) produced what they call **"integrated LTS"** — i.e., the
+LandSyMM-fork features integrated into LPJ-GUESS. That artifact
+lives at
+`/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/`
+and is what `notes/STEP_1.md` imported into our `lpjguess/`.
+
+So in this document and throughout the rebuild documentation:
+
+> **`LandSyMM_LPJ-GUESS/` ≡ "integrated LTS"** (synonymous; same
+> artifact, two names. The terminology trace: the
+> integration-project's working name was "integrated LTS"; the
+> directory was named after the LandSyMM-LPJ-GUESS fork lineage.)
+
+Adjacent in the same parent area is a *separate* directory
+`lpjg_landsymm_integration/LPJ-GUESS-integrated/` which is
+**not** what we imported and is **not** what the user calls "the
+integrated LTS"; it appears to be a later separate experiment and
+is out-of-scope for v1.0.
+
+The third-party `trunk_r13078` lives at
+`version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Integrations/trunk/trunk_r13078/`
+(with an identical copy in `version_B/.../`) and is byte-identical
+to `LandSyMM_LPJ-GUESS/` modulo 6 files (5 cosmetic, 1 critical:
+the `exit(200)` at `imogencfx.cpp:483`).
+
+#### II.11.1 The two LPJ-GUESS implementations to be supported in v1.0
+
+| Implementation | What it is | Status in our rebuild | Practical effect |
 |---|---|---|---|
-| **`trunk_r13078` (LandSyMM fork)** | The historical fork of LPJ-GUESS 4.1 that the coupled framework has always used. Source at `Integrations/trunk/trunk_r13078/`. **Verified additionally** to be byte-identical to the user's standalone `lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/` modulo 6 files (5 cosmetic, 1 critical: the `exit(200)` at `imogencfx.cpp:483`) and the build artefacts | Working with the framework's existing ins-files, gridlists, and data layout | Lower-risk Phase-1 choice |
-| **Integrated LTS** | The LandSyMM-fork features merged into a more recent LPJ-GUESS LTS, the user's prior integration project. Lives in the user's `lpjg_landsymm_integration/` parent area | Working as a standalone DGVM (per the user's prior work and the `landsymm_py` integration); not yet tested in the coupled framework's `imogencfx` mode | Eventual replacement for `trunk_r13078`; Phase-2 switchable backend |
+| **`LandSyMM_LPJ-GUESS/`** (a.k.a. **"integrated LTS"** per user terminology) | The user's earlier integration-project artifact: ≈ `trunk_r13078` minus the `exit(200)` regression and 5 cosmetic touches. Source at `lpjg_landsymm_integration/LandSyMM_LPJ-GUESS/`. | **Active v1.0 development base.** Imported into `lpjguess/` at step 1. All steps 1-8 changes have been applied to this fork. | Lower-risk Phase-1 choice; no `exit(200)` regression to work around. |
+| **`trunk_r13078`** (LandSyMM fork inside `version_A`/`version_B`) | The historical fork of LPJ-GUESS 4.1 that the coupled framework's predecessor versions A and B have always used. **Used in the working paper's Stage 1 PLUM yield runs.** Has the `exit(200)` regression that must be removed first. | **Backport target.** Will receive replicated copies of all `lpjguess/` changes via the Backport Sprint at end of Phase-1 (follow-up F-11). | Paper-stage consistency: Stage 1 used this fork; Stage 2 (our coupled model) will too once the Backport Sprint completes. Also exposed as a switchable build-time backend so users / CI can pick either. |
 
-#### II.11.2 Why `trunk_r13078` for v1.0
+#### II.11.2 Why `LandSyMM_LPJ-GUESS/` ("integrated LTS") for v1.0
 
-1. **Continuity.** The framework's ins-files, data paths, gridlists,
-   and the `imogencfx` input module specifically were designed
-   around `trunk_r13078`. Bringing that into the unified codebase
-   first reduces cross-cutting integration risk.
-2. **Audit coverage.** The 8 phase-2 subagent reports specifically
-   audited `trunk_r13078`; the integrated LTS was audited in the
-   user's prior work but not against the coupling-framework
-   integration points (`MiscOutput` IMOGEN stubs, `imogencfx::init`
-   linkage, etc.).
-3. **Bug-fix budget is bounded.** The 5 cosmetic + 1 critical
-   diff vs the standalone LandSyMM fork is well-characterised
-   ([CMI §4.1.10]). One-line revert of `exit(200)` plus 5 cosmetic
-   touches and `trunk_r13078` is in known-good state.
+1. **No `exit(200)` regression.** The single critical diff between
+   the two forks is the `exit(200)` short-circuit at
+   `imogencfx.cpp:483` in `trunk_r13078`. `LandSyMM_LPJ-GUESS/` has
+   it removed; starting development here saves us a "fix the fork
+   first" step. (The Backport Sprint will simply remove it from
+   `trunk_r13078` before replicating our changes.)
+2. **Continuity with the user's existing work.** The user's
+   integration-project work (preceding this coupled-model project)
+   established `LandSyMM_LPJ-GUESS/` as the canonical fork they
+   develop against; landsymm_py + the verification-test suite all
+   ran against it. Continuing here preserves all that established
+   muscle memory and tooling.
+3. **Audit coverage.** The 8 phase-2 subagent reports audited
+   `trunk_r13078`'s coupling-relevant code paths in detail.
+   Because `LandSyMM_LPJ-GUESS/` differs only in 6 files (1
+   critical + 5 cosmetic), that audit transfers directly: the
+   coupling-framework integration points (`MiscOutput` IMOGEN
+   stubs, `imogencfx::init` linkage, polling-loop fixes,
+   `ndep.getndep()` un-comment, etc.) are byte-identical between
+   the two forks.
+4. **Bug-fix budget is bounded.** The 6-file diff vs `trunk_r13078`
+   is well-characterised ([CMI §4.1.10] and `notes/STEP_1.md` §A).
+   One-line revert of `exit(200)` plus 5 cosmetic touches and
+   `trunk_r13078` is in known-good state — the Backport Sprint
+   reconciles these as its first step before walking the ledger.
 
-#### II.11.3 Phase-2 integrated LTS backend
+#### II.11.3 The Backport Sprint (end of Phase-1)
 
-After v1.0 ships:
+After v1.0 ships (i.e., after V.1 step 19's verification milestone
+is met for the `LandSyMM_LPJ-GUESS/` backend), execute the
+**Backport Sprint** documented in detail at
+`notes/TRUNK_R13078_BACKPORT_LEDGER.md` §4. In summary:
 
-1. **Bring the integrated LTS into the unified codebase** under
-   `lpjguess_lts/` (parallel to the v1.0 `lpjguess/` which holds
-   `trunk_r13078`).
-2. **Audit the integrated LTS against the coupling integration
-   points:**
-   - `imogencfx::init` linkage (does the `IMOGENConfig` namespace
-     still bind from the ins file?)
-   - `RUN_IMOGEN_ENGINE` invocation (does `climatemodel.cpp` integrate?)
-   - The LPJG-side handshake writer (the I.B.1 module: must be
-     ported/adapted into the LTS).
-   - The corrected NEE/NBP formula (already in the integrated LTS
-     per the user's prior work).
-   - The `do_potyield` factorial-management mode (the user added
-     this; verify it's wired into the LTS).
-3. **Numerical-parity test.** Run a short SSP1-2.6 coupled
-   simulation against `trunk_r13078` and the integrated LTS. Compare
-   per-gridcell, per-year `cflux.out` outputs. Any divergence > a
-   documented tolerance is investigated.
-4. **Expose as a switchable backend.** Either `lpjguess_backend
-   "trunk_r13078"` or `lpjguess_backend "lts"` ins parameter, or
-   (more typically for LPJ-GUESS) the build target choice when
-   compiling the binary (`make GUESS_BACKEND=trunk` vs
-   `make GUESS_BACKEND=lts`).
+1. **Setup** (~1 hour). Import
+   `version_A/Integrations/trunk/trunk_r13078/` as a parallel
+   tree under our repo (e.g. `lpjguess_trunk_r13078/`). Add a
+   build-time switch
+   (`-DLPJGUESS_BACKEND=landsymm_fork|trunk_r13078`,
+   default `landsymm_fork`).
+2. **Reconcile baseline** (~2 hours). Apply the 6-file delta
+   (cosmetic + the critical `exit(200)` removal at
+   `imogencfx.cpp:483`).
+3. **Replicate ledger** (~4-6 hours). Walk
+   `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 entries in step
+   order; replicate each recorded edit in
+   `lpjguess_trunk_r13078/`. Each entry has a "Backport
+   guidance" field flagging trivial copies vs entries that
+   need manual relocation due to surrounding-context drift.
+4. **Verify** (~2-4 hours). Build cleanly; unit tests pass; run
+   V.1 step-8 smoke and compare outputs. Functional similarity
+   expected; any qualitative divergence is investigated.
+5. **Document** (~2 hours). Update top-level `README.md`,
+   `lpjguess/README.md`, and CHANGELOG to mention both backends.
+
+**Estimated total: 1-2 days.** This is a one-shot operation;
+after it lands, future steps make changes to BOTH trees in
+lockstep (with the ledger continuing as a maintenance audit
+trail; cf. the discipline section in
+`TRUNK_R13078_BACKPORT_LEDGER.md` §6).
+
+The maintenance discipline starts NOW (not at Phase-1 end):
+every commit that touches `lpjguess/` C++ source files must add
+a corresponding entry to the ledger §3. This is what makes the
+eventual sprint mechanical instead of archaeological.
 
 #### II.11.4 Knowledge gaps
 
 1. **Does `do_potyield` exist in `trunk_r13078`?** This is the
    factorial-management mode for Stage I yield generation. The user
-   added it to the integrated LTS. The audit's `[CMI Open Q §11.1.4]`
-   flagged uncertainty about whether it's also in `trunk_r13078`.
-   If not, Stage I yield generation in v1.0 either reuses
-   pre-existing yield surfaces (cached from prior runs) or pulls in
-   the `do_potyield` patch from the integrated LTS as a one-file
-   merge.
-2. **Has the integrated LTS been tested with `imogencfx`?** The
-   integrated LTS was developed and tested as a standalone DGVM.
-   Whether the coupling-framework integration points still work
-   after the LTS merge is an open question for Phase 2.
+   added it to `LandSyMM_LPJ-GUESS/` (the "integrated LTS"); the
+   audit's `[CMI Open Q §11.1.4]` flagged uncertainty about whether
+   it's also in `trunk_r13078`. If not, Stage I yield generation
+   in v1.0 either reuses pre-existing yield surfaces (cached from
+   prior runs) or the Backport Sprint adds the `do_potyield` patch
+   to `trunk_r13078` as a one-file merge — which is fine because
+   the sprint is already walking source-level changes anyway.
+2. **Has `LandSyMM_LPJ-GUESS/` ("integrated LTS") been tested with
+   `imogencfx`?** Before this rebuild project, it was developed and
+   tested only as a standalone DGVM (per the integration project)
+   and against `landsymm_py`. Whether the coupling-framework
+   integration points still work after the LTS merge is being
+   answered **in real-time as we proceed through V.1**: steps 1-8
+   have established that the build, unit tests, and IMOGEN
+   handshake-writer registration all pass. The first true coupled
+   smoke test (step 9) will be the first end-to-end exercise; if
+   issues surface, they get fixed in `lpjguess/` and recorded in
+   the Backport Ledger so the eventual sprint inherits the fixes.
 
 ---
 

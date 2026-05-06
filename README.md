@@ -63,9 +63,19 @@ lpj-guess_imogen_landsymm/
 │                                       the canonical evidence base for
 │                                       every claim in the master doc.
 │
-├── lpjguess/                          LPJ-GUESS LandSyMM fork (trunk_r13078
-│                                       baseline; integrated LTS as Phase-2
-│                                       switchable backend later).
+├── lpjguess/                          LPJ-GUESS LandSyMM fork
+│                                       (`LandSyMM_LPJ-GUESS/`, also called
+│                                       the "integrated LTS" per user
+│                                       terminology). All v1.0 dev happens
+│                                       here. `trunk_r13078` is the
+│                                       backport target; ledger of every
+│                                       source-level change is tracked at
+│                                       `notes/TRUNK_R13078_BACKPORT_LEDGER.md`
+│                                       for the end-of-Phase-1 sprint
+│                                       (followup F-11) that brings
+│                                       `trunk_r13078` to functional parity
+│                                       and exposes both forks as
+│                                       switchable backends.
 ├── imogen/                            Fortran IMOGEN with ALLOCATABLE-array
 │                                       refactor (Phase 1); C++ refactor
 │                                       brought to parity in Phase 2.
@@ -236,9 +246,16 @@ and `_phase2_findings/`.
 
 This codebase also draws from two other completed predecessor projects:
 
-- **`lpjg_landsymm_integration/`** — the LandSyMM fork integrated
-  into LPJ-GUESS LTS, the user's prior project. The integrated LTS
-  becomes a switchable Phase-2 LPJ-GUESS backend in v1.1+.
+- **`lpjg_landsymm_integration/`** — the user's prior integration
+  project, which produced **`LandSyMM_LPJ-GUESS/`** (a.k.a. the
+  "integrated LTS" per the integration-project terminology). That
+  artifact IS our `lpjguess/` v1.0 development base. Backport
+  target `trunk_r13078` (inside `version_A`/`version_B`) becomes
+  a switchable build-time backend after the end-of-Phase-1
+  Backport Sprint (followup F-11; ledger at
+  `notes/TRUNK_R13078_BACKPORT_LEDGER.md`). See
+  `EXECUTION_PLAN.md` II.11 for the full fork-choice decision and
+  terminology synonymy.
 - **`landsymm_py/`** — Python pipeline for HILDA+ historic + PLUM
   scenario LU harmonisation, the user's prior project. Provides the
   scenario LU at `/media/bampoh-d/.../plum_harm_lu/` consumed by
