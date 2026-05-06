@@ -113,7 +113,10 @@ tmpSPLITGRID_*
 
 # LPJ-GUESS gridded inputs (gigabytes)
 data/lu/
-data/ndep/*.bin
+# Lamarque N-deposition binaries (~501 MB; staged at step 6 via tarball + fetch
+# script). README.md preserved for git.
+data/ndep/ndep_cruncep/
+!data/ndep/README.md
 data/concentrations/IIASA/CMIP*/XLSX/
 data/concentrations/IIASA/CMIP*/ZIP/
 

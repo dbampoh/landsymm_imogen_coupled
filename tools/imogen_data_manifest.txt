@@ -20,9 +20,13 @@
 #                 layout expected by imogen/code/imogen_settings.txt
 #                 default DIR_PATT and DIR_CLIM values.
 #
-# All entries below were generated on 2026-05-05 from
+# Entries 1-4 (patterns + cruncep) were generated on 2026-05-05 from
 # version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Common-directory/IMOGEN-codebase/
 # at step 4 of the unified-codebase rebuild.
+#
+# Entries 5-6 (emiss + ndep) were generated on 2026-05-06 from
+# version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Data/{Imogen/emiss,Ndep}/
+# at step 6 of the unified-codebase rebuild.
 #
 # To regenerate (e.g. when adding a new GCM):
 #   1. rsync source data into imogen/patterns/<NEW_DIR>/
@@ -34,3 +38,5 @@ patterns-cmip5             imogen-patterns-cmip5-v1.0.tar.gz             aaafdf8
 patterns-cmip6             imogen-patterns-cmip6-v1.0.tar.gz             e6e6c08218a20d024e9e1a8b8ffaa15fc1c863ee30ca520f3c91c13ae9f47e40  19636509    imogen/
 patterns-cmip3-legacy      imogen-patterns-cmip3-legacy-v1.0.tar.gz      f566bc01c8d16b15a55f85a7710a81c105fd58183d3f77b76995901ce6efd72b  546260      imogen/
 cruncep                    imogen-cruncep-1960-1989-v1.0.tar.gz          ef2181433cdc51d0a6c89a4b3d7b682c3be5d47e7dff66b17817f7c45f40426b  10938406    imogen/
+emiss-reference            imogen-emiss-reference-v1.0.tar.gz            77b05df35d97512bb580ece56e8875a62f3cb62f08b1876be63776db7b26d15a  318329      imogen/
+ndep-lamarque              imogen-ndep-lamarque-v1.0.tar.gz              a135d64739f49054775255eca6a9854d7f51ab41eba1e1888342df601245952f  481904459   data/

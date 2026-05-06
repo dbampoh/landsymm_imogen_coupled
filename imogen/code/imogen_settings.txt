@@ -1,9 +1,9 @@
 DIR_COMMON ./
 DIR_PATT ../patterns/CEN_IPSL_MOD_IPSL-CM5A-MR/
 DIR_CLIM ../CRUNCEP_1960_1989/
-FILE_SCEN_EMITS ../emiss/co2_emissions_annual_historical_rcp85_allsources.txt
-FILE_NON_CO2_VALS ../emiss/nonco2_ch4_n2o_RF_historical_rcp85.txt
-FILE_CH4_N2O_EMITS ../emiss/ch4_n2o_annual_historical_rcp85_non_lpjg_simulated.txt
+FILE_SCEN_EMITS ../emiss/DKB_dataset_totals/co2_emissions_annual_historical_rcp85_allsources.txt
+FILE_NON_CO2_VALS ../emiss/DKB_dataset_totals/nonco2_ch4_n2o_RF_historical_rcp85.txt
+FILE_CH4_N2O_EMITS ../emiss/DKB_dataset_totals/ch4_n2o_annual_historical_rcp85_non_lpjg_simulated.txt
 FILE_LPJG_FLUX extended_lpjg_only_cfluxrcp85.txt
 FILE_GRIDLIST gridlist_hurtt_RNDM_midpoint_3698.txt
 FILE_LPJG_CH4_N2O_FLUX ch4_n2o_annual_historical_ssp5rcp85_lpjg_simulated_real.txt

@@ -92,16 +92,9 @@ with the closing date. Do not delete; the audit trail is valuable.
 - **Timing**: step 7 of the formal V.1 plan. NOT a separate follow-up;
   already on the formal step-7 task list.
 
-### F-5 — Stage emission scenarios into a 5th tarball
+### ~~F-5~~ — _CLOSED 2026-05-06 by step 6_
 
-- **Trigger**: `imogen/emiss/README.md` says step 6 will roll the small
-  reference emission files (and other RCP/SSP scenarios at
-  `version_A/.../emiss/{DKB_dataset_totals,new_emission_data,rcp_database}/`)
-  into a 5th tarball: `imogen-emiss-historical-cmip5-v1.0.tar.gz`.
-- **Action**: at step 6, when populating `data/`, also tar up the full
-  set of historical + scenario emission ASCII files, hash them, and add
-  a row to `tools/imogen_data_manifest.txt`.
-- **Timing**: step 6 of the formal V.1 plan.
+(Was: stage emission scenarios into a 5th tarball; see DONE section.)
 
 ### F-6 — Confirm CMIP6 `ql1_patt` unit alignment with IMOGEN's `DRH15M_PAT`
 
@@ -168,5 +161,26 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## DONE
 
-_(Closed items go here in reverse-chronological order, with closing
-date and short note. None yet.)_
+### F-5 — Stage emission scenarios into a 5th tarball — closed 2026-05-06
+
+- **Trigger**: `imogen/emiss/README.md` (step 4) flagged that step 6
+  should roll the historical + scenario emission ASCII files into a
+  5th tarball under the existing manifest+fetch architecture.
+- **Resolution**: At step 6, the full `Data/Imogen/emiss/` tree
+  (CMIP5/, CMIP6/, DKB_dataset_totals/, new_emission_data/,
+  rcp_database/, plus 6 loose top-level files; ~5.2 MB raw) was
+  rsynced into `imogen/emiss/`, tarballed as
+  `imogen-emiss-reference-v1.0.tar.gz` (311 KB compressed; 17×
+  compression on ASCII), SHA256-checksummed, and registered in
+  `tools/imogen_data_manifest.txt` as the `emiss-reference`
+  component. The fetch script needed zero code changes — just one
+  new manifest row.
+- **Side effect**: `imogen/emiss/` was restructured from the step-4
+  flat-3-files stop-gap to the full predecessor framework tree, and
+  `imogen/code/imogen_settings.txt`'s `FILE_*_EMITS` paths updated
+  accordingly (3-line edit to add the `DKB_dataset_totals/` subdir
+  prefix).
+- **Verification**: `tools/fetch_imogen_data.sh --verify-only` reports
+  all 6 components clean; standalone IMOGEN regression smoke run
+  produces years 1871, 1872 unchanged from step-4 output.
+- **Documented in**: `notes/STEP_6.md` §3, §4, §6.
