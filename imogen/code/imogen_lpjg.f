@@ -347,6 +347,20 @@ C**************************************************************************
      & 'CO2_all.dat',ACCESS='APPEND',STATUS='REPLACE')
       CLOSE(98) !Close CO2_all.dat file - TP 30.07.15
 
+C [Step 7 of unified-codebase rebuild: bug F-4 fix — auto-create the
+C  'done' handshake file in <DIR_COMMON>/LPJG_main/IMOGEN/ if it
+C  doesn't exist. This eliminates the manual workaround required since
+C  step 4 (where every standalone IMOGEN invocation needed a prior
+C  "touch LPJG_main/IMOGEN/done") and is the Fortran twin of bugs C2/C3
+C  fixed in lpjguess/modules/climatemodel.cpp at the same step.
+C  In coupled mode, LPJ-GUESS controls this file's lifecycle yearly;
+C  this auto-create only kicks in once on the very first invocation
+C  when no prior handshake exists. - DKB 2026-05-06]
+      CALL SYSTEM('mkdir -p '//TRIM(ADJUSTL(DIR_COMMON))//
+     & '/LPJG_main/IMOGEN')
+      CALL SYSTEM('touch '//TRIM(ADJUSTL(DIR_COMMON))//
+     & '/LPJG_main/IMOGEN/done')
+
       !Loop around the whole program so that IMOGEN keeps running throughout the whole
       !LPJ-GUESS simulation . TP 29.07.15
       KEEPRUNNING=.TRUE.
@@ -360,7 +374,9 @@ C**************************************************************************
       RUNFLUX_OPEN=.TRUE.
       RUNNONCO2FLUX_EXIST=.FALSE.
       RUNNONCO2FLUX_OPEN=.TRUE.
-      !DONE_EXIST=.TRUE.
+C [Step 7 fix: dead remnant '!DONE_EXIST=.TRUE.' deleted; the F-4
+C  auto-create above now ensures DONE_EXIST=.TRUE. on the first
+C  INQUIRE inside the polling loop below.]
 
       DO WHILE (RUNNOW.EQV..FALSE.)
 

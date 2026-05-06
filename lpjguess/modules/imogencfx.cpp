@@ -891,8 +891,13 @@ bool IMOGENCFXInput::getgridcell(Gridcell& gridcell) {
 	double cru_lon = coord.lon;
 	double cru_lat = coord.lat;
 
-	// Get nitrogen deposition, using the found CRU coordinates
-	ndep.getndep(param["file_ndep"].str, cru_lon, cru_lat,Lamarque::parse_timeseries(ndep_timeseries));
+	// Get nitrogen deposition, using the found CRU coordinates.
+	// [Step 7 of unified-codebase rebuild: cross-reference note. This is the
+	//  tight-coupling twin of imogen_input.cpp's identical ndep.getndep
+	//  initializer (which was commented out as bug C4 and restored in the
+	//  same step). Both must be active for N-deposition to work in either
+	//  coupling mode. - DKB 2026-05-06]
+	ndep.getndep(param["file_ndep"].str, cru_lon, cru_lat, Lamarque::parse_timeseries(ndep_timeseries));
 
 	soilinput.get_soil(cru_lon, cru_lat, gridcell);
 

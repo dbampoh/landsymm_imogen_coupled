@@ -724,9 +724,14 @@ bool ImogenInput::getgridcell(Gridcell& gridcell) {
 	//DKB 09.08.22: Extract ndep time_series here
 
 
-	// Get nitrogen deposition, using the found CRU coordinates
-	//ndep.getndep(param["file_ndep"].str, cru_lon, cru_lat,Lamarque::parse_timeseries(ndep_timeseries));
-	
+	// Get nitrogen deposition, using the found CRU coordinates.
+	// [Step 7 of unified-codebase rebuild: bug C4 fix — un-comment this active call.
+	//  The ndep object is later used at line 855 in getclimate() (via
+	//  ndep.get_one_calendar_year); without this initialiser, ndep returns
+	//  zero/garbage values throughout the run, silently breaking N-deposition
+	//  forcing in loose-coupling mode. - DKB 2026-05-06]
+	ndep.getndep(param["file_ndep"].str, cru_lon, cru_lat, Lamarque::parse_timeseries(ndep_timeseries));
+
 	soilinput.get_soil(cru_lon, cru_lat, gridcell);
 	
 //  // Setup the soil type

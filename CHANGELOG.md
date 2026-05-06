@@ -19,6 +19,122 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.7.0-coupling-fixes] — 2026-05-06 — step 7
+
+### Fixed — LPJ-GUESS coupling source-level bugs (C2, C3, C4) + closes F-4
+
+Per `EXECUTION_PLAN.md` V.1 step 7 + `[CMI §1.2]`, applied 3 of 5
+catalogued LPJG ↔ IMOGEN coupling source-level bugs. (Bug C1 was
+already eliminated by step 1's import-choice; bug C5's typo fixes
+live in run-config files we'll create at step 9.)
+
+#### C2 + C3 — `lpjguess/modules/climatemodel.cpp` polling loop (lines 332-353)
+
+Before, the polling loop had **4 lines short-circuited**:
+- `// doneExist = filesystem::exists(...)` (INQUIRE-equivalent commented out)
+- `doneExist = true;` (replacement that always exited the wait)
+- `// runnowOpen = !file.is_open();` (×3 instances at lines 336, 343, 352)
+
+The "doneExist=true" hard-code silently bypassed the per-year LPJG↔IMOGEN
+handshake's safety semantics; the 3 `*Open` guards were wholly inactive.
+
+After:
+- Restored `doneExist = filesystem_dkb::exists(...)` (the INQUIRE-equivalent).
+- Added first-call bypass: `if (firstCall && !doneExist) doneExist = true;`
+  using the existing `firstCall` local (initialized from
+  `IMOGENConfig::FIRSTCALL` at line 244, reset at line 993). This avoids
+  an infinite poll on the very first iteration of the very first run
+  while preserving the proper handshake semantics afterward.
+- Uncommented the 3 `*Open` guards.
+
+#### C4 — `lpjguess/modules/imogen_input.cpp:728` ndep initializer
+
+Before:
+```cpp
+//ndep.getndep(param["file_ndep"].str, cru_lon, cru_lat, Lamarque::parse_timeseries(ndep_timeseries));
+```
+
+The `ndep` object is later used at line 855 in `getclimate()` (via
+`ndep.get_one_calendar_year`); without this initializer, ndep returned
+zero/garbage values throughout the run, silently breaking
+N-deposition forcing in loose-coupling mode. Uncommented + documented.
+
+#### F-4 — Fortran twin: `imogen/code/imogen_lpjg.f`
+
+The Fortran-side equivalent of bugs C2/C3 — the polling-loop's
+DONE_EXIST default at line 363 (`!DONE_EXIST=.TRUE.`) was commented
+out, and the line-371 INQUIRE always overrode it. Result: every
+standalone IMOGEN smoke run since step 4 required a manual
+`touch LPJG_main/IMOGEN/done` before invocation, or the binary
+spun forever in the polling loop.
+
+Fix: added `mkdir -p` + `touch done` block via `CALL SYSTEM` right
+before the outer `DO WHILE (KEEPRUNNING)` loop. Idempotent (no error
+if dir/file already exist). The polling-loop INQUIRE then finds the
+auto-created file on the very first iteration → DONE_EXIST=.TRUE. →
+loop exits → year 1 processing begins. In coupled mode, LPJ-GUESS
+manages the file's lifecycle yearly; this auto-create only kicks in
+on the very first invocation when no prior handshake exists.
+
+The dead `!DONE_EXIST=.TRUE.` comment at line 363 (now permanently
+moot) was replaced with an explanatory comment block.
+
+### Verification
+
+- ✅ LPJ-GUESS rebuilds clean.
+- ✅ All **162 unit tests still pass** (`./runtests` reports
+  `All tests passed (162 assertions in 25 test cases)`) — no regression
+  from C2/C3/C4 fixes.
+- ✅ Fortran IMOGEN rebuilds clean.
+- ✅ **CRITICAL**: standalone IMOGEN smoke run, **without** any manual
+  `touch done` or pre-staged `done` file, produces years 1871-1872
+  output cleanly. Verified by:
+  ```
+  rm -rf LPJG_main IMOGEN              # nuke all stale state
+  mkdir -p LPJG_main/IMOGEN IMOGEN/output
+  cp /path/to/version_A/.../*.txt LPJG_main/IMOGEN/   # control-file stubs only
+  test ! -f LPJG_main/IMOGEN/done && echo "OK"        # confirms no done file
+  timeout 60 ./imogen_lpjg
+  # → "Read NGPOINTS: 3698" → "ALLOCATEd regrid arrays" →
+  #   "DONE_EXIST = T" on first poll iteration → years 1871, 1872 produced
+  ```
+  No regression from step 4's structural output (same files, same
+  format).
+
+### What's NOT in this release
+
+- **C5 typo fixes** (`IMOGEN/ouput/`→`IMOGEN/output/`, `R_anom.dat`→
+  `Rh_anom.dat`) — those typos live in the predecessor's run-config
+  `.ins` files, NOT in the imported source code. Our `runs/<SSP>/...`
+  directories don't exist yet — they get created at **step 9**, where
+  fresh ins files will use the correct paths from the start.
+- **LPJG-side handshake writer** (`imogen_lpjg_flux.txt`,
+  `imogen_lpjg_ch4_n2o_flux.txt`, year-end `done`) — that's **step 8**.
+- **Per-scenario coupled-mode run-config** — **step 9**.
+
+### Files modified
+
+- `lpjguess/modules/climatemodel.cpp` (C2 + C3 fixes)
+- `lpjguess/modules/imogen_input.cpp` (C4 fix)
+- `lpjguess/modules/imogencfx.cpp` (cross-reference comment only;
+  the parallel `ndep.getndep()` call here was already active —
+  bug C4 was specifically scoped to `imogen_input.cpp`. Added a
+  small documentation note at line 895 to prevent future
+  maintenance drift between the two modules)
+- `imogen/code/imogen_lpjg.f` (F-4 fix)
+
+### Files added
+
+- `notes/STEP_7.md` (per-step verification record)
+
+### Files modified (docs)
+
+- `notes/FOLLOWUPS.md` (close F-4)
+- `CHANGELOG.md` (this entry)
+- `EXECUTION_PLAN.md` (V.1 step 7 marked complete)
+
+---
+
 ## [v0.6.0-data-import] — 2026-05-06 — step 6
 
 ### Added — reference data import + 2 new tarballs (closes follow-up F-5)

@@ -329,27 +329,38 @@ int RUN_IMOGEN_ENGINE() {
             std::this_thread::sleep_for(std::chrono::seconds(3));
             std::cout << "." << std::flush;
 
-           // doneExist = filesystem::exists(dirCommon + "/LPJG_main/IMOGEN/done");
-            doneExist = true; 
+            // [Step 7 of unified-codebase rebuild: bug C2 fix — restore the
+            //  doneExist filesystem check that was previously short-circuited
+            //  to "doneExist = true" (which silently bypassed the LPJG?IMOGEN
+            //  per-year handshake's safety semantics). The first-call special
+            //  case avoids an infinite poll on the very first iteration of the
+            //  very first run, when no prior 'done' from LPJ-GUESS exists yet.
+            //  - DKB 2026-05-06]
+            doneExist = filesystem_dkb::exists(dirCommon + "/LPJG_main/IMOGEN/done");
+            if (firstCall && !doneExist) {
+                doneExist = true;  // first-call bypass: LPJG hasn't written 'done' yet
+            }
+
             {
                 std::ifstream file(dirCommon + "/LPJG_main/IMOGEN/imogen_lpjg.txt");
-               // runnowOpen = !file.is_open();
+                // [Step 7 fix: bug C3 part 1 — restore the runnowOpen guard]
+                runnowOpen = !file.is_open();
             }
-           
+
             runfluxExist = filesystem_dkb::exists(fileLpjgFlux);
             {
-                //std::ifstream file(dirCommon + "/LPJG_main/IMOGEN/" + fileLpjgFlux);
                 std::ifstream file(fileLpjgFlux);
-               // runfluxOpen = !file.is_open();
+                // [Step 7 fix: bug C3 part 2 — restore the runfluxOpen guard]
+                runfluxOpen = !file.is_open();
             }
             errorExist = filesystem_dkb::exists(dirCommon + "/LPJG_main/IMOGEN/error");
             runnowExist = filesystem_dkb::exists(dirCommon + "/LPJG_main/IMOGEN/imogen_lpjg.txt");
             if (nonco2Emissions) {
                 runnonco2fluxExist = filesystem_dkb::exists(fileLpjgCh4N2oFlux);
                 {
-               
                     std::ifstream file(fileLpjgCh4N2oFlux);
-                   // runnonco2fluxOpen = !file.is_open();
+                    // [Step 7 fix: bug C3 part 3 — restore the runnonco2fluxOpen guard]
+                    runnonco2fluxOpen = !file.is_open();
                 }
             }
 

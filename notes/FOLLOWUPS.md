@@ -81,16 +81,10 @@ with the closing date. Do not delete; the audit trail is valuable.
   in `EXECUTION_PLAN.md` §II.2. Should run after v1.0 ships.
 - **Timing**: post-v1.0.
 
-### F-4 — Bug C2/C3 source fix (the polling-loop `DONE_EXIST` default)
+### ~~F-4~~ — _CLOSED 2026-05-06 by step 7_
 
-- **Trigger**: step 4 confirmed the `imogen_lpjg.f:363` commented-out
-  `!DONE_EXIST=.TRUE.` requires runtime workaround (pre-staging an
-  empty `done` file). `[CMI §1.2]`, `[SA3 §10]`.
-- **Action**: at step 7, either uncomment line 363 or add a
-  `IF(FIRSTCALL) DONE_EXIST=.TRUE.` special case. Document why this
-  default makes standalone runs work without the runtime stub.
-- **Timing**: step 7 of the formal V.1 plan. NOT a separate follow-up;
-  already on the formal step-7 task list.
+(Was: bug C2/C3 source fix — the polling-loop `DONE_EXIST` default;
+see DONE section.)
 
 ### ~~F-5~~ — _CLOSED 2026-05-06 by step 6_
 
@@ -160,6 +154,41 @@ with the closing date. Do not delete; the audit trail is valuable.
 ---
 
 ## DONE
+
+### F-4 — Bug C2/C3 source fix (polling-loop `DONE_EXIST` default) — closed 2026-05-06
+
+- **Trigger**: step 4 (`notes/STEP_4.md` §6 + `notes/FOLLOWUPS.md`
+  original entry). Every standalone Fortran IMOGEN smoke run since
+  step 4 needed a manual `touch LPJG_main/IMOGEN/done` because the
+  polling loop's exit condition required `DONE_EXIST=.TRUE.` and the
+  pre-loop default `!DONE_EXIST=.TRUE.` (line 363) was commented out.
+  The C++ twin in `climatemodel.cpp:332-353` was similarly broken
+  (4 lines commented out: `doneExist` INQUIRE + 3 `*Open` guards;
+  a hard-coded `doneExist = true` short-circuited the safety check).
+- **Resolution at step 7**:
+  - **C++ side** (`lpjguess/modules/climatemodel.cpp`): restored the
+    `doneExist = filesystem_dkb::exists(...)` INQUIRE + added a
+    first-call bypass via the existing `firstCall` local
+    (initialized from `IMOGENConfig::FIRSTCALL`); restored the 3
+    `runnowOpen`, `runfluxOpen`, `runnonco2fluxOpen` guards. This
+    re-engages the proper LPJG↔IMOGEN handshake safety semantics
+    while still allowing first-call bootstrap.
+  - **Fortran side** (`imogen/code/imogen_lpjg.f`): added a
+    `CALL SYSTEM('mkdir -p ... /LPJG_main/IMOGEN')` +
+    `CALL SYSTEM('touch ... /LPJG_main/IMOGEN/done')` block before
+    the outer `DO WHILE (KEEPRUNNING)` loop. The auto-created file
+    is then picked up by the polling loop's INQUIRE on the very
+    first iteration. Idempotent (touch + mkdir -p both succeed
+    whether the target exists or not).
+- **Verification**: standalone IMOGEN smoke run now works
+  end-to-end (years 1871, 1872 produced) **without** any pre-staged
+  `done` file. Confirmed by removing all runtime state via
+  `rm -rf LPJG_main IMOGEN`, re-staging only the control-file
+  stubs (no `done` file), running `./imogen_lpjg`, and observing
+  `DONE_EXIST = T` on the very first polling iteration.
+- **Side benefit**: LPJ-GUESS's 162 unit tests still pass cleanly
+  (no regression from the C2/C3/C4 fixes).
+- **Documented in**: `notes/STEP_7.md` §3.1 (C2/C3), §3.3 (F-4).
 
 ### F-5 — Stage emission scenarios into a 5th tarball — closed 2026-05-06
 
