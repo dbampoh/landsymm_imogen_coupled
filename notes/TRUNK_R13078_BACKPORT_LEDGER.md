@@ -294,6 +294,65 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 9.5: LPJG-side IMOGEN climate-output consumer wiring + BLAZE check + C++ Tmin/Tmax
+
+**Commit:** _TBD_  **Date:** 2026-05-07
+
+#### File: `lpjguess/modules/imogencfx.h`
+- **Operation:** modify
+- **Changes:**
+  - Add `double dtmin[Date::MAX_YEAR_LENGTH]`, `double dtmax[Date::MAX_YEAR_LENGTH]` (~3 LOC)
+  - Add `xtring file_tmin`, `xtring file_tmax` (~3 LOC)
+  - Add `std::vector< std::vector< std::vector<double> > > all_dtmin`, `all_dtmax` (~3 LOC)
+- **Backport guidance:** Trivial 3 separate insert blocks; same locations as
+  the existing `dtemp[]`, `file_temp`, `all_temp` patterns.
+
+#### File: `lpjguess/modules/imogencfx.cpp`
+- **Operation:** modify (substantial; ~80 LOC across 5 spots)
+- **Changes:**
+  - `IMOGENCFXInput::init()`: 4 new `param[...]` reads (file_relhum, file_wind, file_tmin, file_tmax)
+  - `IMOGENCFXInput::init()`: 4 new `resize3DimVector(all_drelhum/all_dwind/all_dtmin/all_dtmax, ...)` calls
+  - `IMOGENCFXInput::read_climate_for_year()`: 4 new `read_lines_from_file(...)` calls (each with empty-path guard)
+  - `IMOGENCFXInput::get_climate_for_gridcell()`: BLAZE compatibility check
+    RESTORED (with empty-path safety message); per-month → per-day
+    interpolation block for the 4 new climate variables (uses
+    `interp_monthly_means_conserve` like existing code); daily-mode
+    passthrough block for the 4 new variables
+  - `IMOGENCFXInput::getclimate()`: 4 new `climate.relhum`/`u10`/`tmin`/`tmax` assignments
+- **Backport guidance:** **NON-TRIVIAL backport**. The trunk_r13078 fork's
+  `imogencfx.cpp` may not have all of the existing infrastructure (e.g.,
+  `all_drelhum`/`all_dwind` may already be in our fork from earlier
+  integration work but absent from trunk_r13078). The backport sprint
+  must FIRST replicate the half-built infrastructure (per the user's
+  earlier integration project) THEN apply step 9.5's wiring. Estimated
+  3-4 hours during the backport sprint.
+
+#### File: `lpjguess/modules/climatemodel.cpp`
+- **Operation:** modify (~25 LOC inserted into existing T_anom write block)
+- **Changes:**
+  - In the non-REGRID native-grid output branch (around lines ~880-958):
+    - Add `file100, file101` ofstream declarations
+    - Open at `iyear == year1`: `Tmin_anom.dat`, `Tmax_anom.dat`
+    - Per-gridpoint lon/lat header writes for both
+    - Per-month-per-day data writes in BOTH `dailyOut` branches:
+      `Tmin = tOutM - dtempOutM/2`, `Tmax = tOutM + dtempOutM/2`
+    - Per-gridpoint newlines + close at `iyear == iyend`
+- **Backport guidance:** Trivial copy if trunk_r13078's climatemodel.cpp
+  has the same Rh+W writer pattern (which the user added at integration
+  project time). If not, requires the integration-project Rh+W work
+  first. **TODO at step 9.5b**: replicate the same Tmin/Tmax write in
+  the REGRID branch (smoke uses `REGRID=0` so non-REGRID is sufficient
+  for v1.0).
+
+#### Non-`lpjguess/` notes (no backport needed; Fortran tree fork-shared)
+- Step 9.5 deliberately does NOT modify `imogen/code/imogen_lpjg.f`.
+  The Fortran Rh/W computation+writer port (item a in the original
+  step 9.5 plan) was deferred to step 9.5b after investigation revealed
+  Fortran engine doesn't COMPUTE Rh/wind at all — it's not just a writer
+  port but a full physics-pipeline port (~70-100 LOC of Fortran).
+
+---
+
 ### Step 9: SSP1-2.6 run-config + bug C5/R-anom fixes; perturbation_factor add-then-remove
 
 **Commit:** _TBD (step 9)_  **Date:** 2026-05-07

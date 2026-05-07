@@ -19,6 +19,138 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.10.0-step9.5-consumer-wiring] — 2026-05-07 — step 9.5: LPJG-side consumer wiring + BLAZE check + C++ engine Tmin/Tmax (PARTIAL)
+
+### Added — LPJG-side consumer wiring for IMOGEN engine's Rh/Wind/Tmin/Tmax outputs
+
+Per `EXECUTION_PLAN.md` V.1 step 9.5 + Decisions #11 (Tmin/Tmax) and #12
+(Rh/W output asymmetry). Step 9.5 is **partial** with significant scope
+refinement (see "Scope refinement" below).
+
+#### `lpjguess/modules/imogencfx.h` — header additions
+
+- Per-day `dtmin[Date::MAX_YEAR_LENGTH]` and `dtmax[Date::MAX_YEAR_LENGTH]` arrays
+- `xtring file_tmin` and `xtring file_tmax` ins-parameter paths
+- `std::vector< std::vector< std::vector<double> > > all_dtmin` and `all_dtmax` storage
+
+(`drelhum`, `dwind`, `file_relhum`, `file_wind`, `all_drelhum`, `all_dwind`
+were already in the header from prior integration-project work — only the
+`*tmin` / `*tmax` analogs needed adding.)
+
+#### `lpjguess/modules/imogencfx.cpp` — 5 wiring blocks
+
+- **`init()` param reads**: `param["file_relhum"]`, `param["file_wind"]`,
+  `param["file_tmin"]`, `param["file_tmax"]` — 4 new ins-file consumed parameters
+- **`init()` resize block**: `resize3DimVector(all_drelhum, ...)`, `all_dwind`,
+  `all_dtmin`, `all_dtmax` storage allocation
+- **`read_climate_for_year()`**: 4 new `read_lines_from_file()` calls (each
+  with empty-path guard so missing-file cases are graceful no-ops)
+- **`get_climate_for_gridcell()`**: BLAZE compatibility check **RESTORED**
+  with empty-path safety (actionable error message); monthly→daily
+  interpolation block for the 4 new climate variables (uses
+  `interp_monthly_means_conserve` mirroring existing `interp_climate`
+  pattern); daily-mode passthrough block for the 4 new variables
+- **`getclimate()`**: `climate.relhum = drelhum[date.day]; climate.u10 =
+  dwind[date.day]; climate.tmin = dtmin[date.day]; climate.tmax = dtmax[date.day];`
+  — mirrors `cfxinput.cpp:1940-1945`
+
+### Restored — BLAZE compatibility check at `imogencfx.cpp:803-804`
+
+Was commented out in the predecessor framework (per `[CMI §1.2]` break-point).
+Step 9 left it commented because Rh+wind weren't yet wired (uncommenting
+would have caused all coupled runs with `firemodel=BLAZE` to fail). After
+step 9.5's wiring of `file_relhum`/`file_wind` (above), BLAZE can run safely
+PROVIDED the user supplies the corresponding IMOGEN engine output paths in
+the ins file. The check is now **active** and produces an actionable error
+message:
+
+```cpp
+fail("imogencfx with firemodel=BLAZE requires file_relhum + file_wind ins
+      parameters pointing at the IMOGEN engine's Rh_anom.dat / W_anom.dat
+      per-year output. None set; aborting. (See runs/SSP1-2.6/imogen_intermediary.ins
+      for the canonical ins-file layout.)");
+```
+
+### Added — `lpjguess/modules/climatemodel.cpp` Tmin/Tmax write block
+
+In the non-REGRID native-grid output branch (lines ~880-958):
+- `file100, file101` ofstream declarations
+- Open at `iyear == year1`: `Tmin_anom.dat`, `Tmax_anom.dat`
+- Per-gridpoint lon/lat headers + per-month-per-day data writes:
+  `Tmin = tOutM[..] − dtempOutM[..]/2` (deg C)
+  `Tmax = tOutM[..] + dtempOutM[..]/2` (deg C)
+- Per-gridpoint newlines + close at `iyear == iyend`
+
+**TODO at step 9.5b**: replicate in the REGRID branch (smoke uses `REGRID=0`
+so non-REGRID is sufficient for v1.0).
+
+### Scope refinement (deferred items)
+
+Two items in the original step 9.5 plan were **deferred** after Phase A
+investigation surfaced unanticipated infrastructure dependencies:
+
+#### (a) Fortran Rh/W writer port — DEFERRED to step 9.5b
+
+The original plan (Decision #12) assumed the Fortran engine *computed*
+Rh/wind but didn't *write* them — i.e., a writer-only port (~20 LOC).
+Investigation revealed the Fortran engine **doesn't compute these
+variables at all**: the C++ port added the entire computation pipeline
+(per `[CMI §4.3.4a]`). Real Fortran port = adding ~70-100 LOC of
+Fortran physics work. Beyond step 9.5's 1-day budget; deferred to a
+focused step 9.5b session.
+
+Item (b) Fortran Tmin/Tmax depends on (a)'s computation infrastructure;
+also deferred to step 9.5b.
+
+#### (e) F-9 closure — REFINED, kept open
+
+`MiscOutput`'s 12 climate-input diagnostic stubs (`out_t_anom`, `out_p_anom`,
+etc.) need both `create_output_table()` calls in `define_output_tables()`
+AND per-gridcell `outlimit()` calls in `outannual()`. The latter has no
+data source: `Climate` has only single-day fields and 20-year-window
+aggregates — **no per-month accumulator array**. The original step 9.5
+plan assumed `gridcell.climate.mtemp[m]` was accessible; it's not (only
+the single-value `mtemp` "mean of last 31 days" exists).
+
+F-9's `notes/FOLLOWUPS.md` entry refined with two paths to closure:
+- **Option A** (recommended; ~50 LOC): add per-month accumulator arrays
+  to `Climate` (e.g., `mclimate_temp[12]`, `mclimate_prec[12]`, ...)
+- **Option B** (~15 LOC): cross-module getter from `IMOGENCFXInput::dtemp[]`
+
+Deferred to a focused step 9.5c (or merged with the F-12 sprint).
+
+### Verification
+
+```text
+Build: clean (no warnings on new code; pre-existing fortify-source
+       warnings unchanged)
+Tests: 162/162 still pass
+End-to-end smoke: NOT POSSIBLE in v1.0 — F-10 deadlock (per step 9 §4.4)
+                  blocks LPJG main loop; new wiring is code-correct,
+                  build-verified, but un-firable until F-12 lands
+What CAN be verified in next smoke: 64 new files (Tmin_anom.dat +
+                  Tmax_anom.dat × 32 engine years) in
+                  Common-directory/IMOGEN/output/<YYYY>/
+```
+
+### Files modified
+
+```text
+Modified:
+  lpjguess/modules/imogencfx.h           +9 LOC (3 blocks)
+  lpjguess/modules/imogencfx.cpp         +80 LOC (5 spots)
+  lpjguess/modules/climatemodel.cpp      +25 LOC (non-REGRID Tmin/Tmax block)
+  notes/FOLLOWUPS.md                     F-9 refined with infrastructure blocker
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md  +Step 9.5 entry
+  EXECUTION_PLAN.md                      step 9.5 row marked PARTIAL
+  CHANGELOG.md                           this entry
+
+Added:
+  notes/STEP_9.5.md                      ~12 KB
+```
+
+---
+
 ## [v0.9.0-step9-smoke] — 2026-05-07 — step 9: SSP1-2.6 run-config + bug fixes + empirical F-10 confirmation
 
 ### Added — `runs/SSP1-2.6/` directory (first per-scenario run setup)

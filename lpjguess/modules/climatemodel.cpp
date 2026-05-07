@@ -329,7 +329,7 @@ int RUN_IMOGEN_ENGINE() {
             std::this_thread::sleep_for(std::chrono::seconds(3));
             std::cout << "." << std::flush;
 
-            // [Step 7 of unified-codebase rebuild: bug C2 fix — restore the
+            // [Step 7 of unified-codebase rebuild: bug C2 fix  restore the
             //  doneExist filesystem check that was previously short-circuited
             //  to "doneExist = true" (which silently bypassed the LPJG?IMOGEN
             //  per-year handshake's safety semantics). The first-call special
@@ -343,14 +343,14 @@ int RUN_IMOGEN_ENGINE() {
 
             {
                 std::ifstream file(dirCommon + "/LPJG_main/IMOGEN/imogen_lpjg.txt");
-                // [Step 7 fix: bug C3 part 1 — restore the runnowOpen guard]
+                // [Step 7 fix: bug C3 part 1  restore the runnowOpen guard]
                 runnowOpen = !file.is_open();
             }
 
             runfluxExist = filesystem_dkb::exists(fileLpjgFlux);
             {
                 std::ifstream file(fileLpjgFlux);
-                // [Step 7 fix: bug C3 part 2 — restore the runfluxOpen guard]
+                // [Step 7 fix: bug C3 part 2  restore the runfluxOpen guard]
                 runfluxOpen = !file.is_open();
             }
             errorExist = filesystem_dkb::exists(dirCommon + "/LPJG_main/IMOGEN/error");
@@ -359,7 +359,7 @@ int RUN_IMOGEN_ENGINE() {
                 runnonco2fluxExist = filesystem_dkb::exists(fileLpjgCh4N2oFlux);
                 {
                     std::ifstream file(fileLpjgCh4N2oFlux);
-                    // [Step 7 fix: bug C3 part 3 — restore the runnonco2fluxOpen guard]
+                    // [Step 7 fix: bug C3 part 3  restore the runnonco2fluxOpen guard]
                     runnonco2fluxOpen = !file.is_open();
                 }
             }
@@ -877,7 +877,11 @@ int RUN_IMOGEN_ENGINE() {
 
                 // Output in native IMOGEN grid
                 std::cout << "Writing native-grid anomalies for year: " << iyear << "\n";
-                std::ofstream file92, file93, file94, file95, file11, file96, file97;
+                // [Step 9.5: file100/file101 added for Tmin_anom.dat / Tmax_anom.dat
+                //  (computed as T -/+ DTEMP/2 per cell x month x sub-day step).
+                //  TODO at step 9.5b: replicate this in the REGRID branch.
+                //  - DKB 2026-05-07]
+                std::ofstream file92, file93, file94, file95, file11, file96, file97, file100, file101;
 
                 if (iyear == year1) {
                     file92.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/T_anom.dat");
@@ -887,7 +891,9 @@ int RUN_IMOGEN_ENGINE() {
                     file11.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/DTEMP_anom.dat");
                     file96.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/Rh_anom.dat");
                     file97.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/W_anom.dat");
-
+                    // [Step 9.5: Tmin/Tmax outputs - DKB 2026-05-07]
+                    file100.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/Tmin_anom.dat");
+                    file101.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/Tmax_anom.dat");
                 }
                 for (igp = 0; igp < GPOINTS; ++igp) {
                     file92 << std::fixed << std::setw(8) << std::setprecision(3) << longG[igp] << " ";
@@ -904,6 +910,11 @@ int RUN_IMOGEN_ENGINE() {
                     file96 << std::fixed << std::setw(8) << std::setprecision(3) << lat[igp] << " ";
                     file97 << std::fixed << std::setw(8) << std::setprecision(3) << longG[igp] << " ";
                     file97 << std::fixed << std::setw(8) << std::setprecision(3) << lat[igp] << " ";
+                    // [Step 9.5: Tmin/Tmax lon/lat headers - DKB 2026-05-07]
+                    file100 << std::fixed << std::setw(8) << std::setprecision(3) << longG[igp] << " ";
+                    file100 << std::fixed << std::setw(8) << std::setprecision(3) << lat[igp] << " ";
+                    file101 << std::fixed << std::setw(8) << std::setprecision(3) << longG[igp] << " ";
+                    file101 << std::fixed << std::setw(8) << std::setprecision(3) << lat[igp] << " ";
 
                     for (imm = 0; imm < MM; ++imm) {
                         if (dailyOut) {
@@ -917,6 +928,10 @@ int RUN_IMOGEN_ENGINE() {
                                         file96 << std::fixed << std::setw(10) << std::setprecision(3) << rhOutM[igp][imm][imd][ind] << " ";//DKB Rh
                                         file11 << std::fixed << std::setw(10) << std::setprecision(3) << dtempOutM[igp][imm][imd] << " ";
                                         file95 << std::setw(10) << fWetClimOut[igp][imm] << " ";
+                                        // [Step 9.5: Tmin = T - DTEMP/2; Tmax = T + DTEMP/2.
+                                        //  Same units as T (K). - DKB 2026-05-07]
+                                        file100 << std::fixed << std::setw(10) << std::setprecision(3) << (tOutM[igp][imm][imd][ind] - dtempOutM[igp][imm][imd] / 2.0) << " ";
+                                        file101 << std::fixed << std::setw(10) << std::setprecision(3) << (tOutM[igp][imm][imd][ind] + dtempOutM[igp][imm][imd] / 2.0) << " ";
                                     }
                                 }
                             }
@@ -929,6 +944,9 @@ int RUN_IMOGEN_ENGINE() {
                             file96 << std::fixed << std::setw(10) << std::setprecision(3) << rhOutM[igp][imm][0][0] << " "; //DKB
                             file11 << std::fixed << std::setw(10) << std::setprecision(3) << dtempOutM[igp][imm][0] << " ";
                             file95 << std::setw(10) << fWetClimOut[igp][imm] << " ";
+                            // [Step 9.5: Tmin/Tmax monthly variants - DKB 2026-05-07]
+                            file100 << std::fixed << std::setw(10) << std::setprecision(3) << (tOutM[igp][imm][0][0] - dtempOutM[igp][imm][0] / 2.0) << " ";
+                            file101 << std::fixed << std::setw(10) << std::setprecision(3) << (tOutM[igp][imm][0][0] + dtempOutM[igp][imm][0] / 2.0) << " ";
                         }
                     }
                     file92 << "\n";
@@ -938,6 +956,8 @@ int RUN_IMOGEN_ENGINE() {
                     file96 << "\n";
                     file97 << "\n";
                     file11 << "\n";
+                    file100 << "\n";  // [Step 9.5 - DKB]
+                    file101 << "\n";  // [Step 9.5 - DKB]
                 }
 
                 if (iyear == iyend) {
@@ -948,6 +968,8 @@ int RUN_IMOGEN_ENGINE() {
                     file96.close();
                     file97.close();
                     file11.close();
+                    file100.close();  // [Step 9.5 - DKB]
+                    file101.close();  // [Step 9.5 - DKB]
                 }
 
                 // Write done file for LPJ-GUESS
@@ -1216,7 +1238,7 @@ double radf_non_co2(int year, int nyr_non_co2, bool file_non_co2, const std::str
  * Calculates saturation mixing ratio at given temperatures and pressures.
  *
  * Uses a lookup table of saturation water vapor pressures based on the
- * Goff-Gratch formulae, with values over water above 0°C and over ice below 0°C.
+ * Goff-Gratch formulae, with values over water above 0C and over ice below 0C.
  *
  * @param qs Output saturation mixing ratio (kg/kg).
  * @param t Input temperature (K).

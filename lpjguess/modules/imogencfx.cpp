@@ -387,6 +387,23 @@ void IMOGENCFXInput::init() {
 	file_insol = param["file_insol"].str;
 	file_dtr = param["file_dtr"].str;
 
+	// [Step 9.5 of unified-codebase rebuild: wire the LPJG-side consumer
+	//  for IMOGEN engine's Rh / wind / Tmin / Tmax outputs. The C++ engine
+	//  (climatemodel.cpp) writes Rh_anom.dat / W_anom.dat / Tmin_anom.dat /
+	//  Tmax_anom.dat per year; up to v0.9.0 these were unconsumed by LPJ-GUESS.
+	//  Now wired here so BLAZE can run safely (needs wind + RH) and so
+	//  LandSyMM crop dynamics can use Tmin/Tmax from IMOGEN rather than
+	//  computing internally from DTEMP. The 4 paths are normally set in the
+	//  ins file (see runs/SSP1-2.6/imogen_intermediary.ins file_relhum +
+	//  file_wind + file_tmin + file_tmax param directives). If unset, the
+	//  reads in read_climate_for_year() are skipped (path empty -> filename
+	//  resolves empty -> read_lines_from_file no-ops gracefully).
+	//  - DKB 2026-05-07]
+	file_relhum = param["file_relhum"].str;
+	file_wind   = param["file_wind"].str;
+	file_tmin   = param["file_tmin"].str;
+	file_tmax   = param["file_tmax"].str;
+
 	ndep_timeseries = param["ndep_timeseries"].str;
 
 	spatial_resolution = parse_spatial_resolution();
@@ -510,6 +527,20 @@ void IMOGENCFXInput::init() {
 	resize3DimVector(all_wetdays, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 	resize3DimVector(all_insol, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 	resize3DimVector(all_dtr, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+
+	// [Step 9.5 of unified-codebase rebuild: storage for IMOGEN engine's
+	//  Rh / wind / Tmin / Tmax outputs. Same shape as all_temp etc. so the
+	//  read_lines_from_file calls in read_climate_for_year() index correctly
+	//  when the corresponding file_* paths are set in the ins file. When
+	//  paths are unset, these vectors are still resized but the file-read
+	//  is skipped (see read_climate_for_year guard); leaves all-zero
+	//  storage which is harmless for downstream code that doesn't consume
+	//  the values (e.g., firemodel != BLAZE; LandSyMM stand list does not
+	//  call for Tmin/Tmax). - DKB 2026-05-07]
+	resize3DimVector(all_drelhum, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dwind,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmin,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmax,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 
 	all_co2.resize(nyears);
 
@@ -787,6 +818,31 @@ int IMOGENCFXInput::readenv(std::vector<double> lons, std::vector<double> lats, 
 			filename = gen_filename(file_dtr, calendar_year, false);
 			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtr[store_index], monthly);
 		}
+
+		// [Step 9.5: read IMOGEN engine's Rh / wind / Tmin / Tmax outputs
+		//  from per-year ASCII files. Each path is YYYY-templated like the
+		//  others (e.g., "./IMOGEN/output/YYYY/Rh_anom.dat"). When path is
+		//  empty (parameter unset in ins), gen_filename produces an empty
+		//  string and read_lines_from_file is skipped to keep behavior
+		//  graceful when these files aren't being produced (e.g., Fortran
+		//  engine before step 9.5b's port lands). - DKB 2026-05-07]
+		if ((char*)file_relhum != NULL && file_relhum != "") {
+			filename = gen_filename(file_relhum, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_drelhum[store_index], monthly);
+		}
+		if ((char*)file_wind != NULL && file_wind != "") {
+			filename = gen_filename(file_wind, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dwind[store_index], monthly);
+		}
+		if ((char*)file_tmin != NULL && file_tmin != "") {
+			filename = gen_filename(file_tmin, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmin[store_index], monthly);
+		}
+		if ((char*)file_tmax != NULL && file_tmax != "") {
+			filename = gen_filename(file_tmax, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmax[store_index], monthly);
+		}
+
 		// already in init() determined, which grids have imogen climate coordinates lines
 		for (int i = 0; i < coord_line.size(); i++) {
 			if (coord_line[i] > 0)
@@ -800,9 +856,29 @@ int IMOGENCFXInput::readenv(std::vector<double> lons, std::vector<double> lats, 
 void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& seed) {
 
 	if (monthly) {
-		/*if (firemodel == BLAZE) {
-			fail("%s: sorry, imogencfx input not setup for firemodel BLAZE, needs extra climate data and GWGEN", __FUNCTION__);
-		}*/
+		// [Step 9.5 of unified-codebase rebuild: BLAZE compatibility check
+		//  RESTORED. Up to v0.9.0 the check was commented out because RH +
+		//  wind weren't yet wired (uncommenting would have caused all coupled
+		//  runs with firemodel=BLAZE to fail, even though the .ins file might
+		//  have specified BLAZE intentionally). After step 9.5's wiring of
+		//  file_relhum / file_wind (+ file_tmin / file_tmax) above, BLAZE can
+		//  run safely PROVIDED the user supplies the corresponding IMOGEN
+		//  engine output paths in the ins file. If the paths are empty, this
+		//  check still fires - which is correct: BLAZE needs RH+wind, and if
+		//  they weren't supplied, the run cannot proceed. The error message
+		//  here is now actionable: tells the user to set file_relhum +
+		//  file_wind in the ins file. - DKB 2026-05-07]
+		if (firemodel == BLAZE) {
+			if ((char*)file_relhum == NULL || file_relhum == "" ||
+			    (char*)file_wind == NULL || file_wind == "") {
+				fail("%s: imogencfx with firemodel=BLAZE requires file_relhum + "
+				     "file_wind ins parameters pointing at the IMOGEN engine's "
+				     "Rh_anom.dat / W_anom.dat per-year output. None set; aborting. "
+				     "(See runs/SSP1-2.6/imogen_intermediary.ins for the canonical "
+				     "ins-file layout.)", __FUNCTION__);
+			}
+		}
+
 		// Interpolate monthly spinup data to quasi-daily values
 		double mtmp[12];
 		double mprec[12];
@@ -818,6 +894,30 @@ void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& 
 		}
 		interp_climate(mtmp, mprec, minsol, mdtr, mwet, dtemp, dprec, dinsol, ddtr, seed);
 
+		// [Step 9.5: monthly -> quasi-daily interpolation for the new IMOGEN
+		//  outputs (Rh, wind, Tmin, Tmax). Mirrors interp_climate's pattern:
+		//  use interp_monthly_means_conserve for non-rainfall variables.
+		//  Each block guarded so that empty-path cases (the data wasn't
+		//  loaded) leave the per-day array zero-initialized rather than
+		//  reading from uninitialized all_*[store_index][igrid] memory.
+		//  Storage shape: all_drelhum[store_index][igrid] has size 12 in
+		//  monthly mode -> safe to index [0..11]. - DKB 2026-05-07]
+		double mrelhum[12], mwind[12], mtmin[12], mtmax[12];
+		bool have_relhum = ((char*)file_relhum != NULL && file_relhum != "");
+		bool have_wind   = ((char*)file_wind   != NULL && file_wind   != "");
+		bool have_tmin   = ((char*)file_tmin   != NULL && file_tmin   != "");
+		bool have_tmax   = ((char*)file_tmax   != NULL && file_tmax   != "");
+		for (int i = 0; i < 12; i++) {
+			mrelhum[i] = have_relhum ? all_drelhum[store_index][igrid][i] : 0.0;
+			mwind[i]   = have_wind   ? all_dwind[store_index][igrid][i]   : 0.0;
+			mtmin[i]   = have_tmin   ? all_dtmin[store_index][igrid][i]   : 0.0;
+			mtmax[i]   = have_tmax   ? all_dtmax[store_index][igrid][i]   : 0.0;
+		}
+		if (have_relhum) interp_monthly_means_conserve(mrelhum, drelhum, 0);
+		if (have_wind)   interp_monthly_means_conserve(mwind,   dwind,   0);
+		if (have_tmin)   interp_monthly_means_conserve(mtmin,   dtmin);
+		if (have_tmax)   interp_monthly_means_conserve(mtmax,   dtmax);
+
 	}
 	else {
 		for (int i = 0; i < Date::MAX_YEAR_LENGTH; i++) {
@@ -825,6 +925,17 @@ void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& 
 			dprec[i] = all_prec[store_index][igrid][i]; // * 86400 / 1000; // convert to precip rate in kg/m2/s
 			dinsol[i] = all_insol[store_index][igrid][i];
 			if (ifbvoc) ddtr[i] = all_dtr[store_index][igrid][i];
+			// [Step 9.5: daily-mode passthrough for the new IMOGEN outputs.
+			//  Each guarded so empty-path doesn't index into empty storage.
+			//  - DKB 2026-05-07]
+			if ((char*)file_relhum != NULL && file_relhum != "")
+				drelhum[i] = all_drelhum[store_index][igrid][i];
+			if ((char*)file_wind != NULL && file_wind != "")
+				dwind[i] = all_dwind[store_index][igrid][i];
+			if ((char*)file_tmin != NULL && file_tmin != "")
+				dtmin[i] = all_dtmin[store_index][igrid][i];
+			if ((char*)file_tmax != NULL && file_tmax != "")
+				dtmax[i] = all_dtmax[store_index][igrid][i];
 		}
 	}
 
@@ -1060,6 +1171,21 @@ bool IMOGENCFXInput::getclimate(Gridcell& gridcell) {
 		if (ifbvoc) {
 			climate.dtr = ddtr[date.day];
 		}
+
+		// [Step 9.5 of unified-codebase rebuild: populate the LPJ-GUESS
+		//  Climate struct's relhum / u10 / tmin / tmax from the IMOGEN
+		//  engine outputs that step 9.5's wiring (above) loaded into
+		//  drelhum / dwind / dtmin / dtmax. Mirrors cfxinput.cpp:1941-1944.
+		//  When the corresponding ins parameters are unset (file_relhum
+		//  etc. = ""), the per-day arrays are zero-filled and these
+		//  assignments produce climate.* = 0; processes that depend on
+		//  these fields (BLAZE, LandSyMM crop dynamics) are gated
+		//  separately (BLAZE check above; LandSyMM stand-list config).
+		//  - DKB 2026-05-07]
+		climate.relhum = drelhum[date.day];
+		climate.u10    = dwind[date.day];
+		climate.tmin   = dtmin[date.day];
+		climate.tmax   = dtmax[date.day];
 
 
 	// Nitrogen deposition

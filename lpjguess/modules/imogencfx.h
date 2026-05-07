@@ -143,6 +143,16 @@ private:
 	/// Wind for current gridcell and current year
 	double dwind[Date::MAX_YEAR_LENGTH];
 
+	// [Step 9.5 of unified-codebase rebuild: per-day Tmin/Tmax arrays, populated
+	//  from monthly IMOGEN engine output Tmin_anom.dat / Tmax_anom.dat (when
+	//  the C++ engine emits them; Fortran-engine port deferred to step 9.5b).
+	//  Mirrors the cfxinput.cpp dmax_temp/dmin_temp pattern. - DKB 2026-05-07]
+	/// Minimum temperature for current gridcell and current year (deg C)
+	double dtmin[Date::MAX_YEAR_LENGTH];
+
+	/// Maximum temperature for current gridcell and current year (deg C)
+	double dtmax[Date::MAX_YEAR_LENGTH];
+
 	/// Daily N deposition for one year
 	double dNH4dep[Date::MAX_YEAR_LENGTH], dNO3dep[Date::MAX_YEAR_LENGTH];
 
@@ -185,6 +195,11 @@ private:
 	//	int historic_timestep_specifichum;
 	xtring file_relhum;
 	xtring file_wind;
+
+	// [Step 9.5: paths to IMOGEN engine's per-year Tmin_anom.dat / Tmax_anom.dat
+	//  output. Wired in init() + read in read_climate_for_year(). - DKB 2026-05-07]
+	xtring file_tmin;
+	xtring file_tmax;
 
 	/// Nitrogen deposition forcing for current gridcell
 	Lamarque::NDepData ndep;
@@ -231,6 +246,12 @@ private:
 	std::vector< std::vector< std::vector<double> > > all_dtr;
 	std::vector< std::vector< std::vector<double> > > all_drelhum;
 	std::vector< std::vector< std::vector<double> > > all_dwind;
+
+	// [Step 9.5: storage for IMOGEN engine's per-year Tmin/Tmax across all
+	//  gridcells × all months/days in the smoke window. Resized in
+	//  read_climate_for_year() the same way all_temp is. - DKB 2026-05-07]
+	std::vector< std::vector< std::vector<double> > > all_dtmin;
+	std::vector< std::vector< std::vector<double> > > all_dtmax;
 
 	// Timers for keeping track of progress through the simulation
 	Timer tprogress, tmute;

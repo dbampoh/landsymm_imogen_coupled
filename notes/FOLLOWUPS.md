@@ -138,7 +138,54 @@ see DONE section.)
 - **Timing**: medium priority; same authoring contact as F-6 so can
   be batched with that.
 
-### F-9 — Complete the half-scaffolded miscoutput IMOGEN climate-input diagnostic outputs
+### F-9 — Complete the half-scaffolded miscoutput IMOGEN climate-input diagnostic outputs (refined at step 9.5)
+
+**Refinement 2026-05-07 (during step 9.5)**: investigation revealed an
+unanticipated infrastructure dependency:
+
+- The 12 `xtring file_*_anom` parameter declarations and `Table out_*_anom`
+  member declarations in `miscoutput.h` ARE in place (gated on
+  `IMOGENConfig::print_imogen_output==true`)
+- BUT: a `create_output_table()` call in `define_output_tables()` AND a
+  per-gridcell `outlimit()`/`add_value()` call in `outannual()` are missing
+- **The missing per-gridcell `outlimit()` call has no obvious data source**:
+  `Climate` has only single-day fields (`temp`, `prec`, `relhum`, `u10`,
+  `tmin`, `tmax`, `insol`) and 20-year-window aggregates (`mtemp_min20`,
+  `mtemp_max20`); **no per-month accumulator array is exposed**.
+- The original step 9.5 plan assumed `gridcell.climate.mtemp[m]` was
+  accessible — it isn't.
+
+**Two paths to close F-9 properly**:
+
+  - **Option A** (cleaner; ~50 LOC infrastructure addition): Add per-month
+    accumulator arrays to `Climate`:
+    ```cpp
+    // In framework/guess.h Climate class:
+    double mclimate_temp[12], mclimate_prec[12], mclimate_relhum[12],
+           mclimate_u10[12], mclimate_tmin[12], mclimate_tmax[12], ...;
+    ```
+    Reset at year-start, accumulate daily values, divide by `mthday[m]` at
+    month-end (or at year-end for outannual access). Then F-9's outannual
+    can `outlimit_misc(out, out_t_anom, gridcell.climate.mclimate_temp[m])`
+    inside a 12-month loop.
+  - **Option B** (smaller; ~15 LOC cross-module getter): Expose
+    `IMOGENCFXInput::dtemp[]` (per-day arrays, populated each year per
+    gridcell) to `MiscOutput::outannual` via a getter or a globally-
+    accessible reference. F-9's outannual aggregates per-day → per-month
+    inline. Drawback: introduces cross-module coupling (output module
+    reaching into input module state).
+
+**Recommendation**: Option A. Cleaner; the per-month accumulator is generally
+useful (e.g., for any other `m*` monthly diagnostic outputs) and keeps
+miscoutput input-module-agnostic.
+
+**Status**: deferred from step 9.5 to a focused step 9.5c (or merge with
+the F-12 sprint if convenient — F-12's two-process design naturally
+provides the per-month aggregation point in the engine-output side).
+
+(Original entry continues below for reference.)
+
+### F-9 — Complete the half-scaffolded miscoutput IMOGEN climate-input diagnostic outputs (original entry)
 
 - **Trigger**: step 8 (`notes/STEP_8.md` §2.1, §3.5). While
   investigating where step 8's LPJG-side handshake writer should live,
