@@ -261,6 +261,16 @@ param "file_dtr"     (str "./IMOGEN/output/YYYY/DTEMP_anom.dat") ! [bug C5]
 param "file_co2"     (str "./IMOGEN/output/YYYY/CO2.dat")        ! [bug C5]
 param "file_wind"    (str "./IMOGEN/output/YYYY/W_anom.dat")     ! [bug C5; C++ engine emits W_anom.dat]
 param "file_relhum"  (str "./IMOGEN/output/YYYY/Rh_anom.dat")    ! [bug C5; bug R-anom: was "R_anom.dat"]
+! [Step 14 of unified-codebase rebuild: add file_tmin / file_tmax param
+!  declarations matching step 9.5's consumer-side wiring in imogencfx.cpp
+!  (which reads them via `param["file_tmin"].str` etc.). Without these
+!  declarations, LPJG's Paramlist::operator[] aborts with "parameter
+!  not found" at runtime. The engine writes Tmin_anom.dat + Tmax_anom.dat
+!  per step 9.5's climatemodel.cpp non-REGRID branch addition.
+!  Discovered empirically by the step 14 launcher's first end-to-end
+!  smoke run on 2026-05-07. - DKB]
+param "file_tmin"    (str "./IMOGEN/output/YYYY/Tmin_anom.dat")
+param "file_tmax"    (str "./IMOGEN/output/YYYY/Tmax_anom.dat")
 
 !///////////////////////////////////////////////////////////////////////////////////////
 ! COUPLING params (LPJG <-> IMOGEN year-range coordination)

@@ -294,6 +294,40 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 14: Workstation launcher + Anaconda3 NetCDF build docs + .ins file_tmin/tmax fix
+
+**Commit:** _TBD_  **Date:** 2026-05-07
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 14's deliverables (launcher script + build docs + .ins file
+collateral fix) live entirely OUTSIDE `lpjguess/`. The Backport
+Sprint (F-11) does NOT need to replicate any step-14 changes in
+`trunk_r13078`.
+
+#### Files added (all OUTSIDE lpjguess/)
+
+- `scripts/run_coupled.sh` (NEW, ~12 KB / ~330 LOC bash) — workstation launcher
+- `docs/build.md` (NEW, ~150 lines markdown) — Anaconda3 NetCDF preference docs + manual build/run paths
+- `notes/STEP_14.md` (NEW, ~12 KB)
+
+#### Files modified (all OUTSIDE lpjguess/)
+
+- `runs/SSP1-2.6/imogen_intermediary.ins` (+2 `param` directives for
+  file_tmin / file_tmax — step-9.5 collateral fix; documents step-14
+  provenance via inline comment)
+- `.gitignore` (+`runs/*/Common-directory/` rule)
+
+#### Cross-reference for the Backport Sprint
+
+When the Backport Sprint runs the coupled model on the `trunk_r13078`
+backend, it will use the SAME launcher (`scripts/run_coupled.sh`).
+The launcher's behavior is fork-agnostic; only the build target changes
+(future enhancement: `--lpjg-backend trunk_r13078` flag added at
+Backport Sprint time).
+
+---
+
 ### Step 13: Python Intermediary -> Fortran IMOGEN ASCII adapter
 
 **Commit:** _TBD_  **Date:** 2026-05-07

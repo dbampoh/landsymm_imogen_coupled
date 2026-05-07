@@ -92,6 +92,10 @@ runs/*/output/
 runs/*/scratch/
 runs/*/saved_state*/
 runs/*/inputs/
+# [Step 14: runtime artifacts produced by scripts/run_coupled.sh in each
+#  scenario's Common-directory/. Engine per-year output, LPJG handshake
+#  files, etc. All regenerable. - DKB 2026-05-07]
+runs/*/Common-directory/
 
 # IMOGEN run output (per-year directories with climate files)
 **/Common-directory/IMOGEN/output/

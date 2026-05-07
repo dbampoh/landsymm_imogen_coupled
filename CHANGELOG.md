@@ -19,6 +19,158 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.14.0-step14-launcher] — 2026-05-07 — step 14: workstation launcher + Anaconda3 NetCDF build docs
+
+### Added — `scripts/run_coupled.sh` (~330 LOC bash; production-quality launcher)
+
+Per `EXECUTION_PLAN.md` V.1 step 14 + Appendix A.4 + Decision #8.
+One-shot launcher that walks the v1.0 coupled-run pipeline through
+7 steps:
+
+1. Build LPJ-GUESS (idempotent; skip if `lpjguess/build/guess` exists)
+2. Run intermediary_py if `--backbone intermediary-py`
+3. Run Python → LPJG-format adapter if `--backbone intermediary-py`
+4. Bootstrap `LPJG_main/IMOGEN/` handshake dir (F-10 deadlock workaround)
+5. Clean stale per-year IMOGEN engine output dirs
+6. Launch `./guess -input imogencfx main.ins` in scenario's run dir
+7. Collect summary + log path
+
+#### Anaconda3 NetCDF auto-detection (Decision #8)
+
+4-tier priority for Anaconda3 NetCDF prefix detection:
+1. `--anaconda3-prefix <path>` flag (explicit override)
+2. `$CONDA_PREFIX` (active conda env)
+3. `$ANACONDA_PREFIX` (set in some shells)
+4. `/home/$USER/anaconda3` (common default install location)
+
+If found, CMake invoked with explicit `-DCMAKE_PREFIX_PATH`,
+`-DNETCDF_INCLUDE_DIR`, `-DNETCDF_C_LIBRARY` pointing at the conda
+env's libs (avoiding the libhdf5_serial / libcurl ABI mismatch that
+breaks native-Ubuntu netcdf-dev linking — see `notes/STEP_1.md`).
+If not found, prints warning and falls back to bare `cmake ..`.
+
+#### CLI flags + validation
+
+- `--scenario SSP` (default SSP1-2.6)
+- `--coupling-mode tight | prescribed | loose` (default prescribed; v1.0
+  workaround for F-10 deadlock that blocks tight mode)
+- `--backbone static-iiasa | intermediary-py` (default static-iiasa;
+  predecessor's reference files for v1.0 minimal-moving-parts)
+- `--smoke / --production` (smoke = 4-cell + 1871-1872; production =
+  62892-cell + 1900-2100)
+- `--no-build / --no-intermediary / --no-adapter` for skipping individual steps
+- `--anaconda3-prefix <path>` override
+- `-h / --help` (89-line self-documenting help via awk-based extraction)
+
+Each flag validated against its allowed values; invalid value aborts
+with actionable error message.
+
+#### F-10 deadlock awareness
+
+When `--coupling-mode tight` or `--production` requested in v1.0, the
+launcher prints WARNING explaining the architectural limitation +
+recommends the v1.0-functional `prescribed` + `--smoke` defaults.
+Phase-2 resolution at F-12 (multi-pass / two-process design).
+
+#### Banner per §I.D.5
+
+Run-start banner displays scenario, coupling-mode, backbone, run-mode,
+plus the canonical units conventions (NEE sign, CO2 unit conversion,
+CH4/N2O units, year indexing, cell-area assumption). Verbatim match
+to EXECUTION_PLAN.md's specified format.
+
+#### Other features
+
+- **Idempotent**: re-runs skip already-completed steps via mtime / file-presence checks
+- **Bootstrap helper**: pre-populates `imogen_lpjg.txt` + `done` files
+  before engine start (per step 9 §4.4 empirical findings; needed
+  until F-12 multi-pass design)
+- **Structured logging**: 4 levels (info/warn/error/ok) with ANSI colors
+- **Date-stamped log**: `logs/run_coupled_<SCENARIO>_<TS>.log`
+- **Trap-based error handler**: actionable error message on any exit
+
+### Added — `docs/build.md` (~150 lines; Anaconda3 NetCDF preference + manual paths)
+
+Comprehensive build documentation covering:
+- Quick-start (one-liner via launcher)
+- 7-step launcher flow explained
+- Why Anaconda3 NetCDF (the libhdf5_serial / libcurl ABI-mismatch
+  diagnosis from step 1)
+- Manual build instructions (without launcher; for debugging)
+- Manual intermediary_py setup (with 7-symlink recipe from step 11)
+- Manual adapter run
+- How to verify the build succeeds
+- Cluster build placeholder (to be filled at step 16)
+- Troubleshooting common errors
+- Cross-references to relevant STEP_*.md, FOLLOWUPS.md, EXECUTION_PLAN.md
+
+### Modified — `runs/SSP1-2.6/imogen_intermediary.ins` (collateral fix)
+
+Added `param "file_tmin" (str ".../Tmin_anom.dat")` and
+`param "file_tmax" (str ".../Tmax_anom.dat")` directives.
+
+**Provenance**: this is a step-9.5 follow-up that step 14's empirical
+test surfaced. Step 9.5 wired the consumer side in
+`imogencfx.cpp::init()` (`file_tmin = param["file_tmin"].str;` etc.)
+but didn't update the example `.ins` file. The launcher's first
+end-to-end smoke run on 2026-05-07 hit
+`Paramlist::operator[]: parameter "file_tmin" not found` and
+revealed the gap. Fix is one block of 2 directives + explanatory
+comment referencing step 14 provenance. The C++ engine writes
+Tmin_anom.dat / Tmax_anom.dat per step 9.5's climatemodel.cpp
+non-REGRID branch; the consumer-side wiring correctly reads them
+after this fix.
+
+### Verified
+
+- `scripts/run_coupled.sh --help`: 89 lines self-documenting help
+- End-to-end smoke run with `--no-build`: banner displays correctly,
+  all 7 steps progress in order, IMOGEN engine produces 30+ year-output
+  dirs (1871-1900+), launcher exits cleanly when engine deadlocks at
+  F-10 boundary
+- Anaconda3 NetCDF auto-detection at `/home/bampoh-d/anaconda3` ✓
+- Bootstrap helper creates handshake files ✓
+- F-10 deadlock warnings printed for `--coupling-mode tight` and `--production` ✓
+
+### What's NOT verified (gated on F-12)
+
+End-to-end coupled run that gets LPJG main loop to actually fire
+(producing `cflux.out`, `mch4.out`, `ngases.out`, etc. in `runs/<SSP>/output/`
++ step 8's writer producing `imogen_lpjg_*.txt` in
+`Common-directory/LPJG_main/IMOGEN/`). Architecturally blocked by F-10
+in v1.0 single-process imogencfx mode regardless of which launcher
+is used. Resolution at F-12 (multi-pass / two-process design;
+post-v1.0).
+
+### NET source-level change in `lpjguess/`: ZERO
+
+Launcher is a shell script + docs are markdown + `.ins` fix is
+configuration. Backport Sprint (F-11) does NOT need to replicate
+any step-14 changes in `trunk_r13078`.
+
+### Files modified / added
+
+```text
+Added:
+  scripts/run_coupled.sh                ~12 KB / ~330 LOC
+  docs/build.md                         ~6 KB / ~150 lines
+  notes/STEP_14.md                      ~12 KB
+
+Modified:
+  runs/SSP1-2.6/imogen_intermediary.ins +param file_tmin/tmax (step 9.5 collateral)
+  .gitignore                            +runs/*/Common-directory/ rule
+  notes/FOLLOWUPS.md                    status dashboard date refresh
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md +Step 14 entry (zero lpjguess C++)
+  EXECUTION_PLAN.md                     step 14 row marked DONE
+  CHANGELOG.md                          this entry
+
+NOT committed (gitignored at runtime):
+  logs/                                 launcher's date-stamped log files
+  runs/*/Common-directory/              IMOGEN engine + LPJG runtime artifacts
+```
+
+---
+
 ## [v0.13.0-step13-adapter] — 2026-05-07 — step 13: Python Intermediary → Fortran IMOGEN ASCII adapter
 
 (Step 12 was consolidated with step 11; see `[v0.12.0-step11-intermediary-py-validated]`.)
