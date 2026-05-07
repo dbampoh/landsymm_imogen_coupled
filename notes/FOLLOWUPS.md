@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-07 (after step 13 adapter implementation).
+**Last updated:** 2026-05-07 (after step 13 adapter implementation; F-13 added).
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -29,6 +29,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 | F-10 | OPEN (architectural; v1.0 caveat) | Phase 2 | **Yes** (CO2 trajectory bias risk) |
 | F-11 | OPEN | End of Phase 1 (after step 19) | No (paper consistency) |
 | F-12 | OPEN | Sprint just before step 17 | **Yes** (LPJG main loop must run) |
+| F-13 | OPEN (paper-stage comparative analysis) | Post-v1.0 (post-step-19) | No (paper-stage; not a v1.0-runnable item) |
 
 ### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
 
@@ -473,6 +474,124 @@ provides the per-month aggregation point in the engine-output side).
     6-file baseline diff)
   - `_phase2_findings/02_lpjguess_trunk_r13078.md` (Phase-2
     investigation of `trunk_r13078`'s coupling surface area)
+
+### F-13 — Post-v1.0 paper-stage comparative-analysis framework
+
+- **Trigger**: user guidance 2026-05-07 after step 13 commit. The user
+  spelled out the comparison-plot framework needed for the GMD paper
+  (working draft at
+  `version_A/.../References/IMOGEN-PAPER-GMD_updated_intro_methods-aa.docx`,
+  currently incomplete: intro + methods sections only, with supervisor
+  comments + edits applied).
+- **Three comparison axes for paper figures + stats**:
+
+  **AXIS 1 — Atmospheric GHG concentration trends (CO2, CH4, N2O)**:
+  IMOGEN engine runs forced by:
+    - RCMIP-raw emissions (no substitution; reference baseline)
+    - RCMIP-substituted emissions (our modelled anthro + LPJG natural)
+  Compare resulting atmospheric concentration trajectories. **Both
+  trajectories now producible** because intermediary_py's Component C
+  outputs `RCMIP_total_Mt` (raw RCMIP) and `Total_Mt` (our substituted)
+  side-by-side in `outputs/component_c/data/integrated_emissions_*.csv`.
+  Adapter (step 13) can convert either column to engine-readable
+  format; a small flag could be added to select RCMIP-raw mode for
+  the comparison plots.
+
+  **AXIS 2 — Climate trends and patterns (T, P, SW, RH, wind, DTR, Tmin/Tmax)**:
+  Two sub-options for what to compare against:
+    - **Sub-option 2A**: RCMIP-raw IMOGEN climate vs RCMIP-substituted
+      IMOGEN climate (parallel to Axis 1; isolates the effect of OUR
+      emissions modelling on downstream climate)
+    - **Sub-option 2B**: RCMIP-substituted IMOGEN climate vs ISIMIP3b
+      forcing climate (the climate used for Stage 1 PLUM-yield runs;
+      validates IMOGEN's climate against an established reference)
+  User notes Sub-option 2B is "the alternative" but **both could be
+  valuable** in the paper.
+
+  **AXIS 3 — LPJ-GUESS ecosystem outputs**:
+  cflux, cmass, anpp, mch4, ngases, etc. under each of Axis 2's
+  climate forcings. Quantifies the *propagated* effect of emissions
+  modelling choices on ecosystem responses (the science the paper is
+  ultimately about).
+
+- **Existing template scripts to leverage** (per user 2026-05-07):
+  `version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Python-scripts/comparative_analysis/analysis/`
+  (identical to version_B's same path; 73 MB total):
+    - `carbon_comparison.py` (15 KB, ~370 LOC) — LPJG ecosystem-carbon
+      output comparison (Axis 3)
+    - `climate_comparison.py` (26 KB, ~640 LOC) — IMOGEN climate vs
+      ISIMIP3b comparison (Axis 2 sub-option 2B)
+    - `preprocess_isimip_cache.py` (6 KB, ~250 LOC) — preprocesses
+      ISIMIP3b cache for the climate_comparison consumer
+    - 12 reference output dirs (`outputs_carbon_ssp{126,245}_*` and
+      `outputs_ssp{126,245}_climate_*`) showing example deliverables
+    - `summary_tables*.xlsx` (3 files) — example stats tables
+    - `comprehensive_synthesis.md` (15 KB) — narrative discussion
+    - `IMOGEN_Prezi_final.pptx` (23 MB) — presentation context
+  These scripts are **enhanceable starting points**; user explicitly
+  flagged "perhaps you may have ideas even there as well" for how to
+  improve them.
+
+- **What intermediary_py already provides (per Component C)**:
+    - `outputs/component_c/data/integrated_emissions_{ch4,co2,n2o}.csv`
+      (Anthro, Natural, Total, RCMIP_total, FAIR_natural, Default_total
+      side-by-side)
+    - `outputs/component_c/data/conventional_comparator_{ch4,co2,n2o}.csv`
+      (raw RCMIP comparator)
+    - `outputs/component_c/data/hybrid_comparator_{ch4,co2,n2o}.csv`
+      (hybrid; with explicit source segments)
+    - `outputs/component_c/data/external_comparators_{ch4,co2,n2o}.csv`
+      (published budget ranges, e.g. GCB 2025 Friedlingstein et al.
+      ESSD 17, with [Lo, Best, Hi] decadal means for stats validation)
+    - `outputs/component_c/figures/...` — comparator plots (with
+      `python3 run_all.py` full mode; not `--skip-plots`)
+
+  User notes: "intermediary_py already has plotting scripts that
+  plot the various sector and total emissions trends in various
+  comparative contexts (no comparative stats with the plots though)" —
+  so adding **comparative stats alongside the plots** is a paper-stage
+  enhancement opportunity (decadal means + IQR; bias + RMSE vs raw
+  RCMIP; RMSE vs GCB external benchmark; etc.).
+
+- **Action plan (post-v1.0; specifically post-step-19 release)**:
+
+  1. **Bring up the comparative_analysis scripts into the rebuild**:
+     copy + clean up + integrate into `tools/comparative_analysis/`
+     (or a new top-level `analysis/` dir; decide at the time)
+  2. **Run AXIS 1 comparison**: produce IMOGEN-engine atmospheric CO2/
+     CH4/N2O trajectories for RCMIP-raw vs RCMIP-substituted; plot +
+     stats. Single set of figures + tables for the paper's results section.
+  3. **Run AXIS 2 sub-option 2A AND 2B comparisons**: produce IMOGEN
+     climate + ISIMIP3b climate side-by-side over the v1.0 coupled
+     run period. Spatial maps (key variables, decadal means) + temporal
+     trends per cell + summary tables.
+  4. **Run AXIS 3 comparisons**: produce LPJ-GUESS outputs under each
+     climate forcing. Spatial + temporal + summary tables.
+  5. **Add comparative stats** to all plots: RMSE, bias, mean, std,
+     decadal-mean, IQR, comparison against published budgets.
+  6. **Revise paper draft** at `paper/manuscript_draft.docx`:
+     - Update intro + methods to reflect the RCMIP backbone (currently
+       IIASA-based per user 2026-05-07)
+     - Add results section using the AXIS 1/2/3 figures + stats
+     - Add discussion of model intercomparisons and limitations
+     - Add conclusions
+     - Add complete references (the planned reference-PDF list in
+       `paper/README.md` covers most; add new references uncovered
+       during analysis)
+     - Address the supervisor's comments + edits already in the draft
+  7. **Submit to GMD** as planned.
+
+- **Cross-references**:
+  - `paper/README.md` (extended at step 13 to reference this F-13)
+  - `intermediary_py/imogen_ghg_controller/outputs/component_c/data/`
+    (the integrated_emissions / *_comparator outputs)
+  - `version_A/.../Python-scripts/comparative_analysis/analysis/`
+    (the existing template scripts)
+  - `EXECUTION_PLAN.md` step 18 (paper revision step)
+  - `EXECUTION_PLAN.md` Decision #1 (RCMIP substitution backbone)
+- **Status**: deferred to post-v1.0 (post-step-19 release). The
+  current v1.0 work is focused on getting the coupled model to RUN
+  end-to-end; the paper-stage analysis framework comes after.
 
 ### F-12 — Multi-pass / two-process tight-mode verification design
 
