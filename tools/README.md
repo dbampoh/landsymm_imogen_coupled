@@ -49,6 +49,60 @@ Adding a new GCM pattern requires:
 2. `sha256sum …new….tar.gz` and `stat -c %s …new….tar.gz`
 3. Append a row to this manifest.
 
+### `imogen_inputs_to_lpjg_format.py` — Python Intermediary → Fortran IMOGEN ASCII adapter (step 13)
+
+Converts intermediary_py's wide-format `imogen_inputs_<SSP>.csv` (10
+columns, Mt-of-gas/yr units) into the four narrow ASCII files the
+Fortran IMOGEN engine expects:
+
+| Adapter output | Format | Maps to ins-parameter | Unit |
+|---|---|---|---|
+| `imogen_lpjg_flux.txt` | (year, val) | `FILE_LPJG_FLUX` | PgC/yr |
+| `imogen_lpjg_ch4_n2o_flux.txt` | (year, ch4, n2o) | `FILE_LPJG_CH4_N2O_FLUX` | TgCH4 / TgN2O per yr |
+| `co2_anthro_emissions.txt` | (year, val) | `FILE_SCEN_EMITS` | PgC/yr |
+| `ch4_n2o_anthro_emissions.txt` | (year, ch4, n2o) | `FILE_CH4_N2O_EMITS` | TgCH4 / TgN2O per yr |
+
+Implements the **unit-checked-adapter discipline** of `EXECUTION_PLAN.md`
+§I.D.2:
+- Schema-validates input columns
+- Asserts no NaNs
+- Sanity-bounds-checks each column (per-column min/max within plausible
+  scientific range; e.g. `CO2_EFOS_Mt: [-50000, 100000]` Mt/yr to allow
+  for SSP1-2.6's negative-emissions late century)
+- Prints unit-conversion banner at startup so the operator sees the math:
+  `MtCO2 / 3666.6667 → PgC` (canonical 44/12*1000 conversion)
+- Verifies producer-consumer chain: output format matches the predecessor's
+  static IIASA reference files in `imogen/emiss/CMIP6/{Co2,CH4-N2O}/`
+  (i.e. what the Fortran reader at `imogen_lpjg.f:565-571 / 598 / 611`
+  parses without complaint)
+
+Quick recipe:
+
+```bash
+# Run intermediary_py end-to-end first (~10 min):
+cd intermediary_py/imogen_ghg_controller && python3 run_all.py --skip-plots && cd ../..
+
+# Then convert intermediary_py output -> Fortran-readable for any SSP:
+python3 tools/imogen_inputs_to_lpjg_format.py \
+    --input intermediary_py/imogen_ghg_controller/outputs/imogen_inputs/imogen_inputs_SSP1-2.6.csv \
+    --output runs/SSP1-2.6/inputs/
+
+# (Same for other SSPs: SSP2-4.5, SSP3-7.0, SSP4-6.0, SSP5-8.5)
+```
+
+The 4 output files at `runs/<SSP>/inputs/` are then ready for the
+`runs/<SSP>/imogen_intermediary.ins` file's "Option B" block to point
+at (see that .ins file's comments for the exact ins-parameter setup).
+
+**Year-range note**: intermediary_py's CSV starts at 1900 (FAOSTAT's
+earliest year); predecessor's static files start at 1850. The adapter
+writes whatever years intermediary_py provides (1900-2100; 201 rows).
+For .ins compatibility with the engine's default `NYR_*=251` parameters,
+update them to `NYR_*=201` and `YEAR1=1900`. Or use `--pad-to-year 1850`
+to prepend zero-valued rows for 1850-1899 (compatibility shim only;
+NOT scientifically defensible — pre-industrial CH4 anthro is ~22 TgCH4/yr,
+not 0).
+
 ### `cmip6_nc_to_cmip5_ascii.py` — CMIP6 NetCDF → CMIP5 ASCII converter (step 5)
 
 Converts the 5 CMIP6 NetCDF patterns at
@@ -97,9 +151,11 @@ env per Decision #8).
 
 | Tool | Step | Role |
 |---|---|---|
-| `imogen_inputs_to_lpjg_format.py` | 13 | Converts the Python Intermediary's wide-format `imogen_inputs_<SSP>.csv` (10 columns, Mt-of-gas/yr) into the four narrow files the Fortran IMOGEN reader expects: `co2_anthro_emissions.txt` (PgC/yr), `ch4_n2o_anthro_emissions.txt` (Tg/yr each), seed `imogen_lpjg_flux.txt` (PgC/yr) and `imogen_lpjg_ch4_n2o_flux.txt` (Tg/yr) for prescribed mode. Implements the unit-checked-adapter discipline of `EXECUTION_PLAN.md` §I.D.2. See Appendix A.2 for sketch. |
 | `regrid/` | 16+ | Cleaned-up successor to the framework's `Regrid/`, `FastRegrid/`, `RegridLPJG/` utilities. Likely just `FastRegrid` brought to a working Linux build (case-fix CMakeLists; restore actual OpenMP `#pragma`s). NetCDF input support added for CMIP6 patterns. |
 | `ndep_archive/` | (post-v1.0) | Cleaned-up successor to the framework's `NdepFastArchive/` (read/repack the Lamarque-format `Data/Ndep/*.bin` archives). |
+
+(`imogen_inputs_to_lpjg_format.py` was implemented at step 13;
+documented in the "Implemented tools" section above.)
 
 ## Discipline
 

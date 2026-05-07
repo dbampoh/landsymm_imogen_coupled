@@ -19,6 +19,154 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.13.0-step13-adapter] — 2026-05-07 — step 13: Python Intermediary → Fortran IMOGEN ASCII adapter
+
+(Step 12 was consolidated with step 11; see `[v0.12.0-step11-intermediary-py-validated]`.)
+
+### Added — `tools/imogen_inputs_to_lpjg_format.py` (~270 LOC; production-quality adapter)
+
+Per `EXECUTION_PLAN.md` V.1 step 13 + Appendix A.2 + Decisions #1 (RCMIP
+backbone) and #11 (units integrity). Converts intermediary_py's wide-format
+`imogen_inputs_<SSP>.csv` (10 columns, Mt-of-gas/yr units) into the four
+narrow ASCII files the Fortran IMOGEN engine expects.
+
+#### 4 output files (all in `runs/<SSP>/inputs/`)
+
+| Output file | Format | Maps to ins-parameter | Unit |
+|---|---|---|---|
+| `imogen_lpjg_flux.txt` | (year, val) | `FILE_LPJG_FLUX` | PgC/yr |
+| `imogen_lpjg_ch4_n2o_flux.txt` | (year, ch4, n2o) | `FILE_LPJG_CH4_N2O_FLUX` | TgCH4/yr, TgN2O/yr |
+| `co2_anthro_emissions.txt` | (year, val) | `FILE_SCEN_EMITS` | PgC/yr |
+| `ch4_n2o_anthro_emissions.txt` | (year, ch4, n2o) | `FILE_CH4_N2O_EMITS` | TgCH4/yr, TgN2O/yr |
+
+#### Unit-checked-adapter discipline
+
+Embodies `EXECUTION_PLAN.md` §I.D.2:
+- **Schema validation**: aborts if any of the 10 expected columns are
+  missing or NaN-valued
+- **Sanity bounds**: per-column min/max range check (e.g.
+  `CO2_EFOS_Mt: [-50000, 100000]` Mt/yr — allows for SSP1-2.6's
+  negative-emissions late-century BECCS pathway)
+- **Year monotonicity**: aborts if Year column has gaps or is non-numeric
+- **Conversion constants**: explicit + named:
+  - `PgC_TO_MtCO2 = (44/12) * 1000 = 3666.6667` (canonical 44/12 g_CO2/g_C
+    × 1000 Mt/Pg ratio)
+  - `MtCO2_TO_PgC = 1/3666.6667`
+  - CH4/N2O: pass-through (Mt = Tg = 1e12 g; identical SI)
+- **Startup banner** prints unit conventions explicitly so the operator
+  sees what's happening
+- **End-of-run banner** prints the exact `imogen_intermediary.ins` edits
+  the user needs to make
+
+#### Output format matches predecessor verbatim
+
+Spot-check: `head -3 runs/SSP1-2.6/inputs/co2_anthro_emissions.txt`:
+```
+1900 0.487860
+1901 0.504180
+1902 0.519031
+```
+
+Compare with predecessor's `imogen/emiss/CMIP6/Co2/co2_pg_emissions_anthropogenic_historical_ssp126_1850_2100.txt`:
+```
+1850 0.000000
+1851 0.482350
+1852 0.957810
+```
+
+Same 2-col space-separated structure with 6-decimal precision. Engine
+reader at `imogen_lpjg.f:598` parses both formats identically.
+
+#### Unit conversion verified to 6 decimals
+
+intermediary_py CSV row 2 (year 1900) `CO2_EFOS_Mt = 1788.820939`:
+- Hand-math: `1788.820939 / 3666.6667 = 0.48786025165581587` PgC
+- Adapter writes: `1900 0.487860`
+- ✓ matches to 6 decimals
+
+#### SSP1-2.6 negative-emissions verification
+
+Late-century rows from `co2_anthro_emissions.txt`:
+```
+2099 -1.575525
+2100 -1.559659
+```
+
+Negative CO2 anthropogenic ~-1.56 PgC/yr in 2099-2100 reflects SSP1-2.6's
+BECCS / DACCS pathway — scientifically expected for the deepest-mitigation
+scenario.
+
+### Modified — `runs/SSP1-2.6/imogen_intermediary.ins`
+
+Added new "Option B" intermediary_py-driven file-paths block alongside
+existing "Option A" (static-IIASA) and "Option C" (relative-path tight-mode):
+
+- **Option A (v1.0 default)**: predecessor's absolute-path static IIASA
+  files; F-10-deadlock-compatible
+- **Option B (NEW at step 13)**: absolute paths to adapter outputs at
+  `runs/SSP1-2.6/inputs/`; same F-10 deadlock behavior as A but with our
+  RCMIP-substituted emissions backbone
+- **Option C**: relative paths so engine concat resolves to LPJG handshake
+  dir; un-testable in v1.0 (deadlocks); resolution at F-12
+
+Option B is preserved as commented-out by default. Users opting into the
+intermediary_py-driven backbone uncomment Option B + comment out Option A.
+
+### Modified — `tools/README.md`
+
+Added detailed adapter entry in "Implemented tools" section; removed
+corresponding "Planned tools" row.
+
+### Year-range mismatch documented
+
+intermediary_py CSV starts at 1900 (FAOSTAT's earliest); predecessor's
+static files start at 1850 (RCMIP/FAIR baseline). Adapter outputs 201
+rows (1900-2100). Documented:
+- adapter prints "AND adjust year-range params if needed" banner with
+  exact `NYR_*=201, YEAR1=1900` instructions
+- `--pad-to-year 1850` flag exists for users who want compatibility with
+  the engine's default `NYR_*=251` parameters; flagged as
+  "compatibility shim only, NOT scientifically defensible" because
+  pre-industrial CH4 anthropogenic ~22 TgCH4/yr (not 0)
+
+### What CAN'T be verified in v1.0
+
+End-to-end coupled run with adapter-driven backbone — the F-10
+architectural deadlock (from step 9 + 9.5) blocks LPJG main loop in
+single-process imogencfx mode regardless of which emissions backbone
+(static-IIASA Option A or adapter-driven Option B) is used. The adapter
+is **scientifically validated** (correct units, conversions, format, value
+ranges); the **integrated coupled run** awaits F-12 (multi-pass /
+two-process design).
+
+### NET source-level change in `lpjguess/`: ZERO
+
+Adapter is fork-agnostic Python tooling. Backport Sprint (F-11) does
+NOT need to replicate any step-13 changes in `trunk_r13078`.
+
+### Files modified / added
+
+```text
+Added:
+  tools/imogen_inputs_to_lpjg_format.py     ~10 KB / ~270 LOC (the adapter)
+  notes/STEP_13.md                          ~14 KB
+
+Modified:
+  tools/README.md                           +"Implemented tools" entry; removed planned row
+  runs/SSP1-2.6/imogen_intermediary.ins     +Option B block (commented-out)
+  .gitignore                                comment annotation about runs/*/inputs/
+  notes/FOLLOWUPS.md                        status dashboard date refresh
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md     +Step 13 entry (zero lpjguess C++)
+  EXECUTION_PLAN.md                         step 13 row marked DONE
+  CHANGELOG.md                              this entry
+
+NOT committed (gitignored):
+  runs/SSP1-2.6/inputs/*                    derived from intermediary_py output;
+                                            regenerable via the adapter
+```
+
+---
+
 ## [v0.12.0-step11-intermediary-py-validated] — 2026-05-07 — step 11: pipeline end-to-end + 4 source bugs fixed + reproducibility verified
 
 ### Headline outcome

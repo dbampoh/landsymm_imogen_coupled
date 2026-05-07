@@ -83,6 +83,10 @@ pip-delete-this-directory.txt
 # Run output (regeneratable; not version-controlled)
 # =============================================================================
 
+# [Step 13 of unified-codebase rebuild: adapter outputs at runs/<SSP>/inputs/
+#  are derived from intermediary_py CSV outputs via tools/imogen_inputs_to_lpjg_format.py.
+#  Regenerable; not committed. The output tree is at runs/<SSP>/output/. - DKB 2026-05-07]
+
 # Per-scenario run outputs
 runs/*/output/
 runs/*/scratch/

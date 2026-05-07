@@ -294,6 +294,41 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 13: Python Intermediary -> Fortran IMOGEN ASCII adapter
+
+**Commit:** _TBD_  **Date:** 2026-05-07
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 13's adapter (`tools/imogen_inputs_to_lpjg_format.py`) is fork-
+agnostic Python tooling. It reads intermediary_py CSV outputs and
+writes Fortran-readable ASCII files using the same format the engine
+parses regardless of which LPJG fork generated the upstream natural-
+flux .gz files.
+
+#### Files added (all OUTSIDE lpjguess/)
+
+- `tools/imogen_inputs_to_lpjg_format.py` (NEW, ~270 LOC Python)
+- `notes/STEP_13.md`
+
+#### Files modified (all OUTSIDE lpjguess/ except annotations)
+
+- `tools/README.md`: added "Implemented tools" entry; removed planned row
+- `runs/SSP1-2.6/imogen_intermediary.ins`: added "Option B" block
+  (commented-out by default; Option A static-IIASA remains v1.0 default)
+- `.gitignore`: comment annotation about `runs/*/inputs/`
+
+#### Cross-reference for the Backport Sprint
+
+When the Backport Sprint runs the coupled model end-to-end on the
+`trunk_r13078` backend, it will use the SAME adapter (no changes
+needed). The adapter produces Fortran-ASCII files that any IMOGEN
+engine (current or backported) reads identically.
+
+(Step 12 was consolidated with step 11; no separate ledger entry.)
+
+---
+
 ### Step 11: intermediary_py end-to-end pipeline run + 4 source bug fixes + reproducibility validation
 
 **Commit:** _TBD_  **Date:** 2026-05-07
