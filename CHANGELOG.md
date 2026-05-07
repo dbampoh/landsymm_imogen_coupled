@@ -19,6 +19,98 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.11.0-step10-intermediary-py-import] — 2026-05-07 — step 10: import imogen_ghg_controller v0.1.0
+
+### Added — `intermediary_py/imogen_ghg_controller/` (7.9 MB; 78 files)
+
+Per `EXECUTION_PLAN.md` V.1 step 10. The user's Python pipeline
+`imogen_ghg_controller v0.1.0` (replacing the predecessor's legacy
+C++ `Intermediary/Code/`, 272 KB, half-built) is now imported as the
+canonical anthropogenic-emissions backbone for v1.0.
+
+#### Source provenance
+
+- Imported from `version_A/Intermediary_py/imogen_ghg_controller_SOURCE_ONLY/imogen_ghg_controller/`
+- Verified byte-identical to version_B's SOURCE_ONLY (excluding figures/inputs/outputs/archive)
+- 7.9 MB total: 59 Python source + 3 pytest tests + 16 docs/config files
+- Excludes `inputs/` (Tier-3 ~1.8 GB; Tier-3 acquisition recipe in `data/DATA.md`)
+- Excludes `outputs/` (generated; not committed)
+- Excludes `archive/`, `__pycache__`, `*.pyc` (transient)
+- Exception: 3 README.md placeholders kept inside excluded dirs for
+  acquisition-instruction tracking
+
+#### Pipeline architecture (43 steps × 4 components)
+
+| Component | Role | Steps |
+|---|---|---|
+| **A** Anthropogenic | IPCC Tier-1 (CH4 EF/MM/rice; N2O MM/MS/syn-fert) × FAO/EDGAR/PLUM × RCMIP substitution | 28 |
+| **B** Natural | LPJG `.gz` streaming + GMB IFW/DCC corrections | 5 |
+| **C** Integration | A + B + 3 comparators (conventional/hybrid/external) | 9 |
+| **D** IMOGEN export | Per-scenario wide + combined long format CSVs | 1 |
+
+Final 6 IMOGEN-input deliverables at `outputs/imogen_inputs/`:
+- 5 per-scenario wide CSVs (SSP1-1.9 / SSP1-2.6 / SSP2-4.5 / SSP3-7.0 / SSP5-8.5)
+- 1 combined long-format CSV
+- Format: 201 rows × 10 columns; **units: Mt-of-gas/yr**
+
+#### Anthropogenic substitution backbone (Decision #1)
+
+```
+New_total = RCMIP_total − RCMIP_agri + Our_agri
+```
+
+Already implemented in `src/component_a_anthropogenic/rcmip_substitution/`.
+Pre-validated: 38/38 reference data files byte-identical to canonical
+scripts (per `Quick_Start.md`'s provenance check).
+
+#### Verified
+
+```bash
+$ python3 run_all.py --dry-run
+══ pipeline complete: 43/43 steps in 0.0s ══
+```
+
+✅ All 43 steps register cleanly (Component A: 28; B: 5; C: 9; D: 1).
+No missing-imports errors. Ready for end-to-end execution at step 11
+once Tier-3 input data is acquired.
+
+#### Deferred (gated on later steps)
+
+- Live pipeline execution + IMOGEN-input file generation: needs
+  ~1.8 GB Tier-3 input data; **step 11** owns acquisition
+- Adapter to convert intermediary_py's 6 CSVs into the 4 narrow
+  IMOGEN-readable files: **step 13** owns the adapter
+- Integration into `runs/SSP1-2.6/imogen_intermediary.ins`: **step 13**
+  + post-F-12 (because F-10 deadlock blocks end-to-end coupled run anyway)
+- Full pytest run: needs populated `outputs/`; **step 11**
+
+### Documented — deferred-items master dashboard in `notes/FOLLOWUPS.md`
+
+Per user code-discipline request 2026-05-07. Added a status dashboard
+at the top of FOLLOWUPS.md showing all OPEN items with best-timing
+columns + a "blocks step 17?" flag. Tracking discipline committed:
+
+1. Update dashboard at end of every step that touches FOLLOWUPS.md
+2. Hard sweep at start of step 17
+3. Final review at end of Phase 1 via the Backport Sprint (F-11)
+
+### Files modified / added
+
+```text
+Added:
+  intermediary_py/imogen_ghg_controller/    7.9 MB / 78 files
+  notes/STEP_10.md                          ~13 KB
+
+Modified:
+  intermediary_py/README.md                 imported-status update
+  notes/FOLLOWUPS.md                        +Status dashboard at top + tracking discipline
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md     +Step 10 entry (zero lpjguess C++ touched)
+  EXECUTION_PLAN.md                         step 10 row marked DONE
+  CHANGELOG.md                              this entry
+```
+
+---
+
 ## [v0.10.0-step9.5-consumer-wiring] — 2026-05-07 — step 9.5: LPJG-side consumer wiring + BLAZE check + C++ engine Tmin/Tmax (PARTIAL)
 
 ### Added — LPJG-side consumer wiring for IMOGEN engine's Rh/Wind/Tmin/Tmax outputs

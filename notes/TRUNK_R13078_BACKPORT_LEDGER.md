@@ -294,6 +294,36 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 10: Import intermediary_py (imogen_ghg_controller v0.1.0)
+
+**Commit:** _TBD_  **Date:** 2026-05-07
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 10's deliverable lives entirely OUTSIDE `lpjguess/`. The
+`intermediary_py/imogen_ghg_controller/` Python pipeline is fork-
+agnostic — it consumes LPJG `.out` outputs (which are the same
+regardless of which LPJG fork produced them) and produces RCMIP-
+substitution emission CSVs that feed IMOGEN. The Backport Sprint
+does NOT need to replicate any step 10 changes in `trunk_r13078`.
+
+#### Files added (all OUTSIDE lpjguess/)
+
+- `intermediary_py/imogen_ghg_controller/` — 7.9 MB / 78 files
+  (rsync'd from `version_A/.../imogen_ghg_controller_SOURCE_ONLY/`,
+  excluding `inputs/`, `outputs/`, `archive/`, `__pycache__`)
+- `notes/STEP_10.md`
+
+#### Cross-reference
+
+When the Backport Sprint runs an end-to-end coupled run on the
+`trunk_r13078` backend, it will use the SAME `intermediary_py/`
+pipeline to produce IMOGEN inputs. No fork-specific intermediary
+code exists; all the substitution/integration logic is in Python
+and reads LPJG outputs through fork-stable file format conventions.
+
+---
+
 ### Step 9.5: LPJG-side IMOGEN climate-output consumer wiring + BLAZE check + C++ Tmin/Tmax
 
 **Commit:** _TBD_  **Date:** 2026-05-07

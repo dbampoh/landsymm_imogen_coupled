@@ -6,11 +6,17 @@ IMOGEN-bound annual emissions vector. Source: the user's
 `imogen_ghg_controller v0.1.0` from the predecessor framework's
 `Intermediary_py/imogen_ghg_controller_SOURCE_ONLY/`.
 
-**Status:** to be imported at **step 10** of the rebuild plan
-(`EXECUTION_PLAN.md` §V.1). Then exercised on staged inputs
-(step 11), validated against earlier reference outputs (step 12),
-and adapted to produce the four narrow IMOGEN-readable files
-via `tools/imogen_inputs_to_lpjg_format.py` (step 13).
+**Status:** ✅ **Imported at step 10** (2026-05-07) into
+`intermediary_py/imogen_ghg_controller/`. Source is version_A's
+`SOURCE_ONLY` tree (verified byte-identical to version_B's via
+code-only diff at step 10's Phase A; only fork-shared figure PNGs
+differ). 7.9 MB total — 78 files (59 Python + 3 tests + 16 docs/
+config). Dry-run verified: `python3 run_all.py --dry-run` reports
+all 43 pipeline steps cleanly across the 4 components (28 + 5 + 9
++ 1). **End-to-end execution gated on step 11** (input-data
+acquisition: RCMIP, FAIR ERF, EDGAR, PLUM, LPJ-GUESS reference
+outputs — totalling ~1.8 GB, all Tier-3 per `data/DATA.md`) and
+on step 13's adapter (writes the 4 narrow IMOGEN-readable files).
 
 **Anthropogenic substitution backbone: RCMIP** (Decision #1 in
 `EXECUTION_PLAN.md` §Decisions Settled). The substitution algebra is

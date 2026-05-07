@@ -11,6 +11,47 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ---
 
+## Status dashboard (at-a-glance; updated at end of every step)
+
+**Last updated:** 2026-05-07 (after step 10 import).
+
+| ID | Status | Best timing | Blocks step 17 validation? |
+|---|---|---|---|
+| F-1 | OPEN | At v1.0 release time (~step 19) | No |
+| F-2 | OPEN | Step 9.5b or step 17 | No |
+| F-3 | OPEN | F-12 era (when both engines testable) | No |
+| F-4 | DONE 2026-05-06 | — | — |
+| F-5 | DONE 2026-05-06 | — | — |
+| F-6 | OPEN | Step 9.5b | No |
+| F-7 | OPEN | Step 9.5b | No |
+| F-8 | OPEN | Step 9.5b | No |
+| F-9 | OPEN (refined at step 9.5) | Step 9.5c (or merge with F-12 sprint) | No |
+| F-10 | OPEN (architectural; v1.0 caveat) | Phase 2 | **Yes** (CO2 trajectory bias risk) |
+| F-11 | OPEN | End of Phase 1 (after step 19) | No (paper consistency) |
+| F-12 | OPEN | Sprint just before step 17 | **Yes** (LPJG main loop must run) |
+
+### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
+
+| Item | Where to track | Best timing |
+|---|---|---|
+| Step 9 V.1 verification milestone (NEE 2× → CO2 shift) | EXECUTION_PLAN.md V.1 step 9 row | Gated on F-12 |
+| Step 9.5b: Fortran Rh/W port + Fortran Tmin/Tmax + C++ Tmin/Tmax in REGRID branch | EXECUTION_PLAN.md V.1 step 9.5 row | Next time we touch engine output code |
+| Step 11 input-data acquisition (RCMIP, FAIR ERF, EDGAR, PLUM, LPJG outputs ~1.8 GB) | EXECUTION_PLAN.md V.1 step 11 row | Step 11 |
+| Step 13 adapter (intermediary_py outputs → 4 narrow IMOGEN-readable files) | EXECUTION_PLAN.md V.1 step 13 row | Step 13 |
+
+### Tracking discipline (committed 2026-05-07)
+
+1. **At end of every step** that touches FOLLOWUPS.md, refresh the
+   "Last updated" date and review every OPEN entry for stale timing.
+2. **At start of step 17** (validation milestone), do a hard sweep:
+   convert F-10 + F-12 into in-progress sprint work; ensure no other
+   open items have become blockers since being deferred.
+3. **At end of Phase 1** (after step 19), the Backport Sprint (F-11)
+   forces a final review of every `lpjguess/` source change, which
+   will surface anything else still deferred.
+
+---
+
 ## OPEN
 
 ### F-1 — Upload IMOGEN data tarballs to a permanent host
