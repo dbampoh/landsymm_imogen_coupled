@@ -223,6 +223,13 @@ void ImogenOutput::flush_year(int year) {
 	// accum_NEE_kgC      -> PgC/yr:    *  1e-12  (kgC -> Pg)
 	// accum_CH4_gCH4C    -> TgCH4/yr:  *  CH4_PER_CH4C  *  1e-12  (gC -> g CH4 -> Tg)
 	// accum_N2O_kgN      -> TgN2O/yr:  *  N2O_PER_N     *  1e-9   (kgN -> kgN2O -> Tg)
+	//
+	// [Step 9: imogen_nee_perturbation_factor multiplier (V.1 step-9
+	//  verification helper) was applied here briefly then REMOVED at step
+	//  9's wrap-up because the F-10 architectural deadlock means LPJG
+	//  main loop never runs in v1.0 single-process mode -- so the helper
+	//  could never affect anything observable. Resolution at follow-up
+	//  F-12. - DKB 2026-05-07]
 	const double NEE_PgC    = accum_NEE_kgC   * 1e-12;
 	const double CH4_TgCH4  = accum_CH4_gCH4C * CH4_PER_CH4C * 1e-12;
 	const double N2O_TgN2O  = accum_N2O_kgN   * N2O_PER_N    * 1e-9;

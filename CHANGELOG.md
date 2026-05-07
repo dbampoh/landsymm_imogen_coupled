@@ -19,6 +19,154 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.9.0-step9-smoke] — 2026-05-07 — step 9: SSP1-2.6 run-config + bug fixes + empirical F-10 confirmation
+
+### Added — `runs/SSP1-2.6/` directory (first per-scenario run setup)
+
+Per `EXECUTION_PLAN.md` V.1 step 9 + per user guidance 2026-05-07
+to bring in the predecessor's legacy SSP1_RCP26 land-use data:
+
+- **`runs/SSP1-2.6/main.ins`** (~6 KB, NEW): LPJG entry point.
+  Imports `global.ins`, `crop_n.ins`, `wetlandpfts.ins`,
+  `imogen_intermediary.ins`. Smoke overrides for spinup (100y vs
+  500y production), `freenyears` (50y vs 100y production),
+  `firemodel="NOFIRE"` (avoiding BLAZE wind/RH dependency until
+  step 9.5), `npatch=1` (vs production 25), `run_landcover=1`
+  (per user guidance), and year-range params 1871-1872.
+- **`runs/SSP1-2.6/imogen_intermediary.ins`** (~14 KB, NEW): IMOGEN-
+  coupling parameters. Embodies the bug fixes documented below.
+  Default `coupling_mode="prescribed"` (the only v1.0 mode that
+  doesn't deadlock immediately; see "Empirical F-10 confirmation").
+- **`runs/SSP1-2.6/README.md`** (~6 KB, NEW): scenario metadata,
+  how-to-run instructions including the bootstrap-handshake setup,
+  empirical F-10 findings, production setup overrides.
+- **11 stand/PFT/landcover ins files** (copied from version_A's
+  `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` predecessor):
+  global, global_soiln, crop, crop_n, crop_n_pftlist, crop_n_stlist
+  (3 variants), pasture_n_stlist (2 variants), landcover, wetlandpfts.
+  Stale `/home/bampoh-d/Desktop/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/...`
+  paths in `crop.ins` and `landcover.ins` retargeted to version_A's
+  actual tree at
+  `/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/.../version_A/.../Data/LU/...`.
+
+### Added — `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt`
+
+3.5 KB file (251 rows, 1850-2100). Was MISSING from our tree at step 6
+(other 4 SSPs ssp245/ssp370/ssp460/ssp585 were imported; only SSP126
+was overlooked). Imported from version_B at step 9 to fix the smoke
+crash `Invalid data format in file: ../../imogen/emiss/RF_NONCO2_GHG_IS92A.dat`
+(which had only 243 rows starting at 1859, mismatched with `NYR_NON_CO2=251`).
+
+### Fixed — bug C5 (`ouput` typo) and bug R-anom (filename mismatch)
+
+Both fixed in `runs/SSP1-2.6/imogen_intermediary.ins`:
+
+- **C5**: 8 climate-input file paths (`file_temp`, `file_prec`,
+  `file_insol`, `file_wetdays`, `file_dtr`, `file_co2`, `file_wind`,
+  `file_relhum`) corrected from `./IMOGEN/ouput/YYYY/...` to
+  `./IMOGEN/output/YYYY/...`. **PROVEN**: the smoke run produced 32
+  per-year directories at `Common-directory/IMOGEN/output/<YYYY>/`,
+  not `ouput/`.
+- **R-anom → Rh_anom**: `file_relhum` corrected from `R_anom.dat` to
+  `Rh_anom.dat` to match the C++ engine's actual writer output.
+  **PROVEN**: the engine emitted `Rh_anom.dat` files in each per-year
+  directory; matches our path.
+
+### Documented — bug C35 fix attempted but un-testable in v1.0
+
+The relative-path C35 fix (`FILE_LPJG_FLUX "imogen_lpjg_flux.txt"`)
+is correct in concept and in the .ins file (commented out with
+extensive documentation). However, the v1.0 single-process mode
+**deadlocks immediately** with relative paths because the file
+doesn't exist (LPJG hasn't written it yet); the polling loop's
+`RUNFLUX_EXIST=0` flag prevents progress. The active configuration
+is `coupling_mode="prescribed"` with absolute-path static IIASA
+reference files (predecessor's "bug C35" mechanic, intentionally
+preserved as the only v1.0-functional configuration). Real C35
+testing is gated on follow-up F-12.
+
+### Documented — F-10 architectural deadlock empirically confirmed
+
+Step 9's smoke test **definitively confirmed F-10's predicted
+architectural deadlock** in v1.0 single-process imogencfx mode:
+
+- IMOGEN engine ran successfully for 32 years (1871-1902, 320 climate
+  output files in 3 minutes), then deadlocked polling for year 1903's
+  `done` file
+- LPJG main loop NEVER reached because `imogencfx::init()` never
+  returned (engine still in outer `KEEPRUNNING` loop)
+- Step 8's writer NEVER fired (no `imogen_lpjg_flux.txt` or
+  `imogen_lpjg_ch4_n2o_flux.txt` produced in `Common-directory/LPJG_main/IMOGEN/`)
+- The deadlock occurs in BOTH `coupling_mode="tight"` (immediate, with
+  relative paths) and `coupling_mode="prescribed"` (delayed, after
+  ~32 years using bootstrap+absolute paths)
+
+**This formally explains why the predecessor "never ran end-to-end"
+([CMI §1.1]).** The predecessor's apparent functionality was an
+artifact of the polling loop being neutered (bugs C2/C3 — fixed at
+step 7); restoring correct polling-loop semantics surfaced the
+underlying architectural deadlock that was always there.
+
+### Added — follow-up F-12 (multi-pass / two-process verification design)
+
+`notes/FOLLOWUPS.md`. The proper resolution of the F-10 deadlock for
+v1.0 production runs. Recommended approach: **Option B (two-process)**
+— split the `imogen_lpjg` engine binary out of `imogencfx::init()`
+into a separate concurrent Fortran process. This is what the
+predecessor's polling-loop architecture was originally DESIGNED for;
+the in-process port (`climatemodel.cpp::RUN_IMOGEN_ENGINE`) was a
+convenience wrapper that broke this design. Estimated effort: 2-3 days.
+Option C (in-process restructure per F-10 Phase-2) for v2.0+.
+
+### Added (then removed) — `imogen_nee_perturbation_factor` runtime parameter
+
+Per V.1 step-9's verification milestone (NEE 2x → CO2 trajectory shift),
+a runtime ins parameter `imogen_nee_perturbation_factor` was added at
+step 9 (parameters.h, parameters.cpp, imogencfx.cpp declare_parameter,
+imogenoutput.cpp consumer). Then REMOVED at step 9's wrap-up because
+the smoke test empirically confirmed F-10's deadlock means LPJG main
+loop never runs in v1.0 — so the perturbation factor cannot affect
+anything observable. Per user code-integrity preference, the perturbation
+parameter is NOT permanent in lpjguess. Resolution will be designed at
+follow-up F-12. **Net source-level changes after step 9 wrap-up: zero**
+(only annotation comments referencing the add-then-remove decision).
+
+### Verification
+
+```text
+Build: clean
+Tests: 162/162 pass
+Smoke: 32 years climate output (1871-1902); deadlock at year 1903 polling
+  - Engine: read all inputs (CRUNCEP, GCM patterns, emissions, fluxes)
+  - Engine: produced 320 climate output files (sized correctly)
+  - LPJG: did NOT enter main loop (F-10 deadlock confirmed)
+  - Step 8 writer: did NOT fire (gated on F-12)
+```
+
+### Files modified / added
+
+```text
+Added:
+  runs/SSP1-2.6/main.ins                                   ~6 KB
+  runs/SSP1-2.6/imogen_intermediary.ins                    ~14 KB
+  runs/SSP1-2.6/README.md                                  ~6 KB
+  runs/SSP1-2.6/{global, crop, landcover, ...}.ins         ~78 KB across 11 files
+  imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt   3.5 KB
+  notes/STEP_9.md                                          ~14 KB
+
+Modified:
+  notes/FOLLOWUPS.md                                       +F-12 (~80 lines)
+  lpjguess/framework/parameters.h                          comment-only annotation
+  lpjguess/framework/parameters.cpp                        comment-only annotation
+  lpjguess/modules/imogencfx.cpp                           comment-only annotation
+  lpjguess/modules/imogenoutput.cpp                        comment-only annotation
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md                    +Step 9 entry
+  CHANGELOG.md                                             this entry
+  EXECUTION_PLAN.md                                        V.1 step 9 row marked PARTIAL
+```
+
+---
+
 ## [v0.8.1-backport-ledger] — 2026-05-06 — terminology + backport-ledger documentation
 
 ### Documented — `LandSyMM_LPJ-GUESS/` ≡ "integrated LTS" terminology synonymy

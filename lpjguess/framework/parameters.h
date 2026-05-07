@@ -503,6 +503,15 @@ namespace IMOGENConfig {
 	//  applies to "tight" in v1.0. - DKB 2026-05-06]
 	extern xtring coupling_mode;
 
+	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
+	//  was added at step 9 as a V.1 step-9 verification helper, then
+	//  REMOVED at step 9's wrap-up (per user code-integrity preference)
+	//  because the smoke test empirically confirmed F-10's architectural
+	//  deadlock means LPJG main loop never runs in v1.0 single-process
+	//  mode -- so the perturbation factor cannot affect anything that's
+	//  actually observable. Resolution will be designed at follow-up F-12
+	//  (multi-pass / two-process verification). - DKB 2026-05-07]
+
     //LPJG-IMOGEN Coupling config params
     extern int  YEAR1; //!IN First year of the numerical experiment
     extern int  IYEND;  //!IN Stop year of the ENTIRE run

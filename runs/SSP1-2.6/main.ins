@@ -1,0 +1,108 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! Step 9 V.1 step-9 smoke test — main entry point for SSP1-2.6 coupled run
+!
+! This is a MINIMAL smoke configuration designed to verify the LPJG <-> IMOGEN
+! handshake-writer mechanics (V.1 step-9 verification milestone). Land use,
+! crops, BLAZE fire — all bypassed because:
+!   - LU files are Tier-3 data (not in the rebuild repo; see data/DATA.md)
+!   - BLAZE requires wind + humidity, currently a step-9.5 deferred item
+!   - The verification target is the imogenoutput writer + bug C35 fix,
+!     which is independent of LU/fire realism.
+!
+! For a PRODUCTION coupled run (post-V.1), copy this .ins to a sibling
+! directory and:
+!   - Add `import "crop_n.ins"` after `import "global.ins"`
+!   - Add `import "landcover.ins"` after `import "wetlandpfts.ins"`
+!   - Override the file_lu / file_lucrop / file_Nfert / file_irrigintens paths
+!     to point at your scenario LU data (see data/DATA.md acquisition recipes)
+!   - Set run_landcover 1 (vs the override 0 below)
+!   - Set firemodel "BLAZE" (after step 9.5 wires up wind+RH)
+!   - Set nyear_spinup 500 (vs the smoke override 5 below)
+!   - Optionally update file_ndep to point at the Lamarque tarball
+!     (extracted via tools/fetch_imogen_data.sh --component ndep)
+!   - Use a production gridlist (gridlist_in_62892_and_climate.txt or similar)
+!
+! Run:  ./guess -input imogencfx main.ins
+!
+! - Daniel Bampoh, 2026-05-07 (step 9 of unified-codebase rebuild)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard PFT definitions + run config
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+import "crop_n.ins"
+
+! Wetland PFTs (required for natural CH4 — IMOGEN consumes wetland CH4)
+import "wetlandpfts.ins"
+
+! IMOGEN-coupling parameters (DIR_COMMON, DIR_PATT, FILE_*, coupling_mode, etc.)
+import "imogen_intermediary.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Smoke-test overrides — these REPLACE values set in global.ins / imported files
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Smoke gridlist (4 cells, broad latitudinal coverage):
+!   NW Canada Arctic (-103.75, 76.25), N. Russia (-95.75, 80.25),
+!   Central Asia (94.25, 54.25), Patagonia (-57.75, -33.75).
+param "file_gridlist"     (str "../../data/gridlist/gridlist_test2.txt")
+param "file_gridlist_cf"  (str "../../data/gridlist/gridlist_test2.txt")
+
+! Soil map (Tier-1 committed data)
+param "file_soildata"     (str "../../data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition: empty -> LPJG uses pre-industrial constant 2 kgN/ha/yr.
+! For production, point at the Lamarque tarball after running:
+!   tools/fetch_imogen_data.sh --component ndep
+! Then set: param "file_ndep" (str "../../data/ndep/ndep_cruncep/GlobalNitrogenDeposition.bin")
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP26")
+
+! SIMFIRE-BLAZE: empty -> BLAZE not driven; firemodel override to NOFIRE below
+param "file_simfire"      (str "")
+
+! NetCDF climate forcing files: NOT NEEDED in imogencfx mode; the engine
+! produces ASCII climate via DIR_COMMON/IMOGEN/output/<YYYY>/*.dat. We set
+! these to empty to avoid LPJG looking for cf-style NetCDFs that don't exist.
+param "file_temp"         (str "./IMOGEN/output/YYYY/T_anom.dat")
+param "file_prec"         (str "./IMOGEN/output/YYYY/P_anom.dat")
+param "file_insol"        (str "./IMOGEN/output/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "./IMOGEN/output/YYYY/WET.dat")
+param "file_dtr"          (str "./IMOGEN/output/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
+param "file_wind"         (str "./IMOGEN/output/YYYY/W_anom.dat")
+param "file_relhum"       (str "./IMOGEN/output/YYYY/Rh_anom.dat")
+
+! Step 9.5 deferred items (step 9 doesn't need these wired)
+param "file_pres"         (str "")
+param "variable_pres"     (str "")
+param "file_specifichum"  (str "")
+param "variable_specifichum" (str "")
+param "file_min_temp"     (str "")
+param "variable_min_temp" (str "")
+param "file_max_temp"     (str "")
+param "variable_max_temp" (str "")
+
+! Smoke overrides — keep run small and well-isolated
+nyear_spinup        100            ! 100y spinup (production: 500). LPJG validator requires freenyears < nyear_spinup.
+freenyears          50             ! 50y N-free spinup (production: 100). Smaller for smoke speed.
+
+! Year-range parameters (LPJG validator requires firsthistyear/lasthistyear > 0).
+! Smoke matches IMOGEN window in imogen_intermediary.ins (YEAR1=1871, IYEND=1872).
+! For production, both predecessor's main.ins used 1901-2100; here we use 1871-1872
+! because that's our 2-year smoke window.
+firsthistyear       1871
+lasthistyear        1872
+firstoutyear        1871
+lastoutyear         1872
+
+firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency (step 9.5 deferred)
+run_landcover       1              ! [Step 9 user guidance 2026-05-07]: enable LU; uses version_A's
+                                   ! 7.3 GB SSP1_RCP26_concatenated/ Tier-3 data (paths in crop.ins +
+                                   ! landcover.ins). Local-machine-specific; see runs/SSP1-2.6/README.md
+                                   ! for production setup on other machines.
+npatch              1              ! Single patch (production: 25). Smoke speed.
+
+! Output directory (created at run time relative to where you launch ./guess)
+outputdirectory "./"

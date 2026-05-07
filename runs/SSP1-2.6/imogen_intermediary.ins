@@ -1,0 +1,262 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! Step 9 V.1 step-9 smoke test — IMOGEN-coupling parameters
+!
+! Embodies bug fixes:
+!   - C5 ([CMI section 3.7]): "ouput" typo -> "output" in the per-year ASCII
+!     climate paths (lines 102-109 of predecessor's intermediary.ins).
+!   - C35 ([CMI section 3.7]): FILE_LPJG_FLUX and FILE_LPJG_CH4_N2O_FLUX were
+!     absolute paths in the predecessor, which the engine's path-concat
+!     collapsed to bypass the LPJG-side handshake; using RELATIVE filenames
+!     here so the concat resolves to <DIR_COMMON>/LPJG_main/IMOGEN/...
+!     (i.e., where step 8's imogenoutput writer emits).
+!   - R-anom -> Rh_anom: predecessor's file_relhum pointed to "R_anom.dat"
+!     while the C++ engine emits "Rh_anom.dat" -> name-mismatch silent failure
+!     in BLAZE setups.
+!
+! Coupling mode: tight (default; introduced at step 8). For prescribed-mode
+! sensitivity experiments, change `coupling_mode "tight"` to `coupling_mode
+! "prescribed"` AND change FILE_LPJG_FLUX / FILE_LPJG_CH4_N2O_FLUX to the
+! absolute paths of pre-computed IIASA reference files (see CMI 3.7.5).
+!
+! For loose coupling ('-input imogen' rather than '-input imogencfx'), set
+! `coupling_mode "loose"` -> step 8's writer skips writes; LPJG reads
+! pre-baked IMOGEN climate from a static disk library.
+!
+! - Daniel Bampoh, 2026-05-07 (step 9 of unified-codebase rebuild)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! INTERMEDIARY (legacy C++) PATHS — KEPT for predecessor parity
+!
+! These point into a flat path layout that does not exist in our rebuild,
+! but the LPJG declare_parameter calls in imogencfx.cpp REQUIRE these to
+! be set or LPJG complains. We set them to placeholder strings; the
+! intermediary code paths that read them are not exercised in our v1.0
+! smoke (the legacy C++ intermediary is being replaced by intermediary_py
+! at step 10+). After step 10, these can be removed entirely.
+!///////////////////////////////////////////////////////////////////////////////////////
+
+scenario              "cmip6"
+firstyear             1850
+lastyear              2100
+lpjg_start_year       1871   ! Smoke override: predecessor used 1901
+lpjg_end_year         1872   ! Smoke override: 2-year smoke
+
+baseDirectory                          ""   ! placeholder; intermediary_py at step 10+
+pathToLogFile                          ""
+myPLUMDataFilePath                     ""
+lpjgOutputDirectory                    ""
+methaneEmissionOutputFilePath          ""
+entericFermentationMethaneOutputFilePath ""
+manureManagementMethaneOutputFilePath  ""
+nitrogenEmissionOutputFilePath         ""
+methaneNitrogenTotalOutputFilePath     ""
+historic_nitrogen_fertiizer_file_path  ""
+arable_lands_nitrogen_fertilizer_path  ""
+wetlandsAreaFilePath                   ""
+wetlandsMethaneEmissionsOutputPath     ""
+basePathPLUMdata                       ""
+basePathPLUMdata_v2                    ""
+plumFertilizerOutputPath               ""
+plumFertlizerPath                      ""
+file_LPJG_IPCC_Path                    ""
+lpjgMethane                            ""
+lpjgNitrogen                           ""
+lpjgCflux                              ""
+lpjgCflux_plus_IIASA_lpjg_co2          ""
+IIASA_lpjg_co2_file_path               ""
+IIASA_non_lpjg_1850_2100               ""
+IIASA_lpjg_1850_2100                   ""
+livestock_counts_path                  ""
+fao_stats_path                         ""
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! AUX PARAMS
+!///////////////////////////////////////////////////////////////////////////////////////
+ssprcp              "126"
+print_imogen_output 1
+include_feedback    1
+
+simulation_mode     "online"     ! online -> in-process engine via imogencfx::init -> RUN_IMOGEN_ENGINE
+feedback_mode       "lpjg_offset"
+interpolation_mode  "IDWC"       ! Inverse Distance Weighted in C-space
+param "searchradius" (num 50)
+
+! Step 8: coupling-mode gate. tight | prescribed | loose. Default tight.
+! See followup F-10 in notes/FOLLOWUPS.md for the architectural caveat
+! that limits true tight-coupling synchronization in v1.0.
+!
+! [Step 9 EMPIRICAL FINDING 2026-05-07]: in single-process imogencfx mode
+!  with step 7's (correct!) restored polling guards, "tight" mode produces
+!  an architectural deadlock: the IMOGEN engine runs entirely within
+!  imogencfx::init() at LPJG startup, and step 7's polling loop now
+!  correctly waits for the LPJG-side handshake files (imogen_lpjg.txt,
+!  imogen_lpjg_flux.txt, imogen_lpjg_ch4_n2o_flux.txt) to exist.
+!  But LPJG cannot produce those files until init() returns and its main
+!  loop runs. DEADLOCK -- empirically reproduced in step 9's first smoke.
+!
+!  This is the proximate manifestation of follow-up F-10 (the framework-
+!  loop ordering vs proper tight-coupling synchronization mismatch).
+!  Bug C35's "absolute path" was actually what HID this deadlock: the
+!  static-IIASA-file read in the predecessor never blocked.
+!
+!  v1.0 resolution: use coupling_mode="prescribed" by default. This
+!  exercises step 8's writer (LPJG produces handshake files; engine
+!  reads from absolute-path static files; both succeed in parallel
+!  without deadlock). Bug C35's "FILE_LPJG_FLUX should be relative"
+!  fix is preserved below in the commented-out tight-mode block but
+!  cannot complete a single-process run in v1.0; gated on Phase-2
+!  framework restructure (per F-10 + new follow-up F-12: multi-pass
+!  / two-process verification design).
+coupling_mode       "prescribed"
+
+! [Step 9 wrap-up: imogen_nee_perturbation_factor was added at step 9 as
+!  a V.1 step-9 verification helper, then REMOVED at step 9's wrap-up
+!  because the smoke test empirically confirmed F-10's architectural
+!  deadlock (LPJG main loop never runs in v1.0 single-process mode), so
+!  the helper could never affect anything observable. F-12 will design
+!  the proper multi-pass / two-process verification protocol. -DKB]
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! IMOGEN-RELATED PARAMS — paths fixed for our rebuild tree
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! DIR_COMMON: where the engine writes per-year climate ASCII + where step 8's
+! ImogenOutput writer emits the LPJG-side handshake files. Created at runtime
+! relative to where ./guess is launched. Use absolute path for stability
+! across recompile/rerun if you launch from elsewhere.
+DIR_COMMON      "./Common-directory"
+DIR_COMMON_OUT  "./Common-directory"          ! For parallel runs, must be "./"
+
+! GCM pattern for SSP1-2.6: CMIP6 MRI-ESM2-0 (matches Stage-1 PLUM yield runs).
+! Patterns are gitignored Tier-2 data; fetch via tools/fetch_imogen_data.sh
+! --component patterns_cmip6 (or use --list to see all components).
+DIR_PATT        "../../imogen/patterns/CEN_CMIP6_MOD_MRI-ESM2-0"
+
+! CRUNCEP 1960-1989 baseline climatology (Tier-2 data; same fetch script).
+DIR_CLIM        "../../imogen/CRUNCEP_1960_1989/"
+
+! Anthropogenic emission scenarios (committed Tier-1/Tier-2 mix; from
+! imogen/emiss/DKB_dataset_totals/ via step 6 import).
+FILE_SCEN_EMITS    "../../imogen/emiss/DKB_dataset_totals/co2_emissions_annual_historical_rcp26_non_lpjg.txt"
+! [Step 9 fix 2026-05-07: was "../../imogen/emiss/RF_NONCO2_GHG_IS92A.dat"
+!  but that file has 243 rows starting at year 1859 - mismatch with
+!  NYR_NON_CO2=251 (which expects 251 rows starting at year 1850).
+!  Switched to scenario-specific SSP126 file (251 rows, 1850-2100;
+!  imported from version_B at step 9). - DKB]
+FILE_NON_CO2_VALS  "../../imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt"
+FILE_CH4_N2O_EMITS "../../imogen/emiss/DKB_dataset_totals/ch4_n2o_annual_historical_rcp26_non_lpjg_simulated.txt"
+
+! ============================================================================
+! [Step 9 EMPIRICAL: see coupling_mode comment above + F-10 + F-12]
+!
+! TIGHT-MODE (bug C35 fix): RELATIVE filenames so the engine's path-concat
+! resolves to <DIR_COMMON>/LPJG_main/IMOGEN/<filename> -- the v1.0 setup
+! deadlocks in single-process mode (engine polls for files LPJG hasn't
+! written yet; LPJG can't write until engine returns from init()). Phase-2
+! resolution at follow-up F-10 / F-12. Commented out for v1.0.
+!FILE_LPJG_FLUX          "imogen_lpjg_flux.txt"
+!FILE_LPJG_CH4_N2O_FLUX  "imogen_lpjg_ch4_n2o_flux.txt"
+!
+! PRESCRIBED-MODE (v1.0 default per the empirical finding): absolute paths
+! to pre-computed static IIASA reference files for SSP1-2.6. The path-concat
+! collapses to the absolute path on POSIX (predecessor's "bug C35" mechanic),
+! the engine reads these files without polling LPJG, and runs to completion.
+! Step 8's writer still produces the handshake files, but in this mode they
+! are effectively diagnostics of LPJG's NEE/CH4/N2O output -- the engine's
+! climate trajectory is determined by the static reference files.
+! ============================================================================
+FILE_LPJG_FLUX          "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/Co2/co2_pg_emissions_natural_historical_ssp126_1850_2100.txt"
+FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/CH4-N2O/ch4_n2o_annual_historical_natural_ssp126_1850_2100.txt"
+
+! Gridlist for the PATTERN regridding (separate from LPJG's gridlist;
+! IMOGEN uses its own internal grid that's regridded to LPJG's gridlist
+! at handshake time).
+FILE_GRIDLIST   "../../data/gridlist/patterns_gridlist.txt"
+
+!FILE_SCEN_CO2_PPMV   ! Optional: if set, overrides emissions-driven CO2
+
+! Engine numerical parameters (predecessor defaults; physics-validated):
+STEP_DAY        1       ! Number of daily timesteps (was 24 in early predecessor)
+T_OCEAN_INIT    289.28  ! Initial ocean temperature (K)
+KAPPA_O         280.0   ! Ocean eddy diffusivity (W/m/K)
+F_OCEAN         0.71    ! Fractional ocean coverage
+LAMBDA_L        0.4     ! Inv. land climate sensitivity (W/m^2/K)
+LAMBDA_O        1.9     ! Inv. ocean climate sensitivity (W/m^2/K)
+MU              1.78    ! Land/ocean temp anomaly ratio
+Q2CO2           3.74    ! 2x CO2 radiative forcing (W/m^2)
+TAU_DECAY_CH4   9.3     ! Atmospheric CH4 lifetime (years)
+TAU_DECAY_N2O   121     ! Atmospheric N2O lifetime (years)
+CO2_INIT_PPMV   286.085
+CH4_INIT_PPBV   865.0
+N2O_INIT_PPBV   277.4
+
+! Number-of-years parameters: smoke uses 2-year window
+NYR_NON_CO2     251     ! RF_NONCO2_GHG_IS92A.dat covers full 1850-2100
+NYR_EMISS_NONCO2 251    ! Anthropogenic CH4+N2O emissions span
+NYR_EMISS       251     ! Anthropogenic CO2 emissions span
+NYR_LPJG_FLUX   251     ! LPJG flux file span (relevant when LPJG_CFLUX=1)
+
+! Behavioural flags
+FILE_NON_CO2          1   ! Use non-CO2 RF file
+NONCO2_EMISSIONS      1   ! Use FAIR for CH4+N2O forcing (vs prescribed RF)
+NONCO2_EMISSIONS_LPJG 1   ! Use LPJG handshake natural CH4+N2O (vs anthro-only)
+C_EMISSIONS           1   ! Compute CO2 from emissions
+LPJG_CFLUX            1   ! Use LPJG handshake CO2 flux. Predecessor B had this 0!
+INCLUDE_CO2           1
+INCLUDE_NON_CO2       1
+DAILYOUT              0   ! Monthly (vs daily) output -- much faster
+LAND_FEED             1   ! Land C feedback on atmospheric CO2
+OCEAN_FEED            1   ! Ocean C feedback
+ANLG                  1   ! GCM analogue mode
+ANOM                  1   ! Anomaly-based pattern scaling
+REGRID                0   ! 0 = use IDWC (interpolation_mode); 1 = nearest-neighbour
+CO2_RF_FAIR           0   ! 0 = standard IMOGEN CO2 RF; 1 = FAIR-style
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! OFFLINE-IMOGEN climate ASCII paths — for LPJG to read engine output
+!
+! Bug C5 fix: predecessor had typo "ouput" (missing 't'); corrected to "output".
+! Bug R-anom fix: predecessor used "R_anom.dat" but C++ engine emits "Rh_anom.dat".
+! These are LPJ-GUESS-side reads of per-year IMOGEN engine output:
+!   - param "file_temp"    is read by imogencfx::init via the YYYY-substitution
+!     mechanism into an ImogenInputArchive that LPJG consults per-year.
+!///////////////////////////////////////////////////////////////////////////////////////
+param "file_temp"    (str "./IMOGEN/output/YYYY/T_anom.dat")     ! [bug C5: was "ouput"]
+param "file_prec"    (str "./IMOGEN/output/YYYY/P_anom.dat")     ! [bug C5]
+param "file_insol"   (str "./IMOGEN/output/YYYY/SW_anom.dat")    ! [bug C5]
+param "file_wetdays" (str "./IMOGEN/output/YYYY/WET.dat")        ! [bug C5]
+param "file_dtr"     (str "./IMOGEN/output/YYYY/DTEMP_anom.dat") ! [bug C5]
+param "file_co2"     (str "./IMOGEN/output/YYYY/CO2.dat")        ! [bug C5]
+param "file_wind"    (str "./IMOGEN/output/YYYY/W_anom.dat")     ! [bug C5; C++ engine emits W_anom.dat]
+param "file_relhum"  (str "./IMOGEN/output/YYYY/Rh_anom.dat")    ! [bug C5; bug R-anom: was "R_anom.dat"]
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! COUPLING params (LPJG <-> IMOGEN year-range coordination)
+!
+! Smoke: 2 years (1871-1872) per Decision 3 of step-9 plan.
+!///////////////////////////////////////////////////////////////////////////////////////
+YEAR1       1871    ! First year of the IMOGEN numerical experiment
+IYEND       1872    ! Stop year of the IMOGEN run (2-year smoke)
+YEAR1_LPJG  1871    ! First year of the LPJG main simulation (smoke: same as YEAR1)
+SPINUP      0       ! Smoke: SPINUP done by LPJG nyear_spinup; IMOGEN doesn't spinup
+KEEPRUNNING 1       ! Engine main loop control flag
+FIRSTCALL   1       ! First call from LPJG (sentinel; flipped by step 8 writer afterwards)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! IMOGEN climate-INPUT diagnostic outputs (the half-scaffolded miscoutput
+! stubs from F-9; declare_parameter calls EXIST so we set the filenames,
+! but no actual writing happens until F-9 is closed at step 9.5).
+!///////////////////////////////////////////////////////////////////////////////////////
+file_t_anom         "T_anom.out"
+file_wet            "WET.out"
+file_sw_anom        "SW_anom.out"
+file_p_anom         "P_anom.out"
+file_fa_ocean       "fa_ocean.out"
+file_dtemp_o        "dtemp_o.out"
+file_dtemp_anom     "DTEMP_anom.out"
+file_co2            "CO2.out"
+file_relhum_anom    "Relhum_anom.out"
+file_tmin_anom      "Tmin_anom.out"
+file_tmax_anom      "Tmax_anom.out"
+file_wind_anom      "wind_anom.out"

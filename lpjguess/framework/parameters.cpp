@@ -277,6 +277,10 @@ namespace IMOGENConfig {
 	// [Step 8 of unified-codebase rebuild: coupling-mode gate; default "tight".
 	//  See followup F-10 for v1.0 caveats. - DKB 2026-05-06]
 	 xtring coupling_mode = "tight";
+
+	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
+	//  was added at step 9 then REMOVED at step 9's wrap-up; see
+	//  parameters.h same-named comment block for rationale. - DKB 2026-05-07]
 	 xtring ssprcp;
 
 	 //LPJG-IMOGEN Coupling config params

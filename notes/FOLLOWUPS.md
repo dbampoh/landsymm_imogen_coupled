@@ -386,6 +386,71 @@ see DONE section.)
   - `_phase2_findings/02_lpjguess_trunk_r13078.md` (Phase-2
     investigation of `trunk_r13078`'s coupling surface area)
 
+### F-12 — Multi-pass / two-process tight-mode verification design
+
+- **Trigger**: step 9 (`notes/STEP_9.md` §4.4 + §6). The smoke test
+  empirically confirmed F-10's architectural deadlock: in v1.0
+  single-process `imogencfx` mode, the IMOGEN engine cannot terminate
+  cleanly without LPJG-supplied per-year handshake updates, AND LPJG
+  cannot run its main loop until `imogencfx::init()` returns (which
+  it cannot until the engine terminates). **Hard deadlock, observed
+  in BOTH `coupling_mode="tight"` and `coupling_mode="prescribed"`
+  modes.**
+- **What this means for v1.0**:
+  - Step 8's `ImogenOutput::flush_year` writer mechanics are correct
+    in code, units, and registration — but the function NEVER FIRES
+    in v1.0 single-process mode because LPJG main loop never runs
+  - Bug C35's relative-path fix is correct in concept but un-testable
+    in v1.0 (deadlocks immediately because `RUNFLUX_EXIST=0`)
+  - V.1 step-9 verification milestone (NEE 2x perturbation → CO2
+    trajectory shift) cannot be tested in v1.0
+  - The `coupling_mode = "prescribed"` workaround (with bootstrap
+    handshake files + absolute-path static-IIASA `FILE_LPJG_FLUX`)
+    runs the engine through climate output successfully but still
+    deadlocks before LPJG main loop runs — see `notes/STEP_9.md` §4.4
+- **F-12 design space** (three options; pick at Phase-2 kickoff):
+  - **Option A — Multi-pass (one-binary, manual orchestration)**:
+    User runs `guess` once with N pre-populated handshake files for
+    year 1. Engine consumes them, runs year 1's climate to disk, then
+    deadlocks polling for year-2 handshake. User kills `guess`, manually
+    populates year-2 handshake files (or runs a tool that does so),
+    relaunches `guess` with year 2's bootstrap. LPJG main loop never
+    actually runs in this design — it's a pure engine-only mode.
+    **Verdict: useless for actual coupling; just a workaround for
+    engine-only verification. Reject.**
+  - **Option B — Two-process (recommended for v1.0 → v1.1)**:
+    Split the `imogen_lpjg` engine out of `imogencfx::init()` into a
+    separate Fortran binary running concurrently with `guess`. The
+    engine polls `<DIR_COMMON>/LPJG_main/IMOGEN/done` per year (already
+    implemented in `imogen_lpjg.f`); LPJG (running concurrently in a
+    separate `guess` process) writes the handshake files via step 8's
+    writer per LPJG-year; engine sees the new handshake, advances to
+    next year, etc. **This is what the predecessor's polling-loop
+    architecture was originally DESIGNED for** — the predecessor's
+    in-process port (climatemodel.cpp's `RUN_IMOGEN_ENGINE`) was a
+    convenience wrapper that broke this design. Restoring two-process
+    mode + step 8's writer should yield genuine year-by-year tight
+    coupling. Estimated effort: 2-3 days (engine binary build setup
+    via existing Fortran Makefile; orchestration script for concurrent
+    launch; documentation).
+  - **Option C — In-process restructure (F-10's Phase-2 design)**:
+    Add `framework_loop_mode = "year_outer"` ins parameter that gates
+    a NEW per-year-outer code path inside `framework.cpp`. Engine and
+    LPJG would alternate per year inside the same process, sharing
+    state via in-memory data structures (no file-based handshake
+    needed for the in-process path). This is F-10's recommended
+    Phase-2 design. Cleaner architecturally but larger surface area
+    (~1-2 weeks). Gives BOTH single-binary AND parallel-HPC potential.
+- **Recommendation**: Option B for v1.0 → v1.1 (faster, validates the
+  bug C35 fix, enables genuine two-way coupling for the GMD paper);
+  Option C for v2.0+ (Phase-2; clean architectural fix).
+- **Cross-references**:
+  - `notes/STEP_9.md` (the empirical findings that motivated F-12)
+  - `notes/FOLLOWUPS.md` F-10 (the architectural diagnosis F-12 resolves)
+  - `runs/SSP1-2.6/README.md` "Empirical findings" section
+  - `[CMI §3.7.6]` (the diagnostic-test recommendation that should be
+    implemented after F-12 lands)
+
 ### F-8 — Revisit CMIP6 wind-magnitude split + precip rain/snow partition at step 9.5
 
 - **Trigger**: step 5 CAVEAT-B and CAVEAT-C. The CMIP6 NetCDF doesn't

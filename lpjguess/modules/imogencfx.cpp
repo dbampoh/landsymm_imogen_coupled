@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <vector>
-#include <cstddef> // für size_t 
+#include <cstddef> // fï¿½r size_t 
 #include <iostream>
 #include "climatemodel.h"
 
@@ -338,6 +338,11 @@ IMOGENCFXInput::IMOGENCFXInput()
 	//  for the framework-loop-ordering caveat affecting "tight" in v1.0.
 	//  - DKB 2026-05-06]
 	declare_parameter("coupling_mode", &IMOGENConfig::coupling_mode, 20, "Coupling mode: tight | prescribed | loose (default tight)");
+
+	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
+	//  declare_parameter was added at step 9 then REMOVED at step 9's
+	//  wrap-up; see parameters.h same-named comment block for rationale.
+	//  - DKB 2026-05-07]
 	
 
 	declare_parameter("ssprcp", &IMOGENConfig::ssprcp, 10, "SSP RCP Scenario");//add a check here
@@ -827,7 +832,7 @@ void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& 
 
 double IMOGENCFXInput::parse_spatial_resolution() {
 	return (3.75 / 2); // 3.75x2.5 deg
-	// https://en.wikipedia.org/wiki/HadCM3 resolution: 3.75 × 2.5 degrees in longitude × latitude. This gives 96 × 73 grid points???
+	// https://en.wikipedia.org/wiki/HadCM3 resolution: 3.75 ï¿½ 2.5 degrees in longitude ï¿½ latitude. This gives 96 ï¿½ 73 grid points???
 }
 
 bool IMOGENCFXInput::getgridcell(Gridcell& gridcell) {

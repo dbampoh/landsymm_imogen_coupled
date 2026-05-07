@@ -294,6 +294,53 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 9: SSP1-2.6 run-config + bug C5/R-anom fixes; perturbation_factor add-then-remove
+
+**Commit:** _TBD (step 9)_  **Date:** 2026-05-07
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 9's substantive deliverable is the `runs/SSP1-2.6/` directory
+(NOT in `lpjguess/`) and the documentation. The `lpjguess/` source
+files received only **annotation comments** documenting an
+add-then-remove cycle of the `imogen_nee_perturbation_factor` runtime
+parameter (added at step 9 phase C, removed at step 9 wrap-up because
+the F-10 deadlock means LPJG main loop never runs in v1.0 single-process
+mode, so the helper could never affect anything observable; per user's
+code-integrity preference, the helper was REMOVED rather than kept as
+permanent v1.0 scaffolding).
+
+#### File: `lpjguess/framework/parameters.h`
+- **Operation:** modify (annotation only; net code: zero added)
+- **Lines:** ~510 (after the `coupling_mode` declaration block)
+- **Description:** Comment block documenting the add-then-remove of
+  `extern double imogen_nee_perturbation_factor;`.
+- **Backport guidance:** Annotation-only; trivial copy.
+
+#### File: `lpjguess/framework/parameters.cpp`
+- **Operation:** modify (annotation only); same as `.h`.
+
+#### File: `lpjguess/modules/imogencfx.cpp`
+- **Operation:** modify (annotation only)
+- **Lines:** in the `declare_parameter` block (after `coupling_mode`)
+- **Description:** Comment block documenting the add-then-remove of
+  `declare_parameter("imogen_nee_perturbation_factor", ...)`.
+
+#### File: `lpjguess/modules/imogenoutput.cpp`
+- **Operation:** modify (annotation only)
+- **Lines:** in `flush_year` near the unit-conversion block
+- **Description:** Comment block documenting that the
+  `imogen_nee_perturbation_factor` multiplier was applied here briefly
+  then removed.
+
+#### Non-`lpjguess/` deliverables (catalogued for completeness)
+
+Listed here for the Backport Sprint to know what step 9 delivered
+(NOT requiring `lpjguess/` replication):
+- `runs/SSP1-2.6/` (NEW): main.ins, imogen_intermediary.ins, README.md,
+  + 11 stand/PFT/landcover ins files copied from version_A's predecessor
+- `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt` (NEW)
+
 ---
 
 ## 4. Backport Sprint plan (executes after step 19's verification)
