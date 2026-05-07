@@ -118,12 +118,62 @@ EDGAR_IEA_CO2_NEW = EDGAR_DIR / 'IEA_EDGAR_CO2_1970_2024.xlsx'
 
 
 def ensure_output_dirs():
-    """Create all output directories. Called at the start of any script that writes."""
-    for d in (OUT_A_DATA, OUT_A_FIGS, OUT_A_SUMMARIES,
-              OUT_B_DATA, OUT_B_FIGS, OUT_B_SUMMARIES,
-              OUT_C_DATA, OUT_C_FIGS, OUT_C_SUMMARIES,
-              OUT_IMOGEN_INPUTS):
+    """Create all output directories.
+
+    [Step 11 of unified-codebase rebuild: extended 2026-05-07 to also create
+     the per-sector and per-pipeline-stage SUB-subdirectories that the
+     individual scripts write to. The original implementation only created
+     the level-2 dirs (data/, figures/, summaries/) which caused first-run
+     crashes when scripts tried to write to outputs/component_a/data/ch4_ef/
+     etc. Now creates the FULL output tree idempotently so the pipeline
+     "just works" on a fresh clone — no need for users to pre-create dirs
+     manually. Mirrors the FULL/outputs/ tree from the predecessor's
+     reference run. - DKB 2026-05-07]
+
+    Called at the start of any script that writes; idempotent (uses
+    `mkdir(parents=True, exist_ok=True)` so it's safe on re-runs and
+    doesn't fail if the dirs are pre-created manually).
+    """
+    # Level 2 (component_a/data, component_a/figures, etc.)
+    base_dirs = (
+        OUT_A_DATA, OUT_A_FIGS, OUT_A_SUMMARIES,
+        OUT_B_DATA, OUT_B_FIGS, OUT_B_SUMMARIES,
+        OUT_C_DATA, OUT_C_FIGS, OUT_C_SUMMARIES,
+        OUT_IMOGEN_INPUTS,
+    )
+    # Level 3 (component_a/data/ch4_ef, etc.) — Component A is partitioned
+    # by IPCC sector and by pipeline stage; B and C are flat.
+    component_a_subdirs = (
+        'ch4_ef', 'ch4_mm', 'ch4_rice',
+        'n2o_mm', 'n2o_ms', 'n2o_synfert',
+        'scenario_pipeline',
+    )
+    extra_dirs = [
+        OUT_A_DATA / sub for sub in component_a_subdirs
+    ] + [
+        OUT_A_FIGS / sub for sub in component_a_subdirs
+    ]
+    for d in tuple(base_dirs) + tuple(extra_dirs):
         d.mkdir(parents=True, exist_ok=True)
+
+
+# [Step 11 of unified-codebase rebuild: auto-call ensure_output_dirs() on
+#  module import, so ALL scripts that import from src.shared.paths
+#  automatically get the output dir tree created (idempotent; safe whether
+#  dirs are pre-created or not). Gated by IMOGEN_GHG_NO_AUTO_MKDIR=1 env var
+#  for callers that want to inspect paths without side effects (CI lints,
+#  diagnostic tools, etc.). - DKB 2026-05-07]
+if os.environ.get('IMOGEN_GHG_NO_AUTO_MKDIR') != '1':
+    try:
+        ensure_output_dirs()
+    except (OSError, PermissionError) as e:
+        # Don't fail import if mkdir hits a permissions issue; let the
+        # downstream open()/to_csv() call fail with the same error and
+        # a clearer traceback. This preserves backward compatibility
+        # with read-only inspection tools.
+        import sys
+        print(f'[paths.py] WARNING: ensure_output_dirs() failed: {e}',
+              file=sys.stderr)
 
 
 if __name__ == '__main__':

@@ -26,6 +26,7 @@ from src.shared.paths import (
 
 import pandas as pd
 import numpy as np
+import os  # [Step 11 of unified-codebase rebuild: bug fix - os used without import. - DKB 2026-05-07]
 
 SCEN_DIR  = (str(OUT_A_DATA) + '/scenario_pipeline/')
 os.makedirs(SCEN_DIR, exist_ok=True)

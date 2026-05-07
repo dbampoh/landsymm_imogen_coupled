@@ -373,8 +373,16 @@ for plum_s, rcmip_s in SCEN_MAP.items():
 df_ch4 = pd.DataFrame(records_ch4)
 df_n2o = pd.DataFrame(records_n2o)
 
-df_ch4.to_csv(os.path.join(HERE, 'rcmip_substitution_ch4.csv'), index=False)
-df_n2o.to_csv(os.path.join(HERE, 'rcmip_substitution_n2o.csv'), index=False)
+# [Step 11 of unified-codebase rebuild: bug fix - was writing to HERE
+#  (= the script's own src/ directory) instead of OUT_A_DATA. Component C's
+#  external_comparators_processing.py expects these files at
+#  outputs/component_a/data/rcmip_substitution_*.csv. Predecessor's FULL
+#  reference had them in BOTH locations (the src/ files were committed as
+#  reference; outputs/ versions were produced by some out-of-band process).
+#  Fixed to write directly to OUT_A_DATA so the producer-consumer chain
+#  works end-to-end. - DKB 2026-05-07]
+df_ch4.to_csv(os.path.join(str(OUT_A_DATA), 'rcmip_substitution_ch4.csv'), index=False)
+df_n2o.to_csv(os.path.join(str(OUT_A_DATA), 'rcmip_substitution_n2o.csv'), index=False)
 print(f"  Saved: rcmip_substitution_ch4.csv  ({len(df_ch4):,} rows)")
 print(f"  Saved: rcmip_substitution_n2o.csv  ({len(df_n2o):,} rows)")
 

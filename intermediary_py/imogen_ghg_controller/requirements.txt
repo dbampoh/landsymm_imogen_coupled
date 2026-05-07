@@ -2,3 +2,7 @@ pandas>=2.0
 numpy>=1.24
 matplotlib>=3.7
 pyarrow>=14.0
+# [Step 11 of unified-codebase rebuild: bug C33 fix. openpyxl was missing
+#  from the predecessor's requirements but is required by every script
+#  loading EDGAR_*.xlsx files (n2o_synfert, ch4_*, n2o_*). Added 2026-05-07.]
+openpyxl>=3.0

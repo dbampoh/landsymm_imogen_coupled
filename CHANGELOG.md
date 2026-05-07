@@ -19,6 +19,180 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.12.0-step11-intermediary-py-validated] — 2026-05-07 — step 11: pipeline end-to-end + 4 source bugs fixed + reproducibility verified
+
+### Headline outcome
+
+✅ **First end-to-end intermediary_py run succeeded**: 23/23 steps in
+540.3s (~9 min); 10/10 pytest pass; **CO2 + all natural CH4/N2O +
+all historical columns byte-identically reproduce** version_A's
+reference outputs. Anthropogenic scenario CH4/N2O within 0.17-0.22%
+mean relative (matches Quick_Start.md's documented "slightly earlier
+code revision" provenance).
+
+### Strategic shortcut — version_A's FULL/inputs/ as input source
+
+Per user guidance 2026-05-07, instead of acquiring ~1.8 GB inputs
+piecemeal from RCMIP / FAIR / EDGAR / FAOSTAT / PLUM / LPJG, **the
+existing version_A `imogen_ghg_controller_FULL/inputs/` directory
+(5.1 GB) is symlinked** as our pipeline's input source. Pros: 0 GB
+disk overhead; per-subdir granularity; gitignored (no commits).
+
+Symlinks at `intermediary_py/imogen_ghg_controller/inputs/<subdir>`
+for: edgar/, fao/, fair_erf/, lpjg/, plum/, rcmip/, reference_pdfs/.
+
+### Fixed — 4 source-level bugs in the imported intermediary_py
+
+These bugs all manifested during the first end-to-end pipeline run.
+All fixes are localized + small + improve robustness for any user
+running the pipeline:
+
+#### Bug 1 — `paths.py::ensure_output_dirs()` only created level-2 dirs
+
+**Symptom**: `OSError: Cannot save file into a non-existent directory:
+'.../outputs/component_a/data/ch4_ef'` on first script.
+
+**Diagnosis**: `ensure_output_dirs()` created the level-2 dirs (data/,
+figures/, summaries/) but not the per-sector level-3 sub-subdirs
+(data/ch4_ef, ..., data/scenario_pipeline + figures/ analogs).
+
+**Fix** (per user request for self-contained pipeline behavior):
+- Extended `ensure_output_dirs()` to enumerate all 14 level-3
+  sub-subdirs under Component A's data/ + figures/
+- Added auto-call at module-bottom of `paths.py`:
+  `if os.environ.get('IMOGEN_GHG_NO_AUTO_MKDIR') != '1':
+       ensure_output_dirs()`
+- Idempotent (`mkdir(parents=True, exist_ok=True)`); safe whether
+  dirs are pre-created manually or not
+- Gated by `IMOGEN_GHG_NO_AUTO_MKDIR=1` env var for read-only
+  inspection tools that want to import paths without filesystem
+  side effects
+- **Verified**: deleting all output subdirs and importing
+  `src.shared.paths` reconstructs all 28 dirs in one call
+
+#### Bug 2 — `os` not imported in 3 scenario scripts
+
+**Symptom**: `NameError: name 'os' is not defined` at
+`01_scenario_ch4_ef_processing.py:44`.
+
+**Diagnosis**: 3 scripts use `os.makedirs(SCEN_DIR, exist_ok=True)`
+without `import os`. Python 3.10+ may transitively expose `os` via
+sys imports in some environments; on Python 3.9.x (the user's
+anaconda3 default) it fails.
+
+**Fix**: added `import os` to:
+- `src/component_a_anthropogenic/scenarios/01_scenario_ch4_ef_processing.py`
+- `src/component_a_anthropogenic/scenarios/02_scenario_ch4_mm_processing.py`
+- `src/component_a_anthropogenic/scenarios/03_scenario_n2o_mm_processing.py`
+
+#### Bug 3 — `FAOCountry` column reference (stale; should be `Country`)
+
+**Symptom**: `KeyError: 'FAOCountry'` at
+`01_scenario_ch4_ef_processing.py:187`.
+
+**Diagnosis**: Script reads `missing['FAOCountry']` from
+`fao2020_missing_species.csv` — but that CSV is written with column
+`Country`, not `FAOCountry`. Documented in Quick_Start.md's "1-row
+diff" discussion ("the reference outputs the user provided are from
+a slightly earlier code revision").
+
+**Fix**: `missing['FAOCountry']` → `missing['Country']` (single
+occurrence across the codebase). Aligns with canonical-current
+behavior; matches version_A's reference outputs (which also use
+`Country`).
+
+#### Bug 4 — `rcmip_substitution_processing.py` writes to source dir
+
+**Symptom**: `FileNotFoundError:
+'.../outputs/component_a/data/rcmip_substitution_ch4.csv'` when
+Component C tries to read it.
+
+**Diagnosis**: lines 376-377 used `df.to_csv(os.path.join(HERE, ...))`
+where `HERE = os.path.dirname(os.path.abspath(__file__))` — i.e.,
+writing into the script's own `src/` directory, not into
+`outputs/component_a/data/`. This explained why version_A's tree had
+the rcmip_substitution_*.csv files in BOTH locations: the script
+wrote into `src/` (the bug), and someone manually copied them to
+`outputs/` (the workaround).
+
+**Fix**: both `to_csv(os.path.join(HERE, ...))` calls changed to
+`to_csv(os.path.join(str(OUT_A_DATA), ...))`. Producer-consumer
+chain now works directly without manual copying.
+
+### Fixed — `openpyxl` missing from requirements (bug C33)
+
+Added `openpyxl>=3.0` to BOTH `requirements.txt` (with explanatory
+comment) and `pyproject.toml`'s `dependencies` list. Future fresh
+installs via `pip install -r requirements.txt` will pull openpyxl
+correctly. (Did not actually crash on this host since system Python
+already had it installed.)
+
+### Verified
+
+```text
+# Pipeline run
+$ python3 run_all.py --skip-plots
+  ✓ 23/23 steps in 540.3s
+
+# Pytest
+$ python3 -m pytest tests/ -v
+  ✓ 10/10 passed (test_imogen_export_schema, test_unit_conversions, test_co2_option_a_validation)
+
+# Reproducibility (vs version_A FULL/outputs/imogen_inputs_SSP1-2.6.csv)
+  Historical 1900-2019: ALL 9 columns BYTE-IDENTICAL
+  Scenarios 2020-2100:
+    CO2_EFOS_Mt, CO2_NEE_Mt, CO2_total_Mt:           BYTE-IDENTICAL
+    CH4_natural_Mt, N2O_natural_Mt:                  BYTE-IDENTICAL
+    CH4_anthro_Mt, N2O_anthro_Mt, CH4_total_Mt, N2O_total_Mt:
+        max abs diff 0.602 / 0.029 Mt; mean 0.17-0.22% rel drift
+        (matches Quick_Start.md "slightly earlier code revision")
+```
+
+### Files modified / added
+
+```text
+Added:
+  notes/STEP_11.md                                                          ~14 KB
+
+Modified (in intermediary_py — 4 bug fixes + 1 infra + 1 dep declaration):
+  intermediary_py/imogen_ghg_controller/src/shared/paths.py                 +60 LOC (auto-create on import)
+  intermediary_py/imogen_ghg_controller/src/component_a_anthropogenic/
+    rcmip_substitution/rcmip_substitution_processing.py                     +12 LOC (HERE -> OUT_A_DATA)
+    scenarios/01_scenario_ch4_ef_processing.py                              +8 LOC (import os; FAOCountry->Country)
+    scenarios/02_scenario_ch4_mm_processing.py                              +1 LOC (import os)
+    scenarios/03_scenario_n2o_mm_processing.py                              +1 LOC (import os)
+  intermediary_py/imogen_ghg_controller/run_all.py                          +7 LOC (comment about auto-create)
+  intermediary_py/imogen_ghg_controller/requirements.txt                    +4 LOC (openpyxl)
+  intermediary_py/imogen_ghg_controller/pyproject.toml                      +2 LOC (openpyxl)
+
+Modified (in lpjguess infra):
+  .gitignore                                                                +10 LOC (intermediary_py/inputs/outputs)
+
+Modified (in docs):
+  notes/FOLLOWUPS.md                                                        status dashboard refresh
+  notes/TRUNK_R13078_BACKPORT_LEDGER.md                                     +Step 11 entry (zero lpjguess C++)
+  EXECUTION_PLAN.md                                                         step 11 row marked DONE
+  CHANGELOG.md                                                              this entry
+
+NOT committed (local-only):
+  intermediary_py/imogen_ghg_controller/inputs/{edgar,fao,...}/             7 symlinks to version_A/.../FULL/inputs/
+  intermediary_py/imogen_ghg_controller/outputs/                            generated; regenerable via run_all.py
+
+Reverted:
+  intermediary_py/imogen_ghg_controller/src/component_a_anthropogenic/
+    rcmip_substitution/rcmip_substitution_{ch4,n2o}.csv                     reverted to step-10 state (the buggy
+                                                                            script had over-written them; fixed
+                                                                            script no longer touches them)
+```
+
+### NET source-level change in `lpjguess/`: ZERO
+
+intermediary_py is fork-agnostic. Step 11's bug fixes live entirely
+in the Python pipeline. The Backport Sprint (F-11) does NOT need
+to replicate any step-11 changes in `trunk_r13078`.
+
+---
+
 ## [v0.11.0-step10-intermediary-py-import] — 2026-05-07 — step 10: import imogen_ghg_controller v0.1.0
 
 ### Added — `intermediary_py/imogen_ghg_controller/` (7.9 MB; 78 files)

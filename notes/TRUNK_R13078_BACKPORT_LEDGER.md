@@ -294,6 +294,47 @@ One Fortran fix in the shared `imogen/code/`:
   integration project and never propagated to `trunk_r13078`),
   the backport is a no-op for this file.
 
+### Step 11: intermediary_py end-to-end pipeline run + 4 source bug fixes + reproducibility validation
+
+**Commit:** _TBD_  **Date:** 2026-05-07
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 11 deliberately introduces zero `lpjguess/` C++ changes.
+intermediary_py is a fork-agnostic Python pipeline; its bug fixes
+do not need replication in `trunk_r13078`.
+
+#### Files modified (all OUTSIDE lpjguess/)
+
+In `intermediary_py/imogen_ghg_controller/` (Python):
+
+- `src/shared/paths.py` (+60 LOC): extended `ensure_output_dirs()` to
+  enumerate all 14 level-3 sub-subdirs; added module-level auto-call on
+  import (gated by `IMOGEN_GHG_NO_AUTO_MKDIR=1` env var)
+- `src/component_a_anthropogenic/rcmip_substitution/rcmip_substitution_processing.py`
+  (~12 LOC change): write outputs to `OUT_A_DATA` instead of script's
+  own dir (`HERE`)
+- `src/component_a_anthropogenic/scenarios/01_scenario_ch4_ef_processing.py`
+  (+8 LOC): added `import os`; changed `'FAOCountry'` → `'Country'`
+- `src/component_a_anthropogenic/scenarios/02_scenario_ch4_mm_processing.py`
+  (+1 LOC): added `import os`
+- `src/component_a_anthropogenic/scenarios/03_scenario_n2o_mm_processing.py`
+  (+1 LOC): added `import os`
+- `run_all.py` (+7 LOC): comment about path auto-create
+- `requirements.txt` (+4 LOC): added `openpyxl>=3.0` (bug C33 fix)
+- `pyproject.toml` (+2 LOC): added `openpyxl>=3.0` to dependencies
+
+Plus `.gitignore` (+10 LOC) for `intermediary_py/imogen_ghg_controller/{inputs,outputs,archive}/*` (the README.md inside is excepted).
+
+#### Cross-reference for the Backport Sprint
+
+When the Backport Sprint runs the coupled model end-to-end on the
+`trunk_r13078` backend, it will use the SAME intermediary_py
+(imogen_ghg_controller) Python pipeline. The bug fixes from step 11
+are inherited automatically because intermediary_py is fork-agnostic.
+
+---
+
 ### Step 10: Import intermediary_py (imogen_ghg_controller v0.1.0)
 
 **Commit:** _TBD_  **Date:** 2026-05-07

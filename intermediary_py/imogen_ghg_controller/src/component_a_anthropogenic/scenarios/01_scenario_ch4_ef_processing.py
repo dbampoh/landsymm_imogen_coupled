@@ -35,6 +35,12 @@ from src.shared.paths import (
 
 import pandas as pd
 import numpy as np
+import os  # [Step 11 of unified-codebase rebuild: bug fix - 'os' was used
+            #  without import (line 44 below). Predecessor never failed
+            #  here because os was imported transitively via _sys/_Path
+            #  at module-load in some Python versions; on Python 3.9.x
+            #  the transitive import doesn't expose os at module scope.
+            #  - DKB 2026-05-07]
 
 # =============================================================================
 # SECTION 0: PATHS AND CONFIGURATION
@@ -178,7 +184,7 @@ df['Region'] = df['PLUMCountry'].apply(plum_country_region)
 # Missing species: horses, mules, asses, camels (constant at FAO 2020)
 print("Loading missing species (horses, mules, asses, camels) ...")
 missing = pd.read_csv(SCEN_DIR + 'fao2020_missing_species.csv')
-missing['Region'] = missing['FAOCountry'].apply(get_region)
+missing['Region'] = missing['Country'].apply(get_region)  # [Step 11 of unified-codebase rebuild: was 'FAOCountry' (stale per Quick_Start.md provenance check); the historical livestock-anchor script writes 'Country'. Single-script source-of-truth fix; aligns with version_A reference outputs which also used 'Country'. - DKB 2026-05-07]
 
 # Global regional totals for missing species (constant across all years/scenarios)
 missing_regional = missing.groupby('Region')[['Horses_M','Mules_M','Asses_M','Camels_M']].sum()

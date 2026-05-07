@@ -53,6 +53,7 @@ from src.shared.paths import (
 
 import pandas as pd
 import numpy as np
+import os  # [Step 11 of unified-codebase rebuild: bug fix - os used without import. - DKB 2026-05-07]
 
 # =============================================================================
 # SECTION 0: PATHS AND CONSTANTS

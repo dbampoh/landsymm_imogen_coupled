@@ -183,6 +183,13 @@ def main():
     print(f'  dry run:    {args.dry_run}', file=sys.stderr)
     print('', file=sys.stderr)
 
+    # [Step 11 of unified-codebase rebuild: output dir tree is auto-created
+    #  by src/shared/paths.py on first import (which happens in every script
+    #  via its bootstrap block). No explicit call needed here; the
+    #  paths.py auto-call is idempotent (mkdir parents=True exist_ok=True)
+    #  and doesn't fire when IMOGEN_GHG_NO_AUTO_MKDIR=1 is set.
+    #  - DKB 2026-05-07]
+
     t_start = time.time()
     n_run = n_ok = 0
     for comp in comps:
