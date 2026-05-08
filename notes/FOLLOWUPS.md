@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-08 (after step 15 Stage I documentation preservation + PLUM-output reuse verification + bundled BACKPORT_LEDGER errata cleanup).
+**Last updated:** 2026-05-08 (after step 16 cluster launcher loose-only baseline + workstation parallel mimic + architectural-tension investigation surfacing user-confirmed Path A trajectory: step 16 → F-12 Option B → F-12 Option C → steps 17-19).
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|

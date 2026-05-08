@@ -19,6 +19,112 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.16.0-step16-cluster-launcher] — 2026-05-08 — step 16: Cluster launcher (loose-only baseline; F-10/F-12 caveats explicit)
+
+### Architectural-tension investigation (the strategic pivot for this step)
+
+The user surfaced a critical architectural insight at session start
+(2026-05-08): the F-10 single-process deadlock issue extends to multi-rank
+MPI on cluster, not just to single-process tight coupling. Investigation
+this session confirmed:
+
+- `lpjguess/framework/parallel.cpp` implements ONLY `MPI_Init` /
+  `MPI_Comm_rank` / `MPI_Comm_size` / `MPI_Finalize` — no `MPI_Barrier`,
+  no `MPI_Allreduce`, no point-to-point messaging
+- The cluster orchestration is gridlist-split embarrassingly-parallel:
+  `setup_run_owl_with_scratch_lpj_work.sh` distributes per-rank gridcells
+  via `split -a 4 -l <cells/N>` into `runNN/` subdirs; each rank runs
+  `guess -parallel` independently
+- Cluster + LOOSE coupling works fine (LPJG reads pre-baked engine climate;
+  embarrassingly parallel; no synchronization needed)
+- Cluster + TIGHT coupling has the same deadlock as single-process tight,
+  multiplied by N ranks: each rank's `ImogenOutput::flush_year` fires
+  per-rank-per-year; engine cannot consume N independent flux streams at
+  a synchronization point that doesn't exist
+
+User-confirmed Path A trajectory (re-sequencing of v1.0 vs v1.1+ scope):
+
+1. **Step 16 (THIS step)**: Cluster launcher for LOOSE mode + workstation
+   parallel mimic test
+2. **F-12 Option B** (next): Local + tight via two-process; ~2-3 days
+3. **F-12 Option C** (after Option B): HPC + tight via additive
+   `framework_loop_mode = "year_outer"` + `MPI_Barrier`; ~1-2 weeks +
+   cross-validation
+4. **Steps 17-19**: validation + docs + CI/release
+
+### Added — `scripts/cluster/` toolkit (7 files; ~50 KB total)
+
+| File | Size | Adapted from | Role |
+|---|---:|---|---|
+| `run_coupled.sbatch` | ~17 KB / 290 lines | NEW (mirrors `scripts/run_coupled.sh` CLI) | Top-level SLURM launcher; refuses cluster + tight in v1.0 with clear error message |
+| `setup_run.sh` | ~11 KB / 200 lines | `setup_run_owl_with_scratch_lpj_work.sh` (174 lines) | Gridlist split + per-rank `runNN/` + generates `submit.sh` + `startguess.sh` |
+| `mpi_run_guess.sh` | ~7 KB / 165 lines | `mpi_run_guess_on_tmp.sh` (82 lines) | Per-rank scratch-I/O wrapper; multi-MPI rank detection |
+| `finishup_lpj_work.sh` | ~7 KB / 175 lines | `finishup_lpj_work_owl.sh` (172 lines) | Post-run aggregation (concatenate per-rank `*.out`, gzip, copy to `output-YYYY-MM-DD/`) |
+| `make_guess.sh` | ~4.5 KB / 130 lines | NEW (lightweight version of IMK-IFU `make_guess.sh` 126-line original) | Cluster-side build helper with `--mpi` flag |
+| `append_files.sh` | ~1.7 KB / 40 lines | `append_files.sh` (verbatim with comments) | Per-file aggregator helper |
+| `env_owl.sh` | ~3.7 KB / 80 lines | NEW (placeholder template) | Module-load template for `owl` (PLACEHOLDER values; refine via SSH) |
+| `README.md` | ~6 KB / 175 lines | NEW | Comprehensive cluster-orchestration narrative |
+
+### Added — Workstation parallel mimic test: `scripts/run_parallel_mimic.sh` (~9 KB / 200 lines)
+
+Validates the cluster orchestration mechanics (gridlist split + per-rank
+invocation + output concatenation) WITHOUT requiring SSH access to the
+cluster. Uses Anaconda3 MPICH 4.1.1's `mpirun -np N` on the workstation;
+runs `guess -parallel -input imogen` against the smoke 4-cell gridlist;
+verifies per-rank artifacts. Deferred empirical execution to step 17
+(validation), where engine climate library bootstrap will enable
+full end-to-end loose-coupling validation.
+
+### Key adaptations from the IMK-IFU originals
+
+1. **Named-flag CLI** (vs positional 12-arg in `setup_run.sh`)
+2. **Configurable `INPUTMETHOD`** (default `imogen` for v1.0 loose-only;
+   IMK-IFU original was hardcoded `cfx` for forest-productivity)
+3. **Multi-MPI rank detection** (MPICH `PMI_RANK` || OpenMPI
+   `OMPI_COMM_WORLD_RANK` || SLURM `SLURM_PROCID`); IMK-IFU original
+   supported only OpenMPI + SLURM
+4. **F-10/F-12 caveat detection inline**: `setup_run.sh` warns on
+   `--inputmethod imogencfx`; `run_coupled.sbatch` refuses cluster + tight
+   outright (with clear error message + resolution pointer to F-12 Option C)
+5. **`$TMP` fallback to `/tmp/$$`** for non-cluster contexts (workstation mimic)
+6. **`--workdir-base` override** for non-IMK-IFU clusters
+
+### Updated — `docs/build.md`
+
+Cluster section replaced from placeholder with full step-by-step + F-10/F-12
+caveat narrative + cross-references to `scripts/cluster/README.md`.
+
+### Updated — `.gitignore`
+
+Added two new step-16 ignore rules:
+- `runs/*/parallel_work/` (workstation parallel mimic per-rank work dirs)
+- `lpjguess/build_mpi/` (cluster MPI build dir)
+
+### Net source-level change in `lpjguess/`: ZERO
+
+Step 16 is bash + docs + .gitignore additions only. **Backport-irrelevant**
+for the F-11 sprint; the cluster orchestration is fork-agnostic.
+
+### Refs
+
+- `EXECUTION_PLAN.md` V.1 step 16 (cluster integration milestone)
+- `EXECUTION_PLAN.md` Decision #7 (single codebase + binary serves both
+  workstation and cluster) + Decision #8 (Anaconda3 NetCDF preference is
+  workstation-specific; cluster uses module-loaded NetCDF)
+- `notes/STEP_16.md` (per-step verification record)
+- `notes/FOLLOWUPS.md` F-10 (architectural deadlock; cluster-MPI extension
+  documented in F-10 phase-2 sketch lines 343-411) + F-12 (multi-pass /
+  two-process design space; Options B + C)
+- `docs/scientific_framework.md` §5 (F-10 caveat narrative)
+- `docs/v2_roadmap.md` §4 (F-12 Option B; v1.1 single-process tight) + §5
+  (F-12 Option C; v1.1+ HPC tight via additive `framework_loop_mode`)
+- IMK-IFU originals at `/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/owl_hpc_cluster_scripts/scripts/`
+  (the prior-art cluster orchestration adapted from)
+- `lpjguess/parallel_version/aurora.tmpl` (upstream LPJ-GUESS canonical
+  SLURM template; cross-reference for the gridlist-split + mpirun pattern)
+
+---
+
 ## [v0.15.0-step15-stage1-deferral] — 2026-05-08 — step 15: Stage I documentation preservation + Stage II PLUM-output reuse verification
 
 ### Added — `docs/scientific_framework.md` (NEW; ~13 KB)

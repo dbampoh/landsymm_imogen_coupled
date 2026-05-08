@@ -97,6 +97,15 @@ runs/*/inputs/
 #  files, etc. All regenerable. - DKB 2026-05-07]
 runs/*/Common-directory/
 
+# [Step 16: workstation parallel mimic test (scripts/run_parallel_mimic.sh)
+#  produces per-rank work dirs at runs/<SSP>/parallel_work/. All regenerable
+#  by re-running the mimic test. - DKB 2026-05-08]
+runs/*/parallel_work/
+
+# [Step 16: cluster MPI build at lpjguess/build_mpi/ produced by
+#  scripts/cluster/make_guess.sh --mpi. Regenerable from source. - DKB 2026-05-08]
+lpjguess/build_mpi/
+
 # IMOGEN run output (per-year directories with climate files)
 **/Common-directory/IMOGEN/output/
 **/IMOGEN/output/

@@ -581,7 +581,86 @@ Listed here for the Backport Sprint to know what step 9 delivered
 
 ### Step 15: Stage I documentation preservation + Stage II PLUM-output reuse verification + bundled BACKPORT_LEDGER errata cleanup
 
+**Commit:** `cd68b29` (Step 15; tag `v0.15.0-step15-stage1-deferral`)  **Date:** 2026-05-08
+
+**[Hash filled in 2026-05-08 by step-16 prep work]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.15.0-step15-stage1-deferral`.
+
+---
+
+### Step 16: Cluster launcher (loose-only baseline; F-10/F-12 caveats explicit) + workstation parallel mimic test
+
 **Commit:** _TBD_  **Date:** 2026-05-08
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 16 is bash + docs + .gitignore additions only — entirely OUTSIDE
+`lpjguess/`. **Backport-irrelevant.**
+
+#### Files added (all OUTSIDE `lpjguess/`)
+
+- `scripts/cluster/run_coupled.sbatch` (NEW, ~17 KB / 290 lines bash) —
+  top-level SLURM launcher mirroring `scripts/run_coupled.sh` CLI; refuses
+  cluster + tight in v1.0 with clear error + resolution pointer to F-12 Option C
+- `scripts/cluster/setup_run.sh` (NEW, ~11 KB / 200 lines bash) —
+  gridlist-split + per-rank `runNN/` + generates `submit.sh` + `startguess.sh`;
+  adapted from IMK-IFU's 174-line `setup_run_owl_with_scratch_lpj_work.sh`
+- `scripts/cluster/mpi_run_guess.sh` (NEW, ~7 KB / 165 lines bash) —
+  per-rank scratch-I/O wrapper; multi-MPI rank detection (MPICH || OpenMPI ||
+  SLURM); adapted from IMK-IFU's 82-line `mpi_run_guess_on_tmp.sh`
+- `scripts/cluster/finishup_lpj_work.sh` (NEW, ~7 KB / 175 lines bash) —
+  post-run aggregation; adapted from IMK-IFU's 172-line `finishup_lpj_work_owl.sh`
+- `scripts/cluster/make_guess.sh` (NEW, ~4.5 KB / 130 lines bash) —
+  cluster-side build helper with `--mpi` flag; lightweight version of
+  IMK-IFU's 126-line `make_guess.sh`
+- `scripts/cluster/append_files.sh` (NEW, ~1.7 KB / 40 lines bash) —
+  per-file aggregator helper; adapted (verbatim with comments) from
+  IMK-IFU's `append_files.sh`
+- `scripts/cluster/env_owl.sh` (NEW, ~3.7 KB / 80 lines bash) —
+  module-load template (PLACEHOLDER values; refine via SSH on owl)
+- `scripts/cluster/README.md` (NEW, ~6 KB / 175 lines markdown) —
+  comprehensive cluster-orchestration narrative
+- `scripts/run_parallel_mimic.sh` (NEW, ~9 KB / 200 lines bash) —
+  workstation parallel mimic test (4-rank `mpirun -np N` on smoke gridlist)
+- `notes/STEP_16.md` (NEW, ~13 KB markdown)
+
+#### Files modified (all OUTSIDE `lpjguess/`)
+
+- `docs/build.md`: cluster section replaced from placeholder with full
+  step-by-step + F-10/F-12 caveat narrative + cross-references
+- `.gitignore`: +2 step-16 rules (`runs/*/parallel_work/` for workstation
+  parallel mimic per-rank work dirs; `lpjguess/build_mpi/` for cluster MPI build)
+- `CHANGELOG.md`: NEW `[v0.16.0-step16-cluster-launcher]` entry
+- `EXECUTION_PLAN.md`: V.1 step 16 row marked DONE 2026-05-08
+- `notes/FOLLOWUPS.md`: status dashboard "Last updated" refresh
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this file): this NEW step-16
+  row appended
+
+#### Cross-reference for the Backport Sprint
+
+When the Backport Sprint runs the coupled model on the `trunk_r13078`
+backend, it inherits the cluster orchestration verbatim — `scripts/cluster/`
+is fork-agnostic. The Backport Sprint will use the SAME launcher with an
+adapted `make_guess.sh --mpi` flow that selects the `trunk_r13078` build
+backend via the future `-DLPJGUESS_BACKEND=trunk_r13078` cmake flag (added
+at F-11 sprint time per §4 step 1 below).
+
+The architectural-tension investigation this session also re-shaped the
+F-12 sequencing into Phase 1 (per user-confirmed Path A; was Phase 2):
+
+- v1.0 (current) ships with cluster + LOOSE working end-to-end + cluster +
+  tight blocked with clear caveat
+- F-12 Option B (next) lands single-process tight in v1.0
+- F-12 Option C (after Option B) lands HPC tight in v1.0 via additive
+  `framework_loop_mode = "year_outer"` ins parameter (per
+  `docs/v2_roadmap.md` §5)
+
+The F-11 Backport Sprint runs at end-of-Phase-1 per the original plan, so
+the F-12 Options B + C work will all be in `lpjguess/` source by then — the
+Backport Sprint will need to replicate them in `trunk_r13078`. This is a
+significantly larger backport scope than was assumed in the prior chat
+handoff Part 6 §28 — but still manageable per the sprint's per-step ledger
+discipline.
 
 #### Net source-level change in `lpjguess/`: ZERO
 

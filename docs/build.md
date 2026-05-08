@@ -143,13 +143,96 @@ P_anom, SW_anom, DTEMP_anom, Rh_anom, W_anom, WET, CO2, dtemp_o,
 fa_ocean — 10 files per year), then deadlocks on the year-N+1 handshake
 poll (F-10 architectural deadlock; expected in v1.0; resolution at F-12).
 
-## Cluster build (placeholder)
+## Cluster build (step 16 update — 2026-05-08)
 
-To be filled in at step 16 with the KIT IMK-IFU `owl` cluster
-specifics. Likely involves: `module load gcc/14 cmake/3.29
-netcdf-c/4.9 netcdf-fortran/4.6 openmpi/5.0` then the same cmake
-+ make. The Anaconda3 preference is workstation-specific; on the
-cluster, the module-loaded NetCDF should be ABI-consistent.
+For the KIT IMK-IFU `owl` cluster (or any SLURM-managed HPC cluster
+with similar configuration), use the orchestration scripts at
+`scripts/cluster/`. See [`scripts/cluster/README.md`](../scripts/cluster/README.md)
+for the full architecture overview + adaptation guide for non-IMK-IFU clusters.
+
+### Quick start (cluster)
+
+```bash
+# On the cluster login node:
+cd /path/to/lpj-guess_imogen_landsymm
+
+# Source module-load environment (refine env_owl.sh for your cluster)
+source scripts/cluster/env_owl.sh
+
+# Build LPJ-GUESS with MPI enabled (produces lpjguess/build_mpi/guess)
+bash scripts/cluster/make_guess.sh --mpi
+
+# Stage + submit a loose-coupling SLURM job
+sbatch scripts/cluster/run_coupled.sbatch \
+    --scenario SSP1-2.6 \
+    --coupling-mode loose \
+    --partition cclake \
+    --nodes 2 \
+    --cpu-per-node 80 \
+    --walltime 03:00:00
+```
+
+The launcher walks 6 phases:
+
+1. **Source module loads** from `scripts/cluster/env_owl.sh`
+2. **Build LPJ-GUESS with MPI** (`build_mpi/guess`) via `make_guess.sh --mpi`
+3. **Run intermediary_py + adapter** on the head node (if `--backbone intermediary-py`)
+4. **Stage run dir** via `setup_run.sh` (gridlist split into per-rank `runNN/` subdirs)
+5. **Generate `submit.sh` + `startguess.sh`** in the work dir
+6. **Submit (or stage)** via `sbatch`; chains a dependent `finishup_lpj_work.sh`
+   for post-run aggregation
+
+### Key components in `scripts/cluster/`
+
+| File | Role |
+|---|---|
+| `run_coupled.sbatch` | Top-level launcher; mirrors `scripts/run_coupled.sh` CLI |
+| `setup_run.sh` | Gridlist split + per-rank `runNN/` + generates `submit.sh` |
+| `mpi_run_guess.sh` | Per-rank scratch-I/O wrapper (invoked via `srun`) |
+| `finishup_lpj_work.sh` | Post-run aggregation; concatenates per-rank `*.out` |
+| `make_guess.sh` | Cluster-side build helper (`--mpi` flag) |
+| `append_files.sh` | Per-file output aggregator helper |
+| `env_owl.sh` | Module-load template (PLACEHOLDER values; refine via SSH) |
+
+### Workstation parallel mimic (no SSH needed)
+
+Validates the orchestration logic without requiring cluster access:
+
+```bash
+bash scripts/run_parallel_mimic.sh --np 4 --scenario SSP1-2.6
+```
+
+This uses Anaconda3's MPICH (`mpirun -np N`) on the workstation, builds
+`lpjguess/build_mpi/guess` if needed, stages per-rank `runNN/` subdirs
+with the smoke 4-cell gridlist, and exercises `mpirun -np 4 guess
+-parallel -input imogen main.ins`. Useful for catching orchestration
+bugs before submitting to the cluster.
+
+### v1.0 cluster status — what works, what's blocked
+
+✅ **Cluster + LOOSE coupling** (the v1.0 cluster deliverable): LPJ-GUESS
+reads pre-baked engine climate library; embarrassingly parallel; works
+end-to-end on cluster.
+
+❌ **Cluster + TIGHT coupling** (BLOCKED in v1.0): the framework loop's
+per-gridcell-outer / per-day-inner-across-all-years pattern is incompatible
+with per-year-globally-synchronized handshake on multi-rank MPI (no
+`MPI_Barrier` in `lpjguess/framework/parallel.cpp`). Resolution: F-12
+Option C — additive `framework_loop_mode = "year_outer"` ins parameter
+(per [`docs/v2_roadmap.md`](v2_roadmap.md) §5; ~1-2 weeks + cross-validation).
+
+### Cluster module-load specifics
+
+The `scripts/cluster/env_owl.sh` template currently has PLACEHOLDER values
+for `gcc/14`, `cmake/3.29`, `netcdf-c/4.9`, `netcdf-fortran/4.6`,
+`openmpi/5.0`. The actual module names + versions on `owl` will be
+confirmed via SSH session and committed as a step-16 follow-up. For
+non-IMK-IFU clusters, copy `env_owl.sh` → `env_<your-cluster>.sh` and
+refine via your cluster's `module avail` output.
+
+The Anaconda3 NetCDF preference (Decision #8) is workstation-specific;
+on cluster, module-loaded NetCDF/HDF5/openmpi is preferred for ABI
+consistency with the cluster's MPI implementation.
 
 ## Troubleshooting
 
