@@ -590,7 +590,10 @@ placeholder with verified hash via `git rev-list -n 1 v0.15.0-step15-stage1-defe
 
 ### Step 16: Cluster launcher (loose-only baseline; F-10/F-12 caveats explicit) + workstation parallel mimic test
 
-**Commit:** _TBD_  **Date:** 2026-05-08
+**Commit:** `572820c` (Step 16; tag `v0.16.0-step16-cluster-launcher`)  **Date:** 2026-05-08
+
+**[Hash filled in 2026-05-08 by post-step-16 maintenance commit]**: replaced
+`_TBD_` placeholder with verified hash via `git rev-list -n 1 v0.16.0-step16-cluster-launcher`.
 
 #### Net source-level change in `lpjguess/`: ZERO
 

@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-08 (after step 16 cluster launcher loose-only baseline + workstation parallel mimic + architectural-tension investigation surfacing user-confirmed Path A trajectory: step 16 → F-12 Option B → F-12 Option C → steps 17-19).
+**Last updated:** 2026-05-08 (after step 16 cluster launcher loose-only baseline + workstation parallel mimic + architectural-tension investigation surfacing user-confirmed Path A trajectory: step 16 → F-12 Option B → F-12 Option C → steps 17-19; F-12 Options B + C now in v1.0 scope, queued for fresh-chat resumption per session-2 handoff Parts 5-7).
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -26,9 +26,9 @@ with the closing date. Do not delete; the audit trail is valuable.
 | F-7 | OPEN | Step 9.5b | No |
 | F-8 | OPEN | Step 9.5b | No |
 | F-9 | OPEN (refined at step 9.5) | Step 9.5c (or merge with F-12 sprint) | No |
-| F-10 | OPEN (architectural; v1.0 caveat) | Phase 2 | **Yes** (CO2 trajectory bias risk) |
-| F-11 | OPEN | End of Phase 1 (after step 19) | No (paper consistency) |
-| F-12 | OPEN | Sprint just before step 17 | **Yes** (LPJG main loop must run) |
+| F-10 | OPEN (architectural; v1.0 caveat) | Resolved by F-12 Options B+C in v1.0 (per Path A; was Phase 2) | **Yes** (CO2 trajectory bias risk; resolution in F-12) |
+| F-11 | OPEN | End of Phase 1 (after step 19; scope expanded by F-12 in-v1.0) | No (paper consistency) |
+| F-12 | OPEN — **NEXT** (queued for fresh chat) | Options B + C in v1.0 per Path A (was v1.1+ Phase 2). Option B ~2-3 days; Option C ~1-2 weeks + cross-validation | **Yes** (LPJG main loop must run; Option C unblocks cluster + tight) |
 | F-13 | OPEN (paper-stage comparative analysis) | Post-v1.0 (post-step-19) | No (paper-stage; not a v1.0-runnable item) |
 
 ### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
@@ -648,13 +648,36 @@ provides the per-month aggregation point in the engine-output side).
     needed for the in-process path). This is F-10's recommended
     Phase-2 design. Cleaner architecturally but larger surface area
     (~1-2 weeks). Gives BOTH single-binary AND parallel-HPC potential.
-- **Recommendation**: Option B for v1.0 → v1.1 (faster, validates the
-  bug C35 fix, enables genuine two-way coupling for the GMD paper);
-  Option C for v2.0+ (Phase-2; clean architectural fix).
+- **Recommendation (REVISED 2026-05-08 per user-confirmed Path A)**:
+  Both Options B AND C land in v1.0 (no longer deferred to v1.1+ Phase 2).
+  Sequencing: Option B first (single-process tight; ~2-3 days) → Option C
+  next (HPC tight via additive `framework_loop_mode = "year_outer"`;
+  ~1-2 weeks + cross-validation). The shift from "Phase 2 / v1.1+" framing
+  to "v1.0 in-scope" came from this session's investigation surfacing that
+  cluster + tight has the same F-10 deadlock as single-process tight (the
+  framework loop is per-gridcell-outer / per-day-inner-across-all-years on
+  EACH MPI rank; no `MPI_Barrier` in `lpjguess/framework/parallel.cpp`); the
+  user's stated v1.0 requirement of all-4 combinations (local/HPC × loose/
+  tight) therefore requires Option C as well as Option B before v1.0 can
+  ship complete. See `docs/v2_roadmap.md` §4 (Option B; concrete
+  6-deliverable sketch) + §5 (Option C; 3-deliverable sketch + cross-
+  validation protocol) for the implementation plans.
+- **Status as of 2026-05-08 (after step 16)**: queued for fresh chat
+  resumption per session-2 chat handoff Part 5 + Part 6 (the comprehensive
+  fresh-chat onboarding playbook). The session-2 handoff document at
+  `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Parts 0-7 +
+  inherited 14-part `CHAT HANDOFF LandSyMM-IMOGEN.md` provides full
+  foundational context for the next chat to seamlessly resume Option B
+  work without extra prompting.
 - **Cross-references**:
   - `notes/STEP_9.md` (the empirical findings that motivated F-12)
+  - `notes/STEP_16.md` §2 (the architectural-tension investigation that
+    re-shaped F-12 into v1.0 scope)
   - `notes/FOLLOWUPS.md` F-10 (the architectural diagnosis F-12 resolves)
   - `runs/SSP1-2.6/README.md` "Empirical findings" section
+  - `docs/v2_roadmap.md` §4-§5 (concrete sprint plans for Options B + C)
+  - `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Parts 5-7
+    (fresh-chat onboarding playbook)
   - `[CMI §3.7.6]` (the diagnostic-test recommendation that should be
     implemented after F-12 lands)
 
