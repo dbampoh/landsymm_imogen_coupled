@@ -198,3 +198,7 @@ Thumbs.db
 
 # Keep per-subdir READMEs even when the subdir is largely gitignored
 !**/README.md
+
+# Chat_handoff document — local-only context-preservation artifact;
+# NOT part of the scientific project. Kept locally; never committed.
+CHAT HANDOFF LandSyMM-IMOGEN.md
