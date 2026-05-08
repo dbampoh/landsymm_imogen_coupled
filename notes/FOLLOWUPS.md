@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-07 (after step 14 workstation launcher + Anaconda3 NetCDF docs).
+**Last updated:** 2026-05-08 (after step 15 Stage I documentation preservation + PLUM-output reuse verification + bundled BACKPORT_LEDGER errata cleanup).
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|

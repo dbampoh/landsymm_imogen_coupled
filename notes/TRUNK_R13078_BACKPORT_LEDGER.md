@@ -101,7 +101,12 @@ For each file:
 
 ### Step 1: Import LandSyMM_LPJ-GUESS into lpjguess/
 
-**Commit:** `dc91efb` (Step 1)  **Date:** 2026-05-05
+**Commit:** `662f288` (Step 1; bundled into tag `v0.2.0-imports`)  **Date:** 2026-05-05
+
+**[Errata 2026-05-08, step-15 cleanup]**: an earlier draft of this ledger
+recorded `dc91efb` here; verified against `git log` at step 15 and corrected
+to `662f288`. Step 1's commit was bundled with step 2's into the
+`v0.2.0-imports` tag, but the underlying step-1 commit is `662f288`.
 - **No source-level changes from the imported source** (rsync only).
 - The 6-file delta from `trunk_r13078` (per §2 above) is "free"
   for the backport sprint — those differences must be reconciled
@@ -109,7 +114,10 @@ For each file:
 
 ### Step 2: Import Fortran IMOGEN; immediate Linux fixes
 
-**Commit:** `9e51a23` (Step 2)  **Date:** 2026-05-05
+**Commit:** `a93c3ec` (Step 2; tag `v0.2.0-imports`)  **Date:** 2026-05-05
+
+**[Errata 2026-05-08, step-15 cleanup]**: previously `9e51a23`; corrected
+to `a93c3ec` per `git rev-list -n 1 v0.2.0-imports`.
 - **No `lpjguess/` changes**; all changes are in `imogen/code/`
   which is fork-shared (Fortran). Backport-irrelevant for the
   C++ side; relevant for the Fortran side which trunk_r13078 also
@@ -117,19 +125,28 @@ For each file:
 
 ### Step 3: Fortran IMOGEN ALLOCATABLE refactor
 
-**Commit:** `5f86bb1` (Step 3)  **Date:** 2026-05-05
+**Commit:** `fb626c4` (Step 3; tag `v0.3.0-fortran-allocatable`)  **Date:** 2026-05-05
+
+**[Errata 2026-05-08, step-15 cleanup]**: previously `5f86bb1`; corrected
+to `fb626c4` per `git rev-list -n 1 v0.3.0-fortran-allocatable`.
 - **No `lpjguess/` changes**; Fortran-only. Backport-irrelevant
   for the C++ side.
 
 ### Step 4: GCM patterns + CRUNCEP fetch infrastructure
 
-**Commit:** `f3bb471` (Step 4)  **Date:** 2026-05-06
+**Commit:** `e80317b` (Step 4; tag `v0.4.0-imogen-data-fetch-script`)  **Date:** 2026-05-06
+
+**[Errata 2026-05-08, step-15 cleanup]**: previously `f3bb471`; corrected
+to `e80317b` per `git rev-list -n 1 v0.4.0-imogen-data-fetch-script`.
 - **No `lpjguess/` changes**; tooling + Fortran data infrastructure
   only. Backport-irrelevant.
 
 ### Step 5: CMIP6 → CMIP5 ASCII converter
 
-**Commit:** `2d36c8e` (Step 5)  **Date:** 2026-05-06
+**Commit:** `514f089` (Step 5; tag `v0.5.0-cmip6-converter`)  **Date:** 2026-05-06
+
+**[Errata 2026-05-08, step-15 cleanup]**: previously `2d36c8e`; corrected
+to `514f089` per `git rev-list -n 1 v0.5.0-cmip6-converter`.
 - **No `lpjguess/` changes**; Python tool + docs. Backport-
   irrelevant.
 
@@ -296,7 +313,10 @@ One Fortran fix in the shared `imogen/code/`:
 
 ### Step 14: Workstation launcher + Anaconda3 NetCDF build docs + .ins file_tmin/tmax fix
 
-**Commit:** _TBD_  **Date:** 2026-05-07
+**Commit:** `ced4b1d` (Step 14; tag `v0.14.0-step14-launcher`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.14.0-step14-launcher`.
 
 #### Net source-level change in `lpjguess/`: ZERO
 
@@ -330,7 +350,10 @@ Backport Sprint time).
 
 ### Step 13: Python Intermediary -> Fortran IMOGEN ASCII adapter
 
-**Commit:** _TBD_  **Date:** 2026-05-07
+**Commit:** `aa802e0` (Step 13; tag `v0.13.0-step13-adapter`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.13.0-step13-adapter`.
 
 #### Net source-level change in `lpjguess/`: ZERO
 
@@ -365,7 +388,12 @@ engine (current or backported) reads identically.
 
 ### Step 11: intermediary_py end-to-end pipeline run + 4 source bug fixes + reproducibility validation
 
-**Commit:** _TBD_  **Date:** 2026-05-07
+**Commit:** `e89af1e` (Step 11; tag `v0.12.0-step11-intermediary-py-validated`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.12.0-step11-intermediary-py-validated`.
+Step 12 was consolidated with step 11 — no separate ledger entry; this commit
+covers both.
 
 #### Net source-level change in `lpjguess/`: ZERO
 
@@ -406,7 +434,10 @@ are inherited automatically because intermediary_py is fork-agnostic.
 
 ### Step 10: Import intermediary_py (imogen_ghg_controller v0.1.0)
 
-**Commit:** _TBD_  **Date:** 2026-05-07
+**Commit:** `a90e9be` (Step 10; tag `v0.11.0-step10-intermediary-py-import`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.11.0-step10-intermediary-py-import`.
 
 #### Net source-level change in `lpjguess/`: ZERO
 
@@ -436,7 +467,10 @@ and reads LPJG outputs through fork-stable file format conventions.
 
 ### Step 9.5: LPJG-side IMOGEN climate-output consumer wiring + BLAZE check + C++ Tmin/Tmax
 
-**Commit:** _TBD_  **Date:** 2026-05-07
+**Commit:** `f00033c` (Step 9.5; tag `v0.10.0-step9.5-consumer-wiring`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.10.0-step9.5-consumer-wiring`.
 
 #### File: `lpjguess/modules/imogencfx.h`
 - **Operation:** modify
@@ -495,7 +529,10 @@ and reads LPJG outputs through fork-stable file format conventions.
 
 ### Step 9: SSP1-2.6 run-config + bug C5/R-anom fixes; perturbation_factor add-then-remove
 
-**Commit:** _TBD (step 9)_  **Date:** 2026-05-07
+**Commit:** `d6f4853` (Step 9; tag `v0.9.0-step9-smoke`)  **Date:** 2026-05-07
+
+**[Hash filled in 2026-05-08, step-15 cleanup]**: replaced `_TBD_`
+placeholder with verified hash via `git rev-list -n 1 v0.9.0-step9-smoke`.
 
 #### Net source-level change in `lpjguess/`: ZERO
 
@@ -539,6 +576,49 @@ Listed here for the Backport Sprint to know what step 9 delivered
 - `runs/SSP1-2.6/` (NEW): main.ins, imogen_intermediary.ins, README.md,
   + 11 stand/PFT/landcover ins files copied from version_A's predecessor
 - `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt` (NEW)
+
+---
+
+### Step 15: Stage I documentation preservation + Stage II PLUM-output reuse verification + bundled BACKPORT_LEDGER errata cleanup
+
+**Commit:** _TBD_  **Date:** 2026-05-08
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Step 15 is a documentation-only step per Decision #9 (Stage I deferred for
+v1.0). Net-zero `lpjguess/` C++ source change; net-zero `imogen/code/`
+Fortran source change; net-zero `intermediary_py/` Python source change;
+net-zero run-config or tooling change. **Backport-irrelevant.**
+
+#### Files added (all OUTSIDE `lpjguess/`)
+
+- `docs/scientific_framework.md` (NEW, ~13 KB markdown) — canonical Stage I
+  + Stage II + Decision #10 save_state/restart pattern + F-10 caveat narrative
+- `docs/v2_roadmap.md` (NEW, ~13 KB markdown) — post-v1.0 trajectory:
+  v1.1 PLUM-harm save_state wiring + F-12 Option B two-process; v2.0 F-12
+  Option C in-process restructure + PLUM embedding
+- `notes/STEP_15.md` (NEW, ~12 KB)
+
+#### Files modified (all OUTSIDE `lpjguess/`)
+
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this file): §3 commit-hash
+  errata cleanup (15 entries; 5 stale step-1-5 hashes corrected + 9 `_TBD_`
+  step-9-14 placeholders filled in; verified via `git rev-list -n 1 <tag>`);
+  + this NEW step-15 row appended
+- `CHANGELOG.md`: NEW `[v0.15.0-step15-stage1-deferral]` entry
+- `EXECUTION_PLAN.md`: V.1 step 15 row marked DONE 2026-05-08
+- `notes/FOLLOWUPS.md`: status dashboard "Last updated" date refresh
+
+#### Cross-reference for the Backport Sprint
+
+When the Backport Sprint runs the coupled model on the `trunk_r13078`
+backend, it inherits the documentation produced at step 15 verbatim — the
+new `docs/scientific_framework.md` and `docs/v2_roadmap.md` are framework-
+wide artefacts, fork-agnostic. **No replication needed in `trunk_r13078`.**
+
+The errata cleanup of `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 itself is
+also fork-agnostic — the corrected commit hashes are the canonical reference
+both backends will use.
 
 ---
 

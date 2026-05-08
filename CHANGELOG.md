@@ -19,6 +19,129 @@ README.md "Roadmap" for the milestone schedule.
 
 ---
 
+## [v0.15.0-step15-stage1-deferral] — 2026-05-08 — step 15: Stage I documentation preservation + Stage II PLUM-output reuse verification
+
+### Added — `docs/scientific_framework.md` (NEW; ~13 KB)
+
+Per `EXECUTION_PLAN.md` V.1 step 15.a + Decision #9 + working paper §2.4.3.
+Canonical scientific-architecture reference for the framework. 7 sections:
+
+1. The four components (LPJ-GUESS, PLUM, Intermediary Controller, IMOGEN)
+   with peer-reviewed references (Smith 2014; Alexander 2018; Rabin 2020;
+   Huntingford 2010; Smith 2018 FAIR; Nicholls 2020 RCMIP)
+2. The two-stage simulation protocol (Stage I + Stage II per working paper
+   §2.4.3) with ASCII flowchart
+3. Stage II land-use forcing options (Option A in-process Stage I; Option B
+   PLUM-harm forLPJG existing outputs; Option C predecessor's concatenated
+   1901-2100 LU; v1.0 uses Option C)
+4. Decision #10 — `save_state`/`restart` strategy with verbatim example .ins
+   blocks from `owl_hpc_cluster_scripts/`
+5. The F-10 architectural caveat + v1.0 limitation (loose-coupling fallback
+   is scientifically defensible; matches predecessor's working paper)
+6. Units integrity (Decision #6) summary table
+7. References (10 peer-reviewed citations including IPCC 2019 Vol. 4 AFOLU,
+   Winkler 2021 HILDA+, Lindeskog 2013, Olin 2015)
+
+### Added — `docs/v2_roadmap.md` (NEW; ~13 KB)
+
+Per `EXECUTION_PLAN.md` V.1 step 15.c + Decision #9 + Decision #10. The
+post-v1.0 development trajectory. 7 sections:
+
+1. Phase 1 vs Phase 2 trajectory (v1.0 → v1.1 → v1.2 → v2.0 ASCII timeline)
+2. PLUM embedding (Stage I in v2.0; the Decision #9 v2.0 flip): Stage I
+   parameter checklist + 4-step plan
+3. v1.1 — wire save_state/restart with PLUM-harm forLPJG outputs (~0.5-1 day
+   deliverable that follows v1.0 release): per-phase `imogen_intermediary.ins`
+   variants + `--phase historic | scenario | both` launcher flag
+4. F-12 Option B (v1.1 Phase 2A) — two-process tight coupling: 6 concrete
+   deliverables; verification milestone (4-cell × 11-year SSP1-2.6 smoke run)
+5. F-12 Option C (v2.0 Phase 3) — in-process restructure with
+   `framework_loop_mode = "year_outer"`; the user's preferred long-term
+   approach (per F-10 phase-2 entry); cross-validation protocol
+6. Other post-v1.0 stretch items (F-3 Fortran↔C++ parity; F-11 Backport
+   Sprint; F-13 paper-stage 3-axis comparison; F-9 climate-input diagnostics;
+   F-1 Zenodo upload)
+7. v2.0 release criteria
+
+### Added — `notes/STEP_15.md` (NEW; ~12 KB)
+
+Per-step verification record per the standard discipline. 7 sections:
+goal, investigation findings, what was implemented, verification,
+Backport Sprint relevance (zero `lpjguess/` change → backport-irrelevant),
+follow-up cross-reference, effort.
+
+### Verified — PLUM-harm `forLPJG` outputs accessible (item 15.b)
+
+External mount points referenced in `data/DATA.md` §1 verified live:
+
+```text
+/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/    (canonical; 17 GB SSP1_RCP26)
+├── SSP1_RCP26/   ✓
+├── SSP2_RCP45/   ✓
+├── SSP3_RCP70/   ✓
+├── SSP4_RCP60/   ✓
+└── SSP5_RCP85/   ✓
+
+/media/bampoh-d/ISIMIP/inputs/landuse/plum_harm_lu/  (redundant copy on second drive)
+└── (same 5-SSP layout)                              ✓
+```
+
+Per-scenario `s1.HILDA+_remap_v10_old_62892_gL.harm.allow_unveg.forLPJG/`
+sub-tree contains 5 files (~3.5 GB total per scenario):
+`landcover.txt`, `cropfractions.txt`, `irrig.txt`, `nfert.txt`,
+`landcover_peatland.txt`. Year coverage scenario-only (2021-2100); column
+ordering and crop-column count differ from predecessor's concatenated 1901-2100
+LU (PASTURE/CROPLAND/NATURAL/BARREN vs NATURAL/CROPLAND/PASTURE/BARREN; 21
+crops vs 19 with OilNfix/OilOther split vs Oilcrops merged). Switching
+v1.0/v1.1 from Option C (current) to Option B requires either format
+conversion or save_state/restart pattern (latter is canonical; deferred to
+v1.1 per `docs/v2_roadmap.md` §3).
+
+### Updated — `notes/TRUNK_R13078_BACKPORT_LEDGER.md`
+
+§3 commit-hash errata cleanup (per the prior chat handoff Part 11 §82.3
+maintenance follow-up):
+- Steps 1-5 hashes corrected (5 stale entries replaced with verified hashes
+  via `git rev-list -n 1 <tag>`)
+- Steps 9-14 hashes filled in (9 `_TBD_` placeholders replaced)
+- New §3 step-15 row added (annotation only; documentation step; zero
+  `lpjguess/` change → backport-irrelevant)
+
+| Step | Stale | Verified | Tag |
+|---|---|---|---|
+| 1 | `dc91efb` | `662f288` | (bundled into v0.2.0-imports) |
+| 2 | `9e51a23` | `a93c3ec` | v0.2.0-imports |
+| 3 | `5f86bb1` | `fb626c4` | v0.3.0-fortran-allocatable |
+| 4 | `f3bb471` | `e80317b` | v0.4.0-imogen-data-fetch-script |
+| 5 | `2d36c8e` | `514f089` | v0.5.0-cmip6-converter |
+| 9 | `_TBD_` | `d6f4853` | v0.9.0-step9-smoke |
+| 9.5 | `_TBD_` | `f00033c` | v0.10.0-step9.5-consumer-wiring |
+| 10 | `_TBD_` | `a90e9be` | v0.11.0-step10-intermediary-py-import |
+| 11 | `_TBD_` | `e89af1e` | v0.12.0-step11-intermediary-py-validated |
+| 13 | `_TBD_` | `aa802e0` | v0.13.0-step13-adapter |
+| 14 | `_TBD_` | `ced4b1d` | v0.14.0-step14-launcher |
+
+### Net source-level change in `lpjguess/`: ZERO
+
+Documentation-only step. Net: 4 files added/created (`docs/scientific_framework.md`,
+`docs/v2_roadmap.md`, `notes/STEP_15.md`, this CHANGELOG entry); 3 files
+modified (`notes/TRUNK_R13078_BACKPORT_LEDGER.md`, `EXECUTION_PLAN.md`,
+`notes/FOLLOWUPS.md`).
+
+### Refs
+
+- `EXECUTION_PLAN.md` V.1 step 15
+- Decision #9 (Stage I deferred for v1.0); Decision #10 (save_state/restart
+  Option D); Decision #3 (LandSyMM_LPJ-GUESS = "integrated LTS" base)
+- Working paper §2.4.3 framing
+- `docs/scientific_framework.md` (canonical reference going forward)
+- `docs/v2_roadmap.md` (post-v1.0 trajectory)
+- Prior chat handoff Part 11 §82.3 (BACKPORT_LEDGER errata follow-up)
+- `landsymm_runtime_parameters.md` §2 (save_state/restart parameters) + §6
+  (do_potyield Stage I parameters) — both already wired in `lpjguess/`
+
+---
+
 ## [v0.14.0-step14-launcher] — 2026-05-07 — step 14: workstation launcher + Anaconda3 NetCDF build docs
 
 ### Added — `scripts/run_coupled.sh` (~330 LOC bash; production-quality launcher)
