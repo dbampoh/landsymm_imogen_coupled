@@ -208,6 +208,12 @@ Thumbs.db
 # Keep per-subdir READMEs even when the subdir is largely gitignored
 !**/README.md
 
-# Chat_handoff document — local-only context-preservation artifact;
-# NOT part of the scientific project. Kept locally; never committed.
-CHAT HANDOFF LandSyMM-IMOGEN.md
+# Chat handoff documents — local-only context-preservation artifacts;
+# NOT part of the scientific project. Both session-1 and session-2 handoffs
+# now live in the sibling _chat_artifacts/ directory (outside this repo
+# entirely; per session-1 Part 14 §C2 recommendation; consistent naming
+# convention `CHAT_HANDOFF_<DATE>_session<N>.md`). Since they live outside
+# the repo tree, no .gitignore rule needed; this comment is kept as a
+# pointer for anyone wondering where the chat handoffs went.
+# - 2026-05-08 session 1: ../_chat_artifacts/CHAT_HANDOFF_2026-05-08_session1.md (was: CHAT HANDOFF LandSyMM-IMOGEN.md, moved 2026-05-09)
+# - 2026-05-08 session 2: ../_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md
