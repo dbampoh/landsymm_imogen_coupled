@@ -177,6 +177,22 @@ outputs at `/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/`.
 
 ## 4. F-12 Option B (v1.1 Phase 2A) — two-process tight coupling
 
+> **REVISED 2026-05-09 — OPTION B SKIPPED.** Per user-confirmed Path A
+> refinement on 2026-05-09, this sub-section's Option B sprint plan is
+> **superseded** by the staged Option C plan in §5 below + the full
+> revised plan in [`notes/FOLLOWUPS.md`](../notes/FOLLOWUPS.md) F-12 entry
+> (which is now the canonical source). The §4 content is preserved as
+> historical / decision-trail context. The reasoning: Options B and C
+> are orthogonal (B = workstation single-process two-process orchestration;
+> C = framework loop restructure that resolves F-10 at root for both
+> single-process AND multi-rank MPI). Since v1.0's 4-combination
+> requirement (local/HPC × loose/tight) requires C anyway (cluster + tight
+> is gated on it), Option B becomes redundant. The C1 sub-milestone (per
+> §5 / FOLLOWUPS F-12) delivers the same workstation single-process tight
+> capability Option B would have, but more rigorously (globally-synchronized
+> per-cell flush rather than per-gridcell-rolling). Skipping B saves
+> ~2-3 days + a maintenance surface.
+
 ### 4.1 Why Option B is the v1.0 → v1.1 stopgap
 
 Per the prior chat handoff Part 7 §35.2:
@@ -245,7 +261,15 @@ A full SSP1-2.6 coupled run for 4-cell `gridlist_test2.txt` for years
 
 ---
 
-## 5. F-12 Option C (v2.0 Phase 3) — in-process restructure with `framework_loop_mode`
+## 5. F-12 Option C (v1.0 Path A; staged sub-milestones C1 → C2 → C3) — in-process restructure with `framework_loop_mode`
+
+> **REVISED 2026-05-09**: Option C is now in-v1.0 (was: v2.0 Phase 3).
+> Staged into 3 sub-milestones (C1 → C2 → C3) for incremental commitability.
+> See [`notes/FOLLOWUPS.md`](../notes/FOLLOWUPS.md) F-12 entry for the
+> canonical staged plan + cross-validation protocol details. Section §5
+> below preserves the v2.0-framing technical sketch as a reference for
+> the architectural design; the staged-sub-milestone breakdown lives in
+> FOLLOWUPS F-12.
 
 ### 5.1 The user's preferred long-term approach (per F-10 phase-2 entry)
 

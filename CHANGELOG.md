@@ -17,6 +17,76 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-09 — Path A refinement: skip Option B; staged Option C only (no tag)
+
+Documentation-only commit refining the F-12 plan ahead of any code work,
+per user-confirmed Path A discussion 2026-05-09. **No source-level changes;
+no new tag.**
+
+#### What changed
+
+After the 2026-05-08 docs maintenance commit (`76aa57b`) which staged
+F-12 Options B + C as in-v1.0-scope, today's discussion surfaced that
+Options B and C are architecturally orthogonal (not sequential):
+- **Option B** (single-process workstation two-process orchestration)
+  was framed as a fast stopgap (~2-3 days) but addresses ONLY workstation
+  single-process tight, with a per-gridcell-rolling caveat that is less
+  rigorous than Option C
+- **Option C** (additive `framework_loop_mode = "year_outer"` ins
+  parameter; per-year-outer loop alongside the existing per-gridcell-outer)
+  resolves F-10 at the root for both single-process AND multi-rank MPI;
+  is required regardless for the cluster + tight v1.0 deliverable
+- Skipping Option B saves ~2-3 days of effort + a maintenance surface,
+  and the C1 sub-milestone delivers the same workstation single-process
+  tight capability Option B would have, but more rigorously
+  (globally-synchronized per-cell flush vs per-gridcell-rolling)
+
+User confirmed direction 2026-05-09: skip Option B; go straight to Option C
+staged as 3 sub-milestones (C1 → C2 → C3). Workstation specs verified
+(i9-11900K; 64 GB RAM; 16 cores; Anaconda3 MPICH 4.1.1 + gcc 15.2 +
+cmake 3.31.6; ~62 GB single-process production memory pressure means
+production is genuinely cluster-only). The new staged plan:
+
+- **C1** (~1 week; workstation single-process year_outer + cross-validation
+  against gridcell_outer baseline) → tag `v0.17.0-step17a-c1-year-outer-single-process`
+- **C2** (~3-5 days; workstation MPI year_outer via mpirun -np 4 + addresses
+  Anaconda3 mpicxx wrapper issue) → tag `v0.17.5-step17b-c2-mpi-sync`
+- **C3** (~1-2 weeks SSH iterative; cluster MPI year_outer; refines
+  env_owl.sh placeholders against actual `module avail` on owl) →
+  tag `v0.18.0-step17c-c3-cluster-tight`
+
+Plus existing step 17 → renumbered as step 17d (end-to-end validation;
+now actually runnable for all 4 combinations after C3).
+
+#### Updated documents
+
+- **`notes/FOLLOWUPS.md`** F-12 entry: revised "Recommendation" section
+  with the staged Option C plan; new "Cross-validation protocol" subsection
+  (the GO/NO-GO gate at C1; tolerances per output category); new "Status
+  as of 2026-05-09" subsection; new "What was decided today" subsection
+  capturing the 4 user-confirmed decisions (skip Option B; intermediary_py
+  copy-over flow stays; native LPJG filenames v1.1+ refinement noted;
+  local + cluster equally important). Status dashboard "Last updated" +
+  F-10 + F-12 row entries refreshed.
+- **`EXECUTION_PLAN.md` V.1**: inserted 3 NEW step rows (17a, 17b, 17c)
+  between step 16 and the existing step 17; renumbered existing step 17
+  as step 17d (end-to-end validation; now runnable for all 4 combinations
+  after C3 lands).
+- **`docs/v2_roadmap.md`**: added REVISED 2026-05-09 banners at top of §4
+  (Option B sketch — preserved as historical / decision-trail context;
+  superseded) + §5 (Option C sketch — now in-v1.0 + staged); body content
+  preserved for design reference but readers redirected to FOLLOWUPS F-12
+  for the canonical active plan.
+- **`_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md`** Part 8 (NEW;
+  outside-repo session-state preservation): documents 2026-05-09 session
+  decisions + workstation specs + revised plan + commit commands. (Not
+  committed; lives in the sibling `_chat_artifacts/` dir per session-1
+  Part 14 §C2 recommendation.)
+
+#### Net source-level change in `lpjguess/`: ZERO
+
+Documentation pass before any code work. Backport-irrelevant.
+
 ---
 
 ## [v0.16.0-step16-cluster-launcher] — 2026-05-08 — step 16: Cluster launcher (loose-only baseline; F-10/F-12 caveats explicit)

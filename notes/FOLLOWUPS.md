@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-08 (after step 16 cluster launcher loose-only baseline + workstation parallel mimic + architectural-tension investigation surfacing user-confirmed Path A trajectory: step 16 → F-12 Option B → F-12 Option C → steps 17-19; F-12 Options B + C now in v1.0 scope, queued for fresh-chat resumption per session-2 handoff Parts 5-7).
+**Last updated:** 2026-05-09 (post-step-16; Path A refined: skip Option B; staged Option C only — sub-milestones C1 (workstation single-process year_outer + cross-validation; ~1 week) → C2 (workstation MPI year_outer; ~3-5 days) → C3 (cluster MPI year_outer; ~1-2 weeks SSH iterative). Workstation specs verified (i9-11900K; 64 GB RAM; 16 cores). User decisions today: skip Option B; intermediary_py copy-over flow stays for v1.0; native LPJG filenames noted as v1.1+ refinement; local + cluster both matter equally.).
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -26,9 +26,9 @@ with the closing date. Do not delete; the audit trail is valuable.
 | F-7 | OPEN | Step 9.5b | No |
 | F-8 | OPEN | Step 9.5b | No |
 | F-9 | OPEN (refined at step 9.5) | Step 9.5c (or merge with F-12 sprint) | No |
-| F-10 | OPEN (architectural; v1.0 caveat) | Resolved by F-12 Options B+C in v1.0 (per Path A; was Phase 2) | **Yes** (CO2 trajectory bias risk; resolution in F-12) |
+| F-10 | OPEN (architectural; v1.0 caveat) | Resolved by F-12 staged Option C in v1.0 (sub-milestones C1 → C2 → C3 per Path A 2026-05-09 refinement; Option B skipped) | **Yes** (CO2 trajectory bias risk; resolution at C1 + C2 + C3) |
 | F-11 | OPEN | End of Phase 1 (after step 19; scope expanded by F-12 in-v1.0) | No (paper consistency) |
-| F-12 | OPEN — **NEXT** (queued for fresh chat) | Options B + C in v1.0 per Path A (was v1.1+ Phase 2). Option B ~2-3 days; Option C ~1-2 weeks + cross-validation | **Yes** (LPJG main loop must run; Option C unblocks cluster + tight) |
+| F-12 | OPEN — **NEXT** (staged Option C only; Option B SKIPPED per 2026-05-09 user-confirmed Path A refinement) | Sub-milestones C1 (~1 week; workstation single-process year_outer + cross-validation) → C2 (~3-5 days; workstation MPI) → C3 (~1-2 weeks SSH iterative; cluster) | **Yes** (LPJG main loop must run for all 4 combinations; Option C closes F-10 architectural caveat at root) |
 | F-13 | OPEN (paper-stage comparative analysis) | Post-v1.0 (post-step-19) | No (paper-stage; not a v1.0-runnable item) |
 
 ### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
@@ -648,27 +648,88 @@ provides the per-month aggregation point in the engine-output side).
     needed for the in-process path). This is F-10's recommended
     Phase-2 design. Cleaner architecturally but larger surface area
     (~1-2 weeks). Gives BOTH single-binary AND parallel-HPC potential.
-- **Recommendation (REVISED 2026-05-08 per user-confirmed Path A)**:
-  Both Options B AND C land in v1.0 (no longer deferred to v1.1+ Phase 2).
-  Sequencing: Option B first (single-process tight; ~2-3 days) → Option C
-  next (HPC tight via additive `framework_loop_mode = "year_outer"`;
-  ~1-2 weeks + cross-validation). The shift from "Phase 2 / v1.1+" framing
-  to "v1.0 in-scope" came from this session's investigation surfacing that
-  cluster + tight has the same F-10 deadlock as single-process tight (the
-  framework loop is per-gridcell-outer / per-day-inner-across-all-years on
-  EACH MPI rank; no `MPI_Barrier` in `lpjguess/framework/parallel.cpp`); the
-  user's stated v1.0 requirement of all-4 combinations (local/HPC × loose/
-  tight) therefore requires Option C as well as Option B before v1.0 can
-  ship complete. See `docs/v2_roadmap.md` §4 (Option B; concrete
-  6-deliverable sketch) + §5 (Option C; 3-deliverable sketch + cross-
-  validation protocol) for the implementation plans.
-- **Status as of 2026-05-08 (after step 16)**: queued for fresh chat
-  resumption per session-2 chat handoff Part 5 + Part 6 (the comprehensive
-  fresh-chat onboarding playbook). The session-2 handoff document at
-  `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Parts 0-7 +
-  inherited 14-part `CHAT HANDOFF LandSyMM-IMOGEN.md` provides full
-  foundational context for the next chat to seamlessly resume Option B
-  work without extra prompting.
+- **Recommendation (REVISED AGAIN 2026-05-09 per user-confirmed Path A
+  refinement)**: **Skip Option B entirely**. Go straight to Option C,
+  staged into 3 sub-milestones (C1 → C2 → C3) so the work is incrementally
+  committable + verifiable. The 2026-05-08 plan had Option B + Option C
+  sequenced; on closer architectural analysis (per session-2 chat handoff
+  Part 8 and this F-12 entry's revised reasoning), Options B and C are
+  **orthogonal**, not sequential — Option B addresses only single-process
+  workstation tight (per-gridcell-rolling per-rank handshake; doesn't
+  generalise to MPI), while Option C resolves the F-10 architectural
+  deadlock at its root for both single-process AND multi-rank cluster
+  contexts via the `framework_loop_mode = "year_outer"` additive code
+  path. Since v1.0's stated 4-combination requirement REQUIRES Option C
+  anyway (cluster + tight is gated on it), Option B becomes a redundant
+  intermediate workstation-only deliverable. Skipping Option B saves
+  ~2-3 days of effort + maintenance surface; the C1 sub-milestone (below)
+  delivers the same workstation single-process tight capability Option B
+  would have, BUT more rigorously (globally-synchronized per-cell flush
+  rather than per-gridcell-rolling).
+- **Staged sub-milestones for F-12 Option C**:
+  - **C1 — Workstation single-process year_outer + cross-validation**
+    (~1 week): add `framework_loop_mode` ins parameter (default
+    `gridcell_outer`); implement `year_outer` code path in `framework.cpp`
+    as additive single-process code (no MPI yet); add `getclimate_year()`
+    method to relevant input modules; PRNG-state audit of
+    `lpjguess/framework/randomState.cpp` (or equivalent); cross-validate
+    year_outer single-process vs gridcell_outer baseline on 5-cell smoke
+    × 50-yr simulation per the cross-validation protocol in the next
+    bullet. Tag `v0.17.0-step17a-c1-year-outer-single-process`.
+  - **C2 — Workstation MPI year_outer** (~3-5 days): add
+    `MPI_Barrier(MPI_COMM_WORLD)` at year boundary (#ifdef HAVE_MPI);
+    add `flush_year_globally_synchronized()` method on `ImogenOutput`
+    with `MPI_Allreduce` over per-rank flux contributions; test via
+    `scripts/run_parallel_mimic.sh` workstation MPI mimic
+    (`mpirun -np 4` smoke); pre-requisite: address Anaconda3 mpicxx
+    wrapper issue (`x86_64-conda-linux-gnu-c++` not found; install
+    `gxx_linux-64` or override with `OMPI_CXX=g++`). Tag
+    `v0.17.5-step17b-c2-mpi-sync`.
+  - **C3 — Cluster MPI year_outer + production verification**
+    (~1-2 weeks iterative SSH work): cluster deployment via
+    `scripts/cluster/run_coupled.sbatch`; SSH session 1 = refine
+    `env_owl.sh` placeholders against `module avail` on `owl`;
+    SSH session 2 = cluster MPI build via `make_guess.sh --mpi`;
+    SSH session 3 = small smoke run (4 ranks × 480-cell × 5-yr tight);
+    SSH session 4+ = production-scale smoke + iteration. Tag
+    `v0.18.0-step17c-c3-cluster-tight`.
+- **Cross-validation protocol** (the GO/NO-GO gate at C1; ESSENTIAL):
+  Run TWO simulations with byte-identical inputs (.ins / gridlist /
+  seeds / climate / LU forcing):
+  - Run A: `framework_loop_mode = "gridcell_outer"` (existing; trusted
+    baseline)
+  - Run B: `framework_loop_mode = "year_outer"` (new additive code path)
+  Tolerances:
+  - Soil-water balance, C/N pools without disturbance, GPP/NPP:
+    **bit-exact** (these are deterministic; ANY divergence = code bug)
+  - Annual cell-mean values (aggregated across whole gridlist):
+    **≤ 0.1% RMSD**
+  - Per-cell stochastic outputs (vegetation establishment, fire spread,
+    background mortality): **≤ 1% RMSD**
+  PRNG-state audit is the deepest risk surface — if LPJ-GUESS uses
+  per-cell PRNG state (which a well-designed model should), outputs are
+  bit-exact for deterministic processes and 1%-RMSD-level different for
+  stochastic ones. If shared-global PRNG (latent design flaw), outputs
+  diverge wildly → fix that BEFORE year_outer ships.
+- **Status as of 2026-05-09 (after step 16 + post-step-16 docs maintenance
+  + today's plan refinement)**: queued for next session(s); SHOULD fit
+  comfortably in same chat as step 17a/C1 work. Workstation specs verified
+  (i9-11900K; 64 GB RAM; 16 cores; Anaconda3 MPICH 4.1.1 + gcc 15.2 +
+  cmake 3.31.6 available). C1 single-process workstation work fits;
+  production gridlists (62k cells × ~MB ≈ 60+ GB) exceed workstation
+  RAM and require cluster (=C3) for production runs anyway. NFS mount
+  `owl01amd:/home → /bg/home` available on workstation (potential
+  shortcut for some C3 cluster-state-inspection patterns).
+- **What was decided today (2026-05-09; user confirmation)**:
+  1. Skip Option B; go straight to staged Option C (C1 → C2 → C3)
+  2. `intermediary_py` cluster integration: keep existing copy-over
+     workflow (Choice 1) for v1.0; embed-into-launcher deferred to v1.1+
+  3. Filename-naming refinement noted: existing copy-over uses
+     `lpjg_<output>_<scenario>.gz` (redundant with directory hierarchy);
+     could simplify to native LPJG names (`cflux.out.gz`, etc.) since
+     dir structure encodes scenario. Defer to v1.1+ refinement.
+  4. Both local AND cluster matter equally for v1.0; staged C1-C2-C3
+     plan delivers both.
 - **Cross-references**:
   - `notes/STEP_9.md` (the empirical findings that motivated F-12)
   - `notes/STEP_16.md` §2 (the architectural-tension investigation that
