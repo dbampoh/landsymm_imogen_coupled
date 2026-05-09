@@ -720,6 +720,62 @@ provides the per-month aggregation point in the engine-output side).
   RAM and require cluster (=C3) for production runs anyway. NFS mount
   `owl01amd:/home → /bg/home` available on workstation (potential
   shortcut for some C3 cluster-state-inspection patterns).
+- **C1 pre-flight investigation findings (2026-05-09 evening)** — all
+  read-only audit; no source changes:
+  1. **PRNG architecture is year_outer-friendly**: `randfrac(long& seed)`
+     at `lpjguess/modules/driver.cpp:42` is a deterministic Park-Miller
+     LCG taking seed by reference. Every stochastic call (`blaze.cpp`,
+     `spitfire.cpp`, `vegdynam.cpp`, etc.) uses `patch.stand.seed` or
+     `gridcell.seed` — per-instance. `Gridcell.seed` (`guess.h:5406`) +
+     `Stand.seed` (`guess.h:4931`) are documented as designed for
+     "comparing results when changing the order in which the simulation
+     proceeds." Cross-validation should target **bit-exact** for both
+     deterministic AND stochastic outputs (better than the ≤1% RMSD
+     I had budgeted defensively).
+  2. **`framework.cpp:411-516` per-gridcell-outer loop has 4 embedded
+     concerns** to preserve in year_outer: (a) per-gridcell setup
+     (`date.init(1)`, `getgridcell()`, `landcover_init()`, `initdrivers()`
+     at lines 425-452); (b) restart load (`deserialize_gridcell()` at
+     454-459); (c) per-day inner loop (`simulate_day` + `outdaily` +
+     year-end `outannual` + save-year `serialize_gridcell` + `date.next()`
+     at 465-522); (d) per-gridcell teardown (`balance.check_period()` at
+     528+). Year_outer needs to service all 4 concerns per cell within
+     the year-outer loop structure.
+  3. **CRITICAL design challenge — `date` is GLOBAL state**, and
+     `getclimate(gridcell)` is a STATEFUL per-day driver tied to it
+     (per `imogen_input.cpp:752-810` audit; the same pattern in
+     `imogencfx.cpp`, `cfxinput.cpp`, etc.). `getclimate()` reads
+     `date.get_calendar_year()` + `date.day`, advances internal state
+     machinery (`spinup_year_idx`, `stored_years[]`, file-position
+     cursors) keyed off the GLOBAL date. Gridcell_outer mode resets
+     `date` per-cell via `date.init(1)` at line 425. **For year_outer
+     this presents 3 design options**:
+     - **D1**: Pre-load climate per-cell up-front via NEW method
+       `preload_all_climate(gridcell, first_yr, last_yr)`; year_outer
+       inner loop reads from in-memory cache without calling `getclimate()`.
+       Cleanest separation; doesn't touch gridcell_outer hot path. Memory
+       overhead bounded (one cell's climate × all years ≈ few MB per cell
+       briefly; can stream out after year_outer iteration). **CURRENTLY
+       PREFERRED PER 2026-05-09 PRELIMINARY ANALYSIS**.
+     - **D2**: Make `date` a member of `Gridcell` (vs global). Year_outer
+       resets/advances per-cell-per-call; gridcell_outer code unchanged.
+       Largest refactor (date is heavily globally-referenced); risk of
+       incidental changes.
+     - **D3**: Save/restore global `date` per-call within year_outer
+       block. Smallest refactor; localized. Risk of subtle state-save
+       timing pitfalls.
+  4. **Revised C1 effort estimate**: 1.5-2 weeks (was: 1 week). The
+     `getclimate`-refactor + design-D1-implementation work is more
+     substantial than the additive-block sketch in the 2026-05-09 morning
+     plan suggested. Cross-validation phase is unchanged (~few days);
+     code-implementation phase is what expanded.
+  5. **Recommendation for C1 fresh-chat resumption**: read this F-12
+     entry's "C1 pre-flight findings" subsection (this list) FIRST as
+     the canonical pre-flight context; then `_chat_artifacts/CHAT_HANDOFF
+     _2026-05-08_session2.md` Part 9 (which captures the same findings
+     with more detail + design rationale). Then design the D1 (or D2/D3)
+     implementation in the fresh chat with full context budget for the
+     code work.
 - **What was decided today (2026-05-09; user confirmation)**:
   1. Skip Option B; go straight to staged Option C (C1 → C2 → C3)
   2. `intermediary_py` cluster integration: keep existing copy-over
