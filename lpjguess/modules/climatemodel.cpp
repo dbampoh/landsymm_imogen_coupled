@@ -784,7 +784,19 @@ int RUN_IMOGEN_ENGINE() {
             // Write CO2 fluxes
             if (!spinup) {
                 std::ofstream file91, file98;
-                if (iyear == year1) {
+                // [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of
+                //  unified-codebase rebuild (2026-05-10): UNCONDITIONAL OPEN
+                //  per IYEAR iteration. Same root cause + same fix as the
+                //  climate-anomalies block at line ~884 above. Without this
+                //  fix, the IYEND iteration of each engine call silently
+                //  dropped its CO2.dat write because file91 was never opened
+                //  on that iteration; combined with the climate-anomalies
+                //  fix above, this completes the per-year output write so
+                //  EVEN years (= IYEND of prior engine call) get fresh
+                //  CO2.dat too. file98 (CO2_all.dat aggregator; app mode)
+                //  similarly: each iteration appends iyear's entry exactly
+                //  once. - DKB 2026-05-10]
+                {
                     file91.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/CO2.dat");
                     file98.open(dirCommonOut + "/IMOGEN/CO2_all.dat", std::ios::out | std::ios::app);
                 }
@@ -883,7 +895,52 @@ int RUN_IMOGEN_ENGINE() {
                 //  - DKB 2026-05-07]
                 std::ofstream file92, file93, file94, file95, file11, file96, file97, file100, file101;
 
-                if (iyear == year1) {
+                // [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of unified-codebase
+                //  rebuild (2026-05-10): UNCONDITIONAL OPEN per IYEAR iteration.
+                //
+                //  ROOT-CAUSE FIX: the previous `if (iyear == year1)` gate caused
+                //  IYEND iterations (year > YEAR1 in 2-year-window engine calls) to
+                //  silently skip the file open + writes. Combined with the persistent
+                //  `updateImogenControlData()` global increment per IYEAR iteration
+                //  (line ~1004 below; YEAR1++/IYEND++ each call), each engine call
+                //  effectively wrote climate data for ONE year only (the call's
+                //  YEAR1) while leaving the IYEND year as an empty placeholder
+                //  (just a `done` marker, no climate). Net effect across calls:
+                //  ALTERNATING-YEAR staged climate (only ODD years 1871, 1873, ...
+                //  fully populated; EVEN years 1872, 1874, ... empty). Discovered
+                //  empirically at C1.2 (1-cell xval; constrained to need ODD-only
+                //  climate via nyear_spinup=1 + lasthistyear=1871). Surfaced as
+                //  blocker for C1.3 sub-step 7.3.1 multi-cell xval (4-cell ù any
+                //  nyear_spinup hits EVEN imogen_years for some cell ù year_idx).
+                //
+                //  FIX: open ALL output files unconditionally per IYEAR iteration.
+                //  `thisYear` is already updated per iteration at line ~457
+                //  (`thisYear = std::to_string(iyear)`), so each iteration's open
+                //  targets that iteration's correct year-folder. Same fix applied
+                //  symmetrically below at:
+                //    - line ~963 (climate file CLOSE block; was gated `iyear == iyend`)
+                //    - line ~988 (FA_OCEAN/DTEMP_O OPEN block; was gated `iyear == year1`)
+                //    - line ~998 (FA_OCEAN/DTEMP_O CLOSE block; was gated `iyear == iyend`)
+                //
+                //  C1.2 PASS PRESERVED: year-1871 data remains bit-exact (always
+                //  was written by call 1 iteration 1; same code path). Only
+                //  previously-empty even years gain data. The data written for
+                //  iyear == iyend within a call is the engine's "year 2 of call N"
+                //  state, which is physically meaningful (engine state evolves
+                //  forward through its own iterations).
+                //
+                //  Same structural bug exists in the standalone Fortran engine
+                //  at imogen/code/imogen_lpjg.f lines 954, 1013, 1071, 1088, 1099
+                //  (NOT fixed in this commit; standalone Fortran is not on the
+                //  prescribed-mode launcher path which uses this in-process C++
+                //  port; deferred as F-N follow-up for symmetry).
+                //
+                //  Backport-relevant per F-11 + BACKPORT_LEDGER (in-process port
+                //  is part of `lpjguess/modules/climatemodel.cpp`; trunk_r13078
+                //  has identical alternating-year bug if its climatemodel.cpp
+                //  matches LandSyMM_LPJ-GUESS's; backport fix mechanically).
+                //  - DKB 2026-05-10]
+                {
                     file92.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/T_anom.dat");
                     file93.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/P_anom.dat");
                     file94.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/SW_anom.dat");
@@ -960,7 +1017,14 @@ int RUN_IMOGEN_ENGINE() {
                     file101 << "\n";  // [Step 9.5 - DKB]
                 }
 
-                if (iyear == iyend) {
+                // [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of
+                //  unified-codebase rebuild (2026-05-10): UNCONDITIONAL CLOSE
+                //  per IYEAR iteration. Symmetric with the OPEN block above;
+                //  closes the per-iteration files cleanly. Without this fix
+                //  the file objects remained open across iterations within a
+                //  call (relying on auto-destruct at end-of-iyear-loop scope
+                //  for cleanup). - DKB 2026-05-10]
+                {
                     file92.close();
                     file93.close();
                     file94.close();
@@ -985,7 +1049,14 @@ int RUN_IMOGEN_ENGINE() {
             // Write FA_OCEAN and DTEMP_O for restart
             if (oceanFeed) {
                 std::ofstream file95, file96;
-                if (iyear == year1) {
+                // [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of
+                //  unified-codebase rebuild (2026-05-10): UNCONDITIONAL OPEN +
+                //  CLOSE per IYEAR iteration for the FA_OCEAN/DTEMP_O restart
+                //  files. Same root cause + same fix as the climate-anomalies
+                //  block above (~lines 884+). Per-year FA_OCEAN+DTEMP_O writes
+                //  ensure restart from any year is possible (vs only-year1
+                //  with the previous gate). - DKB 2026-05-10]
+                {
                     file95.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/fa_ocean.dat");
                     file96.open(dirCommonOut + "/IMOGEN/output/" + thisYear + "/dtemp_o.dat");
                 }
@@ -995,7 +1066,7 @@ int RUN_IMOGEN_ENGINE() {
                 for (igp = 0; igp < N_OLEVS; ++igp) {
                     file96 << dtempO[igp] << "\n";
                 }
-                if (iyear == iyend) {
+                {
                     file95.close();
                     file96.close();
                 }

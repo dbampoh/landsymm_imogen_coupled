@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-10 (evening; step 17a F-12 sub-milestone C1.2 1-CELL CROSS-VALIDATION PASSED bit-exact; un-tagged commit on top of C1.1 commit `90401f2`. **GO/NO-GO gate per session-2 §9.5: PASSED for 1-cell smoke**. All 37 standard LPJG outputs (cflux, cmass, mch4, ngases, nuptake, nflux, etc.) match bit-exact between Run A (`framework_loop_mode = "gridcell_outer"`) and Run B (`framework_loop_mode = "year_outer"`). Year_outer code path empirically validated. Setup: NEW gridlist_test1.txt (1-cell IMOGEN grid cell) + NEW main_xval_loose.ins (loose-mode .ins; uses searchradius+searchradius_soil per user's 2026-05-10 evening guidance to handle IMOGEN-grid-vs-soilmap mismatch) + NEW scripts/cross_validate_year_outer.sh (bash harness). 1 LOC added to `imogen_input.cpp` (declare_parameter for framework_loop_mode in ImogenInput's constructor; mirrors IMOGENCFXInput's pre-existing identical declaration). Discovered: engine output is alternating-year (only ODD years 1871, 1873, ..., 1901 have full climate; EVEN years have only `done` marker; engine NCALLYR/STEP_DAY internals); resolved by using nyear_spinup=1 + firsthistyear=1871 so all imogen_year selections land on 1871 (ODD ✓). Engine has REGRID=1 alternative for production (engine regrids climate to user-specified gridlist; currently FALSE per imogen_intermediary.ins:244). Remaining within step 17a: 7.3.1 multi-cell cross-validation (~0.5 day) + 7.3.2 IMOGENCFXInput year_outer override (~1.5-2 days; with engine-bypass mechanism). Full step-17a tag waits for those.)
+**Last updated:** 2026-05-10 (late evening; step 17a F-12 sub-milestone **C1.3 SUB-STEP 7.3.1 4-CELL CROSS-VALIDATION PASSED bit-exact** + **IMOGEN ENGINE WRITER FIX** landed; un-tagged commit on top of C1.2 commit `8bddc27`. **GO/NO-GO gate per session-2 §9.5: PASSED for both 1-cell AND 4-cell smoke**. All 37 standard LPJG outputs match bit-exact between Run A (`gridcell_outer`) and Run B (`year_outer`) for 4-cell `gridlist_test2.txt` × `nyear_spinup=2` × `lasthistyear=1879` (44 cell-year iterations per run; 9 distinct imogen_years). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is now empirically validated across BOTH cell_idx>0 AND year_idx>0 branches. Pre-requisite engine writer fix landed: `lpjguess/modules/climatemodel.cpp` 5-conditional-removals at lines ~787/~884/~963/~988/~998 (~76 LOC total incl. doc blocks) — fixes the alternating-year staged-climate quirk discovered at C1.2 (each engine call previously wrote climate ONLY for IYEAR == YEAR1; net effect: ODD years had full climate, EVEN years had only `done` marker). Post-fix: ALL 32 staged years (1871-1902) have full 13-file climate. Same bug exists in standalone Fortran engine (`imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099); deferred for symmetric fix as F-N follow-up. C1.2 PASS preserved (1-cell xval re-verified PASS post-fix). 162 unit tests still pass. **Remaining within step 17a (next session): sub-step 7.3.2 IMOGENCFXInput year_outer override (~1.5-2 days; with engine-bypass mechanism — NEW `skip_inprocess_engine_run` parameter recommended) + cross-validate single-cell first; multi-cell second + tag `v0.17.0-step17a-c1-year-outer-single-process` + close-out.**)
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -844,6 +844,67 @@ provides the per-month aggregation point in the engine-output side).
     C1.1 pattern + handles relhum/wind/tmin/tmax fields + optional
     engine-bypass parameter for testing). Cross-validate identically.
   Then tag `v0.17.0-step17a-c1-year-outer-single-process`.
+- **C1.2 1-CELL CROSS-VALIDATION PASS landed (2026-05-10 evening; commit
+  `8bddc27`)** — first runtime end-to-end PASS of the year_outer code
+  path. Bit-exact 37/37 .out files between Run A (`gridcell_outer`) and
+  Run B (`year_outer`) on `gridlist_test1.txt` (1-cell IMOGEN-native cell
+  at -78.75/82.50; nyear_spinup=1 + lasthistyear=1871). The corrected
+  spinup_year_idx state-machine reproduction formula `(cell_idx *
+  nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) verified for
+  cell_idx=0/year_idx=0. Setup files added: NEW `gridlist_test1.txt`,
+  NEW `runs/SSP1-2.6/main_xval_loose.ins`, NEW
+  `scripts/cross_validate_year_outer.sh`. 1 LOC code change to
+  `imogen_input.cpp` (declare_parameter for framework_loop_mode in
+  ImogenInput's constructor; mirrors IMOGENCFXInput pattern). Per
+  user's evening guidance: searchradius (climate; ImogenInput class
+  member) + searchradius_soil (SoilInput; declare_parameter) resolved
+  IMOGEN-grid-vs-soilmap mismatch. Operational discoveries: engine
+  output is alternating-year (only ODD years 1871, 1873, ..., 1901
+  have full climate; EVEN years have only `done` marker due to engine
+  writer gate quirk; resolved at C1.3 sub-step 7.3.1 via engine writer
+  fix per below). REGRID=1 alternative documented for production.
+  Per session-2 chat handoff Part 12 + STEP_17a.md §6 + §7.2.
+- **C1.3 SUB-STEP 7.3.1 4-CELL CROSS-VALIDATION PASS + IMOGEN ENGINE
+  WRITER FIX landed (2026-05-10 late evening; this commit, un-tagged
+  on top of `8bddc27`)** — multi-cell xval bit-exact PASS. Run A vs
+  Run B 37/37 bit-exact for `gridlist_test2.txt` (4 cells: NW Canada,
+  N Greenland, central Asia, Patagonia) × `nyear_spinup=2` ×
+  `lasthistyear=1879` (44 cell-year iterations per run; spans 9
+  distinct imogen_year values 1871..1879). The spinup_year_idx
+  state-machine reproduction formula `(cell_idx * nyear_spinup +
+  year_idx) % NYEAR_SPINUP` is now empirically validated across BOTH
+  cell_idx>0 AND year_idx>0 branches. **PRE-REQUISITE: engine writer
+  fix bundled in this commit** — `lpjguess/modules/climatemodel.cpp`
+  5 conditional removals (~76 LOC incl. doc blocks) at lines ~787,
+  ~884, ~963, ~988, ~998. Fixes the alternating-year staged-climate
+  structural quirk: each engine call previously wrote climate ONLY
+  for IYEAR == YEAR1 (combined with `updateImogenControlData()`
+  advancing YEAR1++ per IYEAR iteration → only ODD years 1871, 1873,
+  ..., 1901 had full climate; EVEN years had only `done` markers).
+  With fix: ALL 32 staged years (1871-1902) have full 13-file climate.
+  C1.2 PASS preserved (1-cell xval re-verified PASS post-fix). 162
+  unit tests still pass. Same bug exists in standalone Fortran engine
+  (`imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099);
+  DEFERRED for symmetric fix as F-N-equivalent follow-up (Fortran
+  engine is not on the prescribed-mode launcher path; only used for
+  engine-only smoke testing per session-1 §46). Backport-relevant per
+  BACKPORT_LEDGER §1.3 (climatemodel.cpp is in the C++ scope; new
+  step-17a-c1.3 entry added). Also: latent OOB write surfaced in
+  existing `getclimate()` cache (`stored_years[store_index] =
+  imogen_year` when `store_index >= nyears` due to undersized cache
+  formula `nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1`); resolved
+  by bumping `lasthistyear` in `main_xval_loose.ins` (1871 → 1879;
+  cache nyears=9 sufficient for 9 distinct imogen_years). The OOB write
+  is a pre-existing latent bug in the existing `getclimate()` machinery
+  — surfaced by this test config; not introduced by this commit; could
+  be hardened in a future commit if production runs hit it. Iteration
+  history (3 attempts; full forensics in CHANGELOG entry +
+  `notes/STEP_17a.md` §6.3 + session-2 handoff Part 13). **Remaining
+  within step 17a: sub-step 7.3.2 IMOGENCFXInput year_outer override
+  (~1.5-2 days; per STEP_17a.md §7.3.2 + the 3-option engine-bypass
+  recommendation — option (a) NEW `skip_inprocess_engine_run` parameter
+  recommended) + cross-validate single-cell first; multi-cell second +
+  tag `v0.17.0-step17a-c1-year-outer-single-process` + close-out.**
 - **What was decided today (2026-05-09; user confirmation)**:
   1. Skip Option B; go straight to staged Option C (C1 → C2 → C3)
   2. `intermediary_py` cluster integration: keep existing copy-over

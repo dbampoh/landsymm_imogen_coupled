@@ -78,33 +78,61 @@ param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
 param "searchradius" (num 50)
 searchradius_soil    50
 
-! Smoke overrides — keep run minimal: 1-year smoke to bypass the staged-climate
-! odd-year-only constraint. The launcher-staged engine climate at
-! Common-directory/IMOGEN/output/<YYYY>/ has only ODD years (1871, 1873, ..., 1901)
-! fully populated; EVEN years have just the 'done' marker (engine intentionally
-! alternates per its NCALLYR/STEP_DAY internals). For C1.2 cross-validation we
-! constrain the smoke to need only odd-year imogen_year values.
+! [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of unified-codebase
+!  rebuild (2026-05-10 evening): MULTI-CELL CROSS-VALIDATION CONFIG.
 !
-! With nyear_spinup=1 + firsthistyear=lasthistyear=1871 + cell_idx=0 (single-cell):
-!   Spinup year_idx=0: spinup_year_idx_at_(0,0) = (0*1+0) % 30 = 0
-!                      imogen_year = FIRST_SPINUP_YEAR + 0 = 1871 ✓ ODD
-!   Historical year_idx=1: imogen_year = calendar_year = 1871 ✓ ODD
-! Total: 2 simulation years, both using imogen_year=1871; single climate year
-! needed. Eliminates the alternating-climate-availability constraint.
-nyear_spinup        1              ! Minimal 1-year spinup (smoke); validator: freenyears < nyear_spinup
-freenyears          0              ! 0 N-free spinup years (the spinup year IS the N-free year)
+!  Tests the spinup_year_idx state-machine reproduction formula
+!    spinup_year_idx_for_this = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+!  across BOTH cell_idx > 0 AND year_idx > 0 branches.
+!
+!  PREREQUISITE: engine writer fix landed (climatemodel.cpp lines ~884,
+!  ~963, ~787, ~988, ~998 unconditional OPEN/CLOSE per IYEAR iteration;
+!  fixes the alternating-year staged climate quirk so EVEN years now have
+!  full climate too). Without that fix, EVEN imogen_years 1872, 1874, etc.
+!  would have only `done` markers; preload would fail with
+!  "could not open ./IMOGEN/output/1872/T_anom.dat".
+!
+!  CONFIG RATIONALE:
+!  - nyear_spinup=2: 2 spinup years per cell (year_idx 0 and 1) — exercises
+!    the formula's year_idx>0 branch alongside cell_idx>0.
+!  - lasthistyear=1879: gives ImogenInput's cache size
+!      nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1 = 1879 - 1871 + 1 = 9
+!    Sufficient to hold the maximum number of distinct imogen_year values
+!    needed across the simulation:
+!      Cell 0 spinup_year_idx=0,1 -> imogen_year 1871, 1872
+!      Cell 1 spinup_year_idx=0,1 -> imogen_year 1873, 1874
+!      Cell 2 spinup_year_idx=0,1 -> imogen_year 1875, 1876
+!      Cell 3 spinup_year_idx=0,1 -> imogen_year 1877, 1878
+!      All cells historical years 1871..1879 -> imogen_year 1871..1879
+!    Union: {1871, 1872, 1873, 1874, 1875, 1876, 1877, 1878, 1879} = 9 distinct.
+!    Without sufficient nyears, the existing getclimate's
+!    `stored_years[store_index] = imogen_year` triggers an OOB write
+!    (latent bug; std::vector::operator[] no bounds check; UB / segfault).
+!
+!  - firsthistyear=1871: simulation 9 historical years 1871-1879.
+!  - firstoutyear/lastoutyear=1871/1879: write LPJG output for all 9 years.
+!
+!  Net simulation per cell: 2 spinup + 9 historical = 11 years.
+!  Total: 4 cells × 11 years = 44 cell-year iterations per run.
+!
+!  Both Run A (gridcell_outer; existing per-cell getclimate driver) and
+!  Run B (year_outer; preload_all_climate + getclimate_for_year) should
+!  produce bit-identical .out files per per-cell-year (cell, year) data.
+!  - DKB 2026-05-10]
+nyear_spinup        2              ! 2 spinup years per cell (exercises year_idx 0..1 branches of formula)
+freenyears          0              ! 0 N-free spinup years; validator: freenyears < nyear_spinup ✓ (0 < 2)
 
 ! Year-range parameters. Set BOTH the bare-global syntax (which framework.cpp
 ! reads via the global firsthistyear/lasthistyear ints) AND the custom-param
 ! syntax (which ImogenInput::init() reads via param["firsthistyear"].num at
 ! imogen_input.cpp:304). Both must be set for ImogenInput to work.
 firsthistyear       1871
-lasthistyear        1871
+lasthistyear        1879              ! 9 historical years (1871-1879); cache nyears=9 per the §17a sub-step 7.3.1 sizing analysis above
 firstoutyear        1871
-lastoutyear         1871
+lastoutyear         1879
 
 param "firsthistyear" (num 1871)
-param "lasthistyear"  (num 1871)
+param "lasthistyear"  (num 1879)
 
 firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency
 run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
