@@ -1,0 +1,170 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2 cross-validation) — IMOGENCFX-mode .ins
+!
+! This .ins file is used by the cross-validation harness at
+! scripts/cross_validate_year_outer.sh when invoked with the imogencfx
+! input-module argument:
+!     scripts/cross_validate_year_outer.sh 1cell imogencfx
+!     scripts/cross_validate_year_outer.sh 4cell imogencfx
+!
+! It runs LPJ-GUESS with `-input imogencfx` (TIGHT-coupling input module;
+! IMOGENCFXInput) against pre-staged engine climate at
+! runs/SSP1-2.6/Common-directory/IMOGEN/output/<YYYY>/. PRE-REQUISITES:
+!  (1) Climate writer fix landed (commit 7be595a; sub-step 7.3.1) so that
+!      ALL 32 staged years (1871-1902) have full 13-file climate (no
+!      alternating-year quirk).
+!  (2) `skip_inprocess_engine_run 1` is set BELOW; this skips the
+!      RUN_IMOGEN_ENGINE() call in IMOGENCFXInput::init() (which would
+!      otherwise deadlock per F-10 in single-process tight). Climate must
+!      already be staged (it is, post-7.3.1).
+!
+! Cross-validation pattern: 2 runs with identical inputs except
+! framework_loop_mode:
+!   Run A: framework_loop_mode "gridcell_outer" (existing trusted baseline;
+!          uses IMOGENCFXInput::getclimate() per-day driver)
+!   Run B: framework_loop_mode "year_outer" (new C1.3 sub-step 7.3.2
+!          additive code path; uses IMOGENCFXInput::preload_all_climate +
+!          getclimate_for_year overrides)
+! Compared bit-exactly per the spinup_year_idx state-machine reproduction
+! formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`;
+! per session-2 handoff Part 13 + STEP_17a.md §5.4 erratum).
+!
+! The harness sets framework_loop_mode + file_gridlist + outputdirectory
+! by writing a small wrapper .ins that imports this file + adds those
+! 3 overrides per run.
+!
+! IMPORTANT: this .ins is intended to be loaded with cwd =
+! runs/SSP1-2.6/Common-directory/ so the relative file_temp etc. paths
+! resolve to the staged engine climate. The harness sets cwd to that.
+!
+! Mirrors runs/SSP1-2.6/main_xval_loose.ins exactly except:
+!   1. coupling_mode "prescribed" (vs "loose" for ImogenInput .ins);
+!      "prescribed" is the canonical mode for IMOGENCFXInput. With
+!      skip_inprocess_engine_run=true we don't actually need handshake
+!      activity from the engine (engine doesn't run); ImogenOutput's
+!      handshake-file writes are still gated by coupling_mode but they're
+!      diagnostic-only here (no engine to read them).
+!   2. skip_inprocess_engine_run 1 (NEW; bypasses RUN_IMOGEN_ENGINE() in
+!      IMOGENCFXInput::init() that would otherwise deadlock per F-10).
+!
+! - Daniel Bampoh, 2026-05-10 (step 17a sub-step 7.3.2 of unified-codebase rebuild)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard PFT definitions + run config
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+import "crop_n.ins"
+
+! Wetland PFTs
+import "wetlandpfts.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Smoke-test overrides — these REPLACE values set in global.ins / imported files
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Smoke gridlist: harness will override file_gridlist below to either
+! gridlist_test1.txt (1-cell smoke; bypasses cell-ordering complexity) or
+! gridlist_test2.txt (4-cell smoke; tests spinup_year_idx formula across cells).
+! Default here is the 4-cell variant; harness overrides for 1-cell run.
+! ABSOLUTE PATHS (not affected by cwd).
+param "file_gridlist"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+param "file_gridlist_cf"  (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+
+! Soil map (Tier-1 committed data) — ABSOLUTE PATH
+param "file_soildata"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition: empty -> LPJG uses pre-industrial constant 2 kgN/ha/yr.
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP26")
+
+! Climate forcing files (relative to cwd; cwd MUST be
+! runs/SSP1-2.6/Common-directory/ for these to resolve).
+param "file_temp"         (str "./IMOGEN/output/YYYY/T_anom.dat")
+param "file_prec"         (str "./IMOGEN/output/YYYY/P_anom.dat")
+param "file_insol"        (str "./IMOGEN/output/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "./IMOGEN/output/YYYY/WET.dat")
+param "file_dtr"          (str "./IMOGEN/output/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
+
+! IMOGENCFXInput-specific climate-input fields (per step 9.5 wiring of
+! Rh / Wind / Tmin / Tmax IMOGEN engine outputs). Empty paths are
+! gracefully handled (per imogencfx.cpp:842-857 + lines 919-932), but
+! we set them here since they're available post-7.3.1 climate writer fix
+! (engine now writes Rh_anom.dat / W_anom.dat / Tmin_anom.dat / Tmax_anom.dat
+! for ALL years, not just ODD).
+param "file_relhum"       (str "./IMOGEN/output/YYYY/Rh_anom.dat")
+param "file_wind"         (str "./IMOGEN/output/YYYY/W_anom.dat")
+param "file_tmin"         (str "./IMOGEN/output/YYYY/Tmin_anom.dat")
+param "file_tmax"         (str "./IMOGEN/output/YYYY/Tmax_anom.dat")
+
+! IMOGENCFXInput tuning. Per-cell searchradius for nearest-neighbour climate
+! lookup (1631-cell IMOGEN HadCM3 grid -> LPJG gridlist cells; ZERO exact-cell
+! intersections per session-2 §12.3). Soilmap-side searchradius for the
+! 62892-cell soilmap. Both: declared as ImogenInput / SoilInput class members
+! with custom-param syntax + bare-global plib syntax respectively.
+param "searchradius" (num 50)
+searchradius_soil    50
+
+! [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
+!  rebuild (2026-05-10 late evening): SKIP_INPROCESS_ENGINE_RUN is the
+!  KEY cross-validation enabler. With it set true, IMOGENCFXInput::init()
+!  skips the RUN_IMOGEN_ENGINE() call at imogencfx.cpp ~line 524 (which
+!  would otherwise deadlock per F-10 in single-process tight). User is
+!  responsible for having pre-staged climate at <DIR_COMMON>/IMOGEN/output/
+!  <YYYY>/ via separate launcher run + climate writer fix landed at C1.3
+!  sub-step 7.3.1 commit 7be595a. - DKB 2026-05-10]
+skip_inprocess_engine_run 1
+
+! Coupling mode: "prescribed" is the canonical -input imogencfx default
+! per Decision #4 + session-1 §49 launcher behaviour. With
+! skip_inprocess_engine_run=1 the engine isn't actually running, so
+! ImogenOutput's handshake-file writes happen but no consumer reads them
+! (diagnostic-only). "prescribed" is preferred over "tight" because the
+! step-8 ImogenOutput::flush_year writer's relative-path handshake target
+! (Option C in imogen_intermediary.ins) was un-testable in v1.0 due to
+! F-10; "prescribed" uses absolute-path static-IIASA paths which is still
+! fine in this no-engine-running scenario.
+coupling_mode "prescribed"
+
+! Smoke overrides: per the C1.3 sub-step 7.3.1 sizing analysis:
+!   nyear_spinup=2 + lasthistyear=1879 + 4-cell gridlist -> 9 distinct
+!   imogen_year values (1871, 1872, 1873, 1874, 1875, 1876, 1877, 1878, 1879);
+!   ImogenInput cache size formula nyears = (lasthistyear - FIRST_SPINUP_YEAR)
+!   + 1 = 9; sufficient. Same logic applies to IMOGENCFXInput (same nyears
+!   formula at imogencfx.cpp:527).
+!
+!   Cell 0 spinup_year_idx 0,1 -> imogen_year 1871, 1872
+!   Cell 1 spinup_year_idx 0,1 -> imogen_year 1873, 1874
+!   Cell 2 spinup_year_idx 0,1 -> imogen_year 1875, 1876
+!   Cell 3 spinup_year_idx 0,1 -> imogen_year 1877, 1878
+!   All cells historical years 1871..1879 -> imogen_year 1871..1879
+!   Union: 9 distinct ✓
+!
+! With the climate writer fix landed (commit 7be595a; ALL years have full
+! climate), the EVEN imogen_years (1872, 1874, 1876, 1878) now resolve
+! cleanly. Same .ins config as main_xval_loose.ins for direct comparability.
+nyear_spinup        2              ! 2 spinup years per cell
+freenyears          0              ! 0 N-free spinup years; validator: freenyears < nyear_spinup ✓ (0 < 2)
+
+firsthistyear       1871
+lasthistyear        1879
+firstoutyear        1871
+lastoutyear         1879
+
+param "firsthistyear" (num 1871)
+param "lasthistyear"  (num 1879)
+
+firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency (BLAZE check still has actionable error path; NOFIRE is the safe smoke default)
+run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
+npatch              1              ! Single patch for smoke speed
+ifcalcsla           0              ! Standard
+ifcalccton          0              ! Standard
+
+! framework_loop_mode: harness writes a wrapper .ins that imports this
+! file + adds the override per run. Default here is gridcell_outer (the
+! existing baseline) so this .ins works standalone if invoked directly.
+param "framework_loop_mode" (str "gridcell_outer")
+
+! Output directory: harness sets cwd to a per-run dir; outputs go there.
+outputdirectory "./"

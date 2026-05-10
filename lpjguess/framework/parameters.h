@@ -528,6 +528,25 @@ namespace IMOGENConfig {
 	//  - DKB 2026-05-10]
 	extern xtring framework_loop_mode;
 
+	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
+	//  rebuild (2026-05-10 late evening): skip_inprocess_engine_run flag.
+	//  Gates the in-process IMOGEN engine invocation in IMOGENCFXInput::init()
+	//  (the RUN_IMOGEN_ENGINE() call at imogencfx.cpp ~line 524). When true,
+	//  the engine call is skipped and the user is responsible for having
+	//  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via a
+	//  separate launcher run (or via REGRID=1 + alternative driver, etc.).
+	//  When false (DEFAULT; preserves LTS-equivalent behaviour), the engine
+	//  runs in-process per the existing prescribed-mode flow.
+	//
+	//  Primary purpose: enables -input imogencfx cross-validation (Run A
+	//  gridcell_outer vs Run B year_outer) WITHOUT triggering the F-10
+	//  deadlock at IMOGENCFXInput::init(). Per STEP_17a.md §7.3.2 option (a)
+	//  recommendation; see also FOLLOWUPS.md F-12 + EXECUTION_PLAN.md V.1
+	//  step row 17a + the session-2 chat handoff Part 13.
+	//
+	//  Default at parameters.cpp is `false`. - DKB 2026-05-10]
+	extern bool skip_inprocess_engine_run;
+
 	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
 	//  was added at step 9 as a V.1 step-9 verification helper, then
 	//  REMOVED at step 9's wrap-up (per user code-integrity preference)

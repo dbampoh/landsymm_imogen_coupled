@@ -287,6 +287,18 @@ namespace IMOGENConfig {
 	//  documentation. - DKB 2026-05-10]
 	 xtring framework_loop_mode = "gridcell_outer";
 
+	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
+	//  rebuild (2026-05-10 late evening): skip_inprocess_engine_run gate.
+	//  Default `false` preserves LTS-equivalent behaviour (RUN_IMOGEN_ENGINE
+	//  fires in IMOGENCFXInput::init() per the existing prescribed-mode flow).
+	//  When set to `true` in an .ins file (e.g. main_xval_imogencfx.ins),
+	//  the engine call is skipped and the user is responsible for having
+	//  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/. Used for
+	//  -input imogencfx cross-validation; bypasses F-10 deadlock. See
+	//  parameters.h same-named comment block for the full rationale.
+	//  - DKB 2026-05-10]
+	 bool skip_inprocess_engine_run = false;
+
 	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
 	//  was added at step 9 then REMOVED at step 9's wrap-up; see
 	//  parameters.h same-named comment block for rationale. - DKB 2026-05-07]

@@ -1100,7 +1100,9 @@ with the foundation + C1.1 changes.
 
 ### Step 17a (C1.3 SUB-STEP 7.3.1 + ENGINE WRITER FIX): F-12 sub-milestone C1.3 sub-step 7.3.1 — multi-cell xval bit-exact PASS + IMOGEN engine writer fix (alternating-year quirk resolved at root)
 
-**Commit:** `_TBD_` (this commit; bundles C1.3 sub-step 7.3.1 4-cell xval PASS + engine writer fix; full step-17a tag waits for sub-step 7.3.2 IMOGENCFXInput follow-up)  **Date:** 2026-05-10 (late evening, same day as C1.2 commit `8bddc27`)
+**Commit:** `7be595a` (un-tagged; full step-17a tag at C1 close-out at sub-step 7.3.2 commit)  **Date:** 2026-05-10 (late evening, same day as C1.2 commit `8bddc27`)
+
+**[Errata 2026-05-10 very late evening, step-17a sub-step 7.3.2 + close-out commit]**: previously `_TBD_` placeholder; now filled in with verified hash `7be595a` per `git rev-list -n 1 HEAD~1` (where HEAD is the sub-step 7.3.2 + C1 close-out commit).
 
 This commit lands TWO bundled deliverables: (A) IMOGEN engine writer fix in `lpjguess/modules/climatemodel.cpp` (5 conditional removals at lines ~787, ~884, ~963, ~988, ~998 + extensive doc blocks; ~76 LOC total). (B) C1.3 sub-step 7.3.1 4-cell cross-validation PASS bit-exact (37/37) on `gridlist_test2.txt` × `nyear_spinup=2` × `lasthistyear=1879`.
 
@@ -1146,6 +1148,80 @@ Latent OOB write in existing `getclimate()` cache surfaced during this commit's 
 #### Net source-level change in `lpjguess/`: +~76 LOC, -5 LOC across 1 file (climatemodel.cpp; mostly additive incl. doc blocks)
 
 Backport-relevance HIGH. The Backport Sprint must replicate the 5 conditional removals + their associated doc blocks in `trunk_r13078`'s `lpjguess/modules/climatemodel.cpp`. Mechanical change. Consider also bundling the symmetric Fortran fix at `imogen/code/imogen_lpjg.f` if Fortran engine is used in any test scenarios.
+
+### Step 17a (C1.3 SUB-STEP 7.3.2 + C1 CLOSE-OUT): F-12 sub-milestone C1.3 sub-step 7.3.2 — IMOGENCFXInput year_outer override + skip_inprocess_engine_run ins parameter + K→C latent-bug fix in IMOGENCFXInput::get_climate_for_gridcell — FULL C1 CLOSE-OUT (TAGGED v0.17.0-step17a-c1-year-outer-single-process)
+
+**Commit:** `_TBD_` (this commit; FULL C1 CLOSE-OUT; **TAGGED `v0.17.0-step17a-c1-year-outer-single-process`** at this commit)  **Date:** 2026-05-10 (very late evening, same day as sub-step 7.3.1 commit `7be595a`)
+
+This commit closes out F-12 sub-milestone C1 by landing THREE bundled deliverables on top of foundation 2e918c0 + C1.1 commit 90401f2 + C1.2 commit 8bddc27 + C1.3 sub-step 7.3.1 commit 7be595a. ALL FOUR cross-validation scenarios (imogen 1cell + imogen 4cell + imogencfx 1cell + imogencfx 4cell) PASS bit-exact 37/37 each.
+
+#### A. NEW `skip_inprocess_engine_run` ins parameter (~50 LOC across 3 files; backport-relevant)
+
+- File: `lpjguess/framework/parameters.h`
+  - Operation: modify (add)
+  - Lines: +22 LOC; new `extern bool skip_inprocess_engine_run;` declaration with extensive doc block in IMOGENConfig namespace; placed after `framework_loop_mode` extern.
+  - Description: declares the bool ins parameter that gates `RUN_IMOGEN_ENGINE()` in `IMOGENCFXInput::init()`. Default `false` preserves LTS-equivalent behaviour. When set `true` in an .ins file, IMOGENCFXInput::init() skips the in-process engine call (which would otherwise deadlock per F-10 in single-process tight); user must pre-stage climate externally via launcher run + climate writer fix landed at C1.3 sub-step 7.3.1 commit `7be595a`.
+  - Backport guidance: trivial copy-paste into `trunk_r13078`'s `lpjguess/framework/parameters.h` IMOGENConfig namespace. Single declaration line + doc block.
+
+- File: `lpjguess/framework/parameters.cpp`
+  - Operation: modify (add)
+  - Lines: +14 LOC; new `bool skip_inprocess_engine_run = false;` definition with doc block; placed after `framework_loop_mode` definition.
+  - Description: defines the bool with default `false`.
+  - Backport guidance: trivial copy-paste.
+
+- File: `lpjguess/modules/imogencfx.cpp`
+  - Operation: modify (add) at TWO sites
+  - Lines:
+    - +14 LOC at constructor: new `declare_parameter("skip_inprocess_engine_run", &IMOGENConfig::skip_inprocess_engine_run, "...")` registration with doc block, placed after `framework_loop_mode` declare_parameter.
+    - +14 LOC around `RUN_IMOGEN_ENGINE()` call at line ~524: gate on `if (!IMOGENConfig::skip_inprocess_engine_run)` with doc block + informative dprintf when the flag is set.
+  - Description: registers the parameter in the input module's plib table + gates the engine call.
+  - Backport guidance: mechanical; same call-site as the existing RUN_IMOGEN_ENGINE call.
+
+#### B. IMOGENCFXInput year_outer overrides (~345 LOC across 2 files; backport-relevant)
+
+- File: `lpjguess/modules/imogencfx.h`
+  - Operation: modify (add)
+  - Lines: +95 LOC additive (2 includes `<map>`, `<utility>`; 2 new virtual method declarations with extensive doc blocks; 2 cache map members `year_outer_cell_idx` + `year_outer_ndep_cache`)
+  - Description: declares the year_outer mode overrides + per-cell cache. Doc blocks document the 3 IMOGENCFXInput-specific differences from ImogenInput's C1.1 pattern: (1) NO K→C conversion in climate.temp = dtemp[date.day] (preserved here for byte-exact reproduction; per K→C fix in item C below); (2) additional climate fields populated from cache (relhum, u10, tmin, tmax per step 9.5 wiring); (3) BLAZE compatibility check on day 0.
+  - Backport guidance: copy-paste mechanically; same structure as ImogenInput's C1.1 cache members + virtual decls in imogen_input.h.
+
+- File: `lpjguess/modules/imogencfx.cpp`
+  - Operation: modify (add)
+  - Lines: +~250 LOC additive (2 method implementations with extensive doc blocks); inserted before `getsoil()` definition.
+  - Description: implements `IMOGENCFXInput::preload_all_climate(Gridcell&, int first, int last)` (pre-loads all needed years' climate for one cell into existing cache via readenv; mirrors C1.1 ImogenInput pattern with IMOGENCFXInput-specific differences) + `IMOGENCFXInput::getclimate_for_year(Gridcell&, int year, int day)` (reads from cache; on day 0: BLAZE check + populate per-day arrays via get_climate_for_gridcell + ndep + co2; every day: assigns all Climate fields including IMOGENCFXInput-specific relhum/u10/tmin/tmax + Gridcell ndep). Uses CORRECTED spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`).
+  - Backport guidance: copy-paste mechanically; same structure as ImogenInput's C1.1 method implementations in imogen_input.cpp; ensure CORRECTED formula (NO `+1`) is preserved.
+
+#### C. K→C latent-bug fix in `IMOGENCFXInput::get_climate_for_gridcell` (~25 LOC change; 6 code-line changes; backport-relevant)
+
+- File: `lpjguess/modules/imogencfx.cpp`
+  - Operation: modify (~25 LOC of doc blocks + 6 code-line changes adding `- 273.15`)
+  - Lines:
+    - Monthly branch (lines ~902-908): `mtmp[i] = all_temp[store_index][igrid][i] - 273.15` (was without `-273.15`); same fix for `mtmin[i]` and `mtmax[i]` in the lines ~923-927 block (Tmin/Tmax monthly arrays).
+    - Daily branch (lines ~935-952): `dtemp[i] = all_temp[store_index][igrid][i] - 273.15` (was without `-273.15`); same fix for `dtmin[i]` and `dtmax[i]` in the conditional blocks below.
+  - Description: K→C conversion at the input-reading layer. Root cause: IMOGEN engine writes T_anom/Tmin_anom/Tmax_anom in Kelvin; LPJG expects climate.temp/.tmin/.tmax in Celsius. Existing IMOGENCFXInput::getclimate had a LATENT K-vs-C bug for these 3 temperature fields — never surfaced because LPJG main loop never ran in -input imogencfx mode pre-F-12 (F-10 deadlock at IMOGENCFXInput::init's RUN_IMOGEN_ENGINE call blocked before main loop could exercise getclimate's per-day driver). ImogenInput's getclimate at imogen_input.cpp:876 correctly does `-273.15`; IMOGENCFXInput didn't. Surfaced empirically during sub-step 7.3.2 cross-validation with skip_inprocess_engine_run=1 bypassing F-10 (Run A failed at Soil::soil_temp_multilayer with T[i]: 169.393 = -103.76°C). Fix: subtract 273.15 at the monthly-array population step in get_climate_for_gridcell. Single change point benefits BOTH gridcell_outer (existing getclimate) AND year_outer (new getclimate_for_year) modes since both invoke get_climate_for_gridcell. Aligns IMOGENCFXInput's dtemp semantics with CFXInput's pattern (dtemp in Celsius natively; CFXInput's NetCDF ISIMIP3b is in Celsius). Per user's 2026-05-10 clarification: "imogencfx is meant to work like the cfx input module, with only caveat being instead of NetCDF climate forcing it takes in IMOGEN climate; everything else remains as with the cfx module."
+  - Backport guidance: 6 line-level edits; mechanical. Same fix should be applied to `trunk_r13078`'s `lpjguess/modules/imogencfx.cpp` get_climate_for_gridcell. NO behavioral change to gridcell_outer mode that has previously run without exercising LPJG main loop in imogencfx mode (since LPJG main loop never ran in imogencfx mode pre-F-12 due to F-10).
+
+#### Run-config + harness files added/modified (NOT in `lpjguess/`; backport-IRRELEVANT)
+
+- `runs/SSP1-2.6/main_xval_imogencfx.ins` (NEW; ~140 LOC): mirrors `main_xval_loose.ins` exactly except (1) `coupling_mode "prescribed"` (vs "loose"; canonical for IMOGENCFXInput) and (2) `skip_inprocess_engine_run 1` (NEW). Includes the additional 4 file_relhum/wind/tmin/tmax param directives (IMOGENCFXInput-specific; safely processed post-engine-fix at sub-step 7.3.1).
+
+- `scripts/cross_validate_year_outer.sh` (modified; ~20 LOC change): added optional 2nd argument for input-module selector (`imogen` (default; preserves prior behaviour) | `imogencfx` (NEW)). Run-output dirs gain `_imogencfx_` infix when imogencfx variant is used. The `-input` flag uses the variable. Banner updated.
+
+#### Verification (this commit)
+
+- `cd lpjguess/build && make -j$(nproc)`: clean (only pre-existing warnings; ZERO introduced)
+- `lpjguess/build/runtests --reporter compact`: ✅ "Passed all 25 test cases with 162 assertions."
+- ALL FOUR cross-validation scenarios PASS bit-exact (37/37 .out files identical):
+  - `scripts/cross_validate_year_outer.sh 1cell imogen`: ✅ PASS
+  - `scripts/cross_validate_year_outer.sh 4cell imogen`: ✅ PASS (regression)
+  - `scripts/cross_validate_year_outer.sh 1cell imogencfx`: ✅ PASS (NEW)
+  - `scripts/cross_validate_year_outer.sh 4cell imogencfx`: ✅ PASS (NEW)
+- The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is empirically validated for BOTH input modules across BOTH single-cell + multi-cell + single-spinup-year + multi-spinup-year scenarios.
+- Backward compatibility: existing `IMOGENCFXInput::getclimate()` body unchanged (the K→C fix is in the `get_climate_for_gridcell` helper that both modes use; preserves byte-exactness between modes).
+
+#### Net source-level change in `lpjguess/`: +~420 LOC, -0 LOC across 4 files (parameters.h + parameters.cpp + imogencfx.h + imogencfx.cpp; mostly additive incl. doc blocks)
+
+Backport-relevance HIGH for all 4 file changes. The Backport Sprint must replicate all of these in `trunk_r13078`'s corresponding files. Mechanical changes (declarations + parameter registration + cache members + method implementations + 6 K→C code-line edits in get_climate_for_gridcell). All changes preserve gridcell_outer's byte-exact behaviour (year_outer is purely additive; K→C fix benefits both modes equally).
 
 ---
 

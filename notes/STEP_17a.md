@@ -4,14 +4,15 @@
 **Date foundation landed:** 2026-05-10 (commit `2e918c0`)
 **Date C1.1 implementation landed:** 2026-05-10 (commit `90401f2`)
 **Date C1.2 cross-validation 1-cell PASS landed:** 2026-05-10 (commit `8bddc27`)
-**Date C1.3 sub-step 7.3.1 multi-cell PASS landed:** 2026-05-10 (this commit; bundled with engine-writer fix)
-**Date C1 fully closed:** _pending — IMOGENCFXInput follow-up (C1.3 sub-step 7.3.2)_
+**Date C1.3 sub-step 7.3.1 multi-cell PASS + engine writer fix landed:** 2026-05-10 (commit `7be595a`)
+**Date C1.3 sub-step 7.3.2 IMOGENCFXInput year_outer override + K→C fix landed:** 2026-05-10 (this commit; FULL C1 CLOSE-OUT)
+**Date C1 fully closed:** **2026-05-10 (this commit)**
 **Foundation commit:** `2e918c0` (un-tagged)
 **C1.1 implementation commit:** `90401f2` (un-tagged; on top of `2e918c0`)
 **C1.2 1-cell cross-validation commit:** `8bddc27` (un-tagged; on top of `90401f2`)
-**C1.3 sub-step 7.3.1 + engine writer fix commit:** _to be filled in after `git commit`_ (un-tagged; on top of `8bddc27`)
-**Full C1 commit / tag:** _pending — `v0.17.0-step17a-c1-year-outer-single-process`. Tag waits for IMOGENCFXInput year_outer override (C1.3 sub-step 7.3.2) per [§7.3](#73-c13-sub-step-732--imogencfxinput-year_outer-override-next-sessions-15-2-days)._
-**Status:** ✅ **FOUNDATION + C1.1 IMPLEMENTATION + C1.2 1-CELL XVAL PASS + C1.3 SUB-STEP 7.3.1 4-CELL XVAL PASS + ENGINE WRITER FIX LANDED; sub-step 7.3.2 IMOGENCFXInput year_outer override PENDING.** This commit lands TWO bundled deliverables:
+**C1.3 sub-step 7.3.1 commit:** `7be595a` (un-tagged; on top of `8bddc27`)
+**C1.3 sub-step 7.3.2 + close-out commit / tag:** _to be filled in after `git commit + git tag`_ (TAGGED `v0.17.0-step17a-c1-year-outer-single-process`; on top of `7be595a`)
+**Status:** ✅ **FULL C1 CLOSE-OUT LANDED.** Foundation + C1.1 ImogenInput overrides + C1.2 1-cell xval PASS + C1.3 sub-step 7.3.1 4-cell xval PASS + engine writer fix + C1.3 sub-step 7.3.2 IMOGENCFXInput year_outer override + K→C latent-bug fix all done. ALL FOUR cross-validation scenarios (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) PASS bit-exact (37/37 .out files identical between Run A `gridcell_outer` and Run B `year_outer` for each scenario). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is empirically validated for BOTH input modules across BOTH single-cell + multi-cell + single-spinup-year + multi-spinup-year scenarios. **GO/NO-GO gate per session-2 §9.5: PASSED for all 4 scenarios.** Tagging `v0.17.0-step17a-c1-year-outer-single-process` at this commit. This commit lands TWO bundled deliverables:
 1. **Engine writer fix** in `lpjguess/modules/climatemodel.cpp` (4 conditional removals; ~76 LOC including doc blocks): removes the `if (iyear == year1)` and `if (iyear == iyend)` gates around the climate-anomaly file OPEN/CLOSE blocks (lines ~884, ~963, ~988, ~998) AND the CO2.dat/CO2_all.dat writer block (line ~787). Fixes the **alternating-year staged-climate structural quirk** discovered at C1.2: previously each engine call only produced full climate for `IYEAR == YEAR1` (combined with `updateImogenControlData()` advancing `IMOGENConfig::YEAR1++` per IYEAR iteration → calls advanced by 2 years → only ODD-numbered years 1871, 1873, ..., 1901 had data; EVEN years had only `done` markers). With the fix, ALL years get full 13-file climate. Verified empirically: re-staged climate via launcher (~3-4 min wall-clock) produces 32 dirs (1871-1902) ALL with 13 files (vs prior 16 ODD with 13 files + 16 EVEN with 1 file).
 2. **C1.3 sub-step 7.3.1 multi-cell cross-validation**: 4-cell `gridlist_test2.txt` × `nyear_spinup=2` × `lasthistyear=1879` × 11 simulated years per cell × 4 cells = 44 cell-year iterations per run. Run A (`framework_loop_mode = "gridcell_outer"`) vs Run B (`framework_loop_mode = "year_outer"`) → **all 37 .out files bit-exact (37/37 matches; 0 mismatches)**. **GO/NO-GO gate per session-2 §9.5: PASSED for 4-cell smoke (and 1-cell smoke; re-verified PASS with the new config).** The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`; corrected at C1.1) is now empirically validated across BOTH cell_idx>0 AND year_idx>0 branches.
 
@@ -475,41 +476,86 @@ Configured 4-cell xval per:
 
 **Pre-requisite achieved**: engine writer fix in `lpjguess/modules/climatemodel.cpp` (this commit; bundled). Without the fix, the alternating-year staged climate would have failed at EVEN-year imogen_year selections (e.g., cell 0 spinup year_idx=1 → imogen_year=1872 missing climate). See [§5.6 — Engine writer fix bundled in this commit — rationale](#56-engine-writer-fix-bundled-in-this-commit--rationale).
 
-### 7.3.2 C1.3 sub-step 7.3.2 — IMOGENCFXInput year_outer override (next session(s); ~1.5-2 days)
+### 7.3.2 C1.3 sub-step 7.3.2 — IMOGENCFXInput year_outer override + K→C latent-bug fix [DONE this commit; PASSED bit-exact for both single-cell + multi-cell]
 
-Now the only remaining work within step 17a before tagging:
+This commit lands THREE bundled deliverables that together close out F-12 sub-milestone C1:
 
-- Replicate the C1.1 implementation pattern for `IMOGENCFXInput` (the `-input imogencfx` tight-coupling input module; `lpjguess/modules/imogencfx.cpp/h`)
-- USE THE CORRECTED FORMULA: `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`; per [§5.4 erratum](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum))
-- Add per-cell-cache members to `imogencfx.h`: `year_outer_cell_idx` + `year_outer_ndep_cache` (mirror ImogenInput pattern at imogen_input.h)
-- Implement `IMOGENCFXInput::preload_all_climate(Gridcell&, int, int)` + `IMOGENCFXInput::getclimate_for_year(Gridcell&, int, int)` overrides
-- Handle additional climate fields IMOGENCFXInput supports beyond ImogenInput: `relhum`, `wind`, `tmin`, `tmax` (per `imogencfx.cpp:1166-1188`)
-- Handle BLAZE compatibility check (per `imogencfx.cpp:884-893`)
-- Per the user's 2026-05-10 evening note: IMOGENCFXInput supports MORE input types than ImogenInput (NetCDF ndep, NetCDF population data, etc.) — careful handling for these
-- IMPORTANT: `IMOGENCFXInput::init()` calls `RUN_IMOGEN_ENGINE()` at line 524 which deadlocks per F-10. For sub-step 7.3.2 cross-validation, three options remain (per [§7.3.2 below](#732-engine-bypass-options-for-imogencfxinput-xval)):
-- Cross-validate identically: single-cell smoke first (`scripts/cross_validate_year_outer.sh 1cell` with `-input imogencfx` switch); multi-cell smoke second (`4cell` variant). Target: bit-exact 37/37 PASS for both.
+#### A. NEW `skip_inprocess_engine_run` ins parameter (option a per §7.3.2 above)
 
-#### 7.3.2 Engine-bypass options for IMOGENCFXInput xval
+Per the option (a) recommendation, NEW bool `skip_inprocess_engine_run` ins parameter (default `false`; preserves LTS-equivalent behaviour). When set to `true` in an `.ins` file, gates the `RUN_IMOGEN_ENGINE()` call in `IMOGENCFXInput::init()` at imogencfx.cpp ~line 524 (which would otherwise deadlock per F-10 in single-process tight). User must pre-stage climate externally via launcher run (the climate writer fix landed at sub-step 7.3.1 commit `7be595a` makes ALL years available, not just ODD).
 
-Three options for handling the `RUN_IMOGEN_ENGINE()` deadlock in IMOGENCFXInput's init() during cross-validation:
+Files modified for the parameter:
+- `lpjguess/framework/parameters.h` (~22 LOC; new `extern bool skip_inprocess_engine_run;` declaration with extensive doc block)
+- `lpjguess/framework/parameters.cpp` (~14 LOC; default `false` definition with doc block)
+- `lpjguess/modules/imogencfx.cpp` (~14 LOC; `declare_parameter("skip_inprocess_engine_run", &IMOGENConfig::skip_inprocess_engine_run, "...")` registration in `IMOGENCFXInput::IMOGENCFXInput()` constructor + ~14 LOC gate around `RUN_IMOGEN_ENGINE()` call at line ~524 with informative dprintf when the flag is set)
 
-(a) **NEW `skip_inprocess_engine_run` ins parameter** (~10 LOC) gating the engine call in `IMOGENCFXInput::init()`. Simplest. Adds a small helper parameter for testing scenarios where climate is pre-staged.
+#### B. IMOGENCFXInput year_outer overrides (replicates C1.1 ImogenInput pattern with IMOGENCFXInput-specific differences)
 
-(b) **`REGRID=1` engine run + cross-validation against the regridded climate**. Uses existing config knobs (`runs/SSP1-2.6/imogen_intermediary.ins:244`); engine produces climate at exactly the LPJG gridlist cells.
+Implemented two virtuals on `IMOGENCFXInput`:
 
-(c) **Defer IMOGENCFXInput cross-validation to C2 era** (workstation MPI year_outer; per session-2 §6.3.2's Option C sketch — proper per-year-inline `climatemodel.run_year(yr+1)` integration within the year-outer block).
+- **`IMOGENCFXInput::preload_all_climate(Gridcell&, int first_calendar_year, int last_calendar_year)`** — pre-loads all needed years' climate for ONE cell into the existing `all_temp/all_prec/all_wetdays/all_insol/all_dtr/all_drelhum/all_dwind/all_dtmin/all_dtmax` cache via `readenv()` (which handles ALL 9 climate fields IMOGENCFXInput supports). Caches per-cell `cell_idx` (== `current_grid_index` at preload time) + per-cell `Lamarque::NDepData` value-copy in `year_outer_cell_idx` + `year_outer_ndep_cache` maps respectively. Uses the corrected spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`).
 
-Recommendation per user discipline + session-2 §11.5: Option (a) at sub-step 7.3.2 (~10 LOC; simplest; bounded; well-aligned with v1.0 timeline). Option (b) as documentation alternative. Option (c) deferred to C2.
+- **`IMOGENCFXInput::getclimate_for_year(Gridcell&, int calendar_year, int day_of_year)`** — reads from cache. On day 0 of each (cell, year) tuple: BLAZE compatibility check (mirror of imogencfx.cpp:884-893; same actionable error message); looks up cell_idx + cached NDepData; calls existing `get_climate_for_gridcell()` to populate per-day arrays (now with K→C fix per item C below); calls `cell_ndep.get_one_calendar_year(...)` + `distribute_ndep(...)`; sets `climate.co2`. Every day: assigns `climate.{temp, prec, insol, dtr conditional, relhum, u10, tmin, tmax}` + `gridcell.{dNH4dep, dNO3dep}` from per-day arrays.
 
-### 7.4 C1 close-out (after sub-step 7.3.2; ~0.5 day)
+**Critical IMOGENCFXInput-specific difference from ImogenInput**: per the user's 2026-05-10 clarification "imogencfx is meant to work like the cfx input module, with only caveat being that instead of the netcdf climate forcing variables input like isimip3b climate as shown in main.ins, it takes in imogen climate. So everything else with the imogencfx input module remains as with the cfx module — it should therefore still be able to take in NetCDF population density, SIMFIRE-BLAZE binary, atmospheric CO2 concentrations, NetCDF nitrogen deposition as wet and dry NHx and NOy etc." — so IMOGENCFXInput's CFXInput-equivalent infrastructure (landcover_input, management_input, soilinput, ndep, NetCDF population for SIMFIRE, etc.) is preserved unchanged. The year_outer block in framework.cpp already calls `getgridcell()` per cell during pre-load, which exercises all this CFXInput-equivalent setup naturally. Only the climate driver (the IMOGEN ASCII reader in `getclimate()`) is replaced by my `getclimate_for_year` override.
 
-After IMOGENCFXInput cross-validations pass bit-exactly (single-cell + multi-cell):
-- Update this STEP_17a.md with sub-step 7.3.2 outcome + final C1 status
-- Update CHANGELOG `[Unreleased]` → `[v0.17.0-step17a-c1-year-outer-single-process]`
-- Update EXECUTION_PLAN V.1 row 17a status: 🔧 → ✅ DONE
-- Update FOLLOWUPS F-12 entry: C1 closed; C2 next
-- Update BACKPORT_LEDGER with sub-step 7.3.2 file changes
-- Tag `v0.17.0-step17a-c1-year-outer-single-process`; push to all 3 remotes
+Files modified for the overrides:
+- `lpjguess/modules/imogencfx.h` (+~95 LOC additive: 2 includes `<map>`, `<utility>`; 2 method declarations with extensive doc blocks; 2 cache map members)
+- `lpjguess/modules/imogencfx.cpp` (+~250 LOC additive: 2 method implementations with doc blocks)
+
+#### C. K→C latent-bug fix in IMOGENCFXInput::get_climate_for_gridcell (~25 LOC change incl. doc blocks; 5 actual code-line changes)
+
+**Discovered empirically during sub-step 7.3.2 cross-validation**: with skip_inprocess_engine_run=1 bypassing F-10 deadlock, LPJG main loop runs in `-input imogencfx` mode for the first time (no production run had previously exercised this code path because F-10 always blocked init()). Run A immediately failed at `Soil::soil_temp_multilayer - SOIL TEMP. ERROR!!!` with `T[i]: 169.393` (= -103.76°C, physically impossible).
+
+**Root cause**: the IMOGEN engine writes T_anom.dat / Tmin_anom.dat / Tmax_anom.dat in **Kelvin** (e.g., 237.881 K for high-Arctic January); LPJG's Climate struct expects `climate.temp / .tmin / .tmax` in **degrees Celsius**. The previous code stored Kelvin in `dtemp/dtmin/dtmax` then assigned `climate.temp = dtemp[date.day]` directly (line ~1179 in `IMOGENCFXInput::getclimate`) WITHOUT subtracting 273.15. ImogenInput's `getclimate` at imogen_input.cpp:876 correctly does `climate.temp = dtemp[date.day] - 273.15;`. **IMOGENCFXInput had a LATENT K-vs-C bug** for these 3 temperature fields that was never surfaced because LPJG main loop never ran in `-input imogencfx` mode (F-10 deadlock at `IMOGENCFXInput::init`'s `RUN_IMOGEN_ENGINE` call blocked before the main loop could exercise getclimate's per-day driver).
+
+**Fix**: subtract 273.15 at the monthly-array population step in `get_climate_for_gridcell` (lines ~902-908 monthly branch + lines ~935-952 daily branch + symmetric application to mtmin/mtmax). Single change point benefits BOTH `gridcell_outer` (existing `getclimate`) AND `year_outer` (new `getclimate_for_year`) modes since both invoke `get_climate_for_gridcell`. Aligns IMOGENCFXInput's `dtemp` semantics with CFXInput's pattern (dtemp in Celsius natively, since CFXInput's NetCDF ISIMIP3b is in Celsius).
+
+Files modified for the K→C fix:
+- `lpjguess/modules/imogencfx.cpp::get_climate_for_gridcell` (~25 LOC of doc blocks + 5 code-line changes adding `- 273.15` to `mtmp[i]`, `mtmin[i]`, `mtmax[i]` in monthly branch and to `dtemp[i]`, `dtmin[i]`, `dtmax[i]` in daily branch)
+
+**C1.2 1-cell xval (loose; ImogenInput) re-verified post-fix: STILL PASSES bit-exact (37/37).** No regression to the loose-mode test path (since it doesn't touch IMOGENCFXInput::get_climate_for_gridcell).
+
+#### Cross-validation scaffolding for sub-step 7.3.2
+
+- `runs/SSP1-2.6/main_xval_imogencfx.ins` (NEW; ~140 LOC): mirrors `main_xval_loose.ins` exactly except (1) `coupling_mode "prescribed"` (vs `"loose"`; canonical for IMOGENCFXInput) and (2) `skip_inprocess_engine_run 1` (NEW). Includes the additional 4 file_relhum/wind/tmin/tmax param directives (IMOGENCFXInput-specific; safely processed post-engine-fix).
+
+- `scripts/cross_validate_year_outer.sh` (extended; ~20 LOC change): added optional 2nd argument for input-module selector (`imogen` (default; preserves prior behaviour) | `imogencfx` (NEW)). Run-output dirs gain `_imogencfx_` infix suffix when imogencfx variant is used to avoid conflict with imogen runs. The `-input` flag now uses the variable. Banner updated.
+
+#### Cross-validation results (this commit)
+
+ALL FOUR cross-validation scenarios PASS bit-exact (37/37 .out files identical):
+
+```
+$ scripts/cross_validate_year_outer.sh 1cell imogen
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+PASS: All .out files are bit-exact between Run A and Run B.
+
+$ scripts/cross_validate_year_outer.sh 4cell imogen
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+PASS: All .out files are bit-exact between Run A and Run B.
+
+$ scripts/cross_validate_year_outer.sh 1cell imogencfx
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+PASS: All .out files are bit-exact between Run A and Run B.
+
+$ scripts/cross_validate_year_outer.sh 4cell imogencfx
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+PASS: All .out files are bit-exact between Run A and Run B.
+```
+
+**The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is empirically validated for BOTH ImogenInput AND IMOGENCFXInput across BOTH single-cell + multi-cell + single-spinup-year + multi-spinup-year scenarios.** **GO/NO-GO gate per session-2 §9.5: PASSED for all 4 scenarios.**
+
+### 7.4 C1 close-out (this commit)
+
+- ✅ This STEP_17a.md updated with sub-step 7.3.2 outcome + final C1 status
+- ✅ CHANGELOG: new `[v0.17.0-step17a-c1-year-outer-single-process]` entry above the unreleased entries
+- ✅ EXECUTION_PLAN V.1 row 17a status: 🔧 → ✅ DONE
+- ✅ FOLLOWUPS F-12 entry: C1 closed; C2 next
+- ✅ BACKPORT_LEDGER with sub-step 7.3.2 file changes; sub-step 7.3.1 `_TBD_` filled with `7be595a`
+- ✅ Tag `v0.17.0-step17a-c1-year-outer-single-process` at this commit; push to all 3 remotes
+
+**C1 IS CLOSED.** Next sub-milestone within F-12: C2 (workstation MPI year_outer; ~3-5 days; tag target `v0.17.5-step17b-c2-mpi-sync`; per `EXECUTION_PLAN.md` V.1 row 17b).
 
 ---
 
