@@ -408,6 +408,235 @@ int framework(const CommandLineArguments& args) {
 	// SSR
 	bool is_first_gridcell = true;
 
+	// =====================================================================
+	// [Step 17a (F-12 sub-milestone C1) ADDITIVE PATH: per-year-outer /
+	//  per-gridcell-inner loop, gated on IMOGENConfig::framework_loop_mode.
+	//  Default mode "gridcell_outer" SKIPS this block entirely (early-
+	//  return pattern preserves the existing per-gridcell-outer code path
+	//  below byte-exactly; no whitespace or indentation change there).
+	//
+	//  Design rationale (D1; per session-2 chat handoff Part 9 §9.3):
+	//    - Pre-load all gridcells into memory + pre-load all years' climate
+	//      per cell via the new InputModule::preload_all_climate virtual
+	//    - Year-outer loop drives simulate_day per cell per day via the
+	//      new InputModule::getclimate_for_year virtual (NOT the existing
+	//      getclimate(gridcell), to avoid global-date state-machinery
+	//      dependencies and per-input-module shared-mutable-state bugs
+	//      like IMOGENCFXInput's spinup_year_idx)
+	//    - 4 concerns per cell preserved (per session-2 §9.2 audit):
+	//        (a) per-cell setup: getgridcell, reset, setup_multipart,
+	//            climate.initdrivers, landcover_init -- ONCE at preload
+	//        (b) restart load: deserialize_gridcell + date.year jump --
+	//            NOT supported in C1; fail fast (gridcell_outer required)
+	//        (c) per-day inner: simulate_day, outdaily, year-end outannual,
+	//            balance.check_year, abort_check, date.next -- PER YEAR
+	//            in the year-outer loop's inner cell pass
+	//        (d) per-cell teardown: balance.check_period -- ONCE at end
+	//
+	//  C1 scope limitations (deliberately narrow; expand in C1.2/C1.3):
+	//    - restart NOT supported in year_outer (use gridcell_outer)
+	//    - save_state NOT supported in year_outer (use gridcell_outer)
+	//    - crop_gs_out NOT supported in year_outer (use gridcell_outer)
+	//    - printseparatestands NOT supported in year_outer (use gridcell_outer)
+	//  All limitations fail fast with clear pointers to gridcell_outer
+	//  fallback. Smoke test (4-5 cell × 50-yr SSP1-2.6 cross-validation)
+	//  doesn't need any of these.
+	//
+	//  Cross-references:
+	//    - notes/FOLLOWUPS.md F-12 (canonical revised plan; staged C1->C2->C3)
+	//    - notes/STEP_17a.md (per-step verification record)
+	//    - _chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md Part 9
+	//      (full design rationale + D1/D2/D3 options considered)
+	//    - inputmodule.h preload_all_climate + getclimate_for_year doc blocks
+	//  - DKB 2026-05-10]
+	// =====================================================================
+	if (IMOGENConfig::framework_loop_mode == "year_outer") {
+
+		// ----- C1 limitation guards: fail fast on unsupported features -----
+		if (restart) {
+			fail("framework_loop_mode = \"year_outer\" does not support "
+			     "restart in the C1 sub-milestone (step 17a). Use "
+			     "framework_loop_mode = \"gridcell_outer\" (the default) "
+			     "for restarted runs. Restart support in year_outer mode "
+			     "is planned for a subsequent C1 sub-milestone.");
+		}
+		if (save_state) {
+			fail("framework_loop_mode = \"year_outer\" does not support "
+			     "save_state in the C1 sub-milestone (step 17a). Use "
+			     "framework_loop_mode = \"gridcell_outer\" (the default) "
+			     "for save-state runs. save_state support in year_outer "
+			     "mode is planned for a subsequent C1 sub-milestone.");
+		}
+		if (crop_gs_out) {
+			fail("framework_loop_mode = \"year_outer\" does not support "
+			     "crop_gs_out in the C1 sub-milestone (step 17a). Use "
+			     "framework_loop_mode = \"gridcell_outer\" (the default) "
+			     "for GGCMI crop runs.");
+		}
+		if (printseparatestands) {
+			fail("framework_loop_mode = \"year_outer\" does not support "
+			     "printseparatestands in the C1 sub-milestone (step 17a). "
+			     "Use framework_loop_mode = \"gridcell_outer\" (the default) "
+			     "for separate-stand outputs.");
+		}
+
+		// ----- 1. Determine year range for the simulation -----
+		// total_years = nyear_spinup + (lasthistyear - firsthistyear + 1).
+		// first_calendar_year = firsthistyear - nyear_spinup, matching the
+		// gridcell_outer loop's date.year=0 convention (year 0 of the
+		// simulation == first_calendar_year on the calendar).
+		const int total_years = nyear_spinup + (lasthistyear - firsthistyear + 1);
+		const int first_calendar_year = firsthistyear - nyear_spinup;
+
+		dprintf("[year_outer] starting framework_loop_mode = \"year_outer\" "
+		        "(F-12 sub-milestone C1; step 17a)\n");
+		dprintf("[year_outer]   nyear_spinup = %d, firsthistyear = %d, "
+		        "lasthistyear = %d\n",
+		        nyear_spinup, firsthistyear, lasthistyear);
+		dprintf("[year_outer]   total_years = %d (calendar %d .. %d)\n",
+		        total_years, first_calendar_year,
+		        first_calendar_year + total_years - 1);
+
+		// ----- 2. Pre-load all gridcells + preload climate per cell -----
+		// Each cell gets the same setup pipeline as gridcell_outer's lines
+		// 425-452 (date.init(1), getgridcell, reset, setup_multipart,
+		// climate.initdrivers, landcover_init). Then preload_all_climate
+		// loads all years' climate up front (per the D1 design choice).
+		std::vector<std::unique_ptr<Gridcell>> gridcells;
+
+		while (true) {
+
+			// Per-cell setup mirrors gridcell_outer lines 425-452.
+			date.init(1);
+
+			std::unique_ptr<Gridcell> gridcell_ptr(new Gridcell);
+			Gridcell& gridcell = *gridcell_ptr;
+			gridcell.is_first_gridcell = is_first_gridcell;
+
+			input_module->setup_multipart();
+
+			if (!input_module->getgridcell(gridcell)) {
+				break;  // no more gridcells; preload phase complete
+			}
+
+			input_module->reset();
+			input_module->setup_multipart();
+			gridcell.climate.initdrivers(gridcell.get_lat());
+			landcover_init(gridcell, input_module.get());
+
+			// PRELOAD CLIMATE for all years for this cell (D1 design).
+			// Default-fail virtual aborts here if the input module doesn't
+			// override it; only IMOGENCFXInput in C1 (with the spinup_
+			// year_idx state-machine reproduction; landed in subsequent
+			// C1 sub-step) is expected to override.
+			input_module->preload_all_climate(gridcell, first_calendar_year,
+			                                  first_calendar_year + total_years - 1);
+
+			gridcells.push_back(std::move(gridcell_ptr));
+			is_first_gridcell = false;
+		}
+
+		const int num_cells = static_cast<int>(gridcells.size());
+		dprintf("[year_outer] preloaded %d gridcell(s)\n", num_cells);
+
+		if (num_cells == 0) {
+			// No gridcells in gridlist; nothing to simulate.
+			if (crop_gs_out) {
+				output_modules.closelocalfiles_ggcmi();
+			}
+			return 0;
+		}
+
+		// ----- 3. Per-year outer loop -----
+		// For each calendar year in the simulation, process all gridcells
+		// for that year in inner-loop order. The inner loop's per-day
+		// simulate_day calls advance global `date` per day; we reset
+		// `date` to (year_idx, day=0) at the start of each (year, cell)
+		// tuple so the per-day inner loop sees the same date semantics
+		// as gridcell_outer mode would for the same (cell, year, day).
+		for (int year_idx = 0; year_idx < total_years; ++year_idx) {
+
+			const int calendar_year = first_calendar_year + year_idx;
+
+			for (int cell_idx = 0; cell_idx < num_cells; ++cell_idx) {
+
+				Gridcell& gridcell = *gridcells[cell_idx];
+
+				// Reset date to start of this (cell, year). The init(1)
+				// call resets all per-day fields cleanly; we then set
+				// date.year manually to year_idx (relative to
+				// first_calendar_year, which is set globally elsewhere).
+				date.init(1);
+				date.year = year_idx;
+
+				// 365-day inner loop. day_of_year is purely a counter for
+				// getclimate_for_year's day index; date.day is updated by
+				// date.next() per iteration to keep the global-date view
+				// consistent for simulate_day + output_modules.
+				for (int day_of_year = 0;
+				     day_of_year < Date::MAX_YEAR_LENGTH;
+				     ++day_of_year) {
+
+					if (!input_module->getclimate_for_year(gridcell,
+					                                       calendar_year,
+					                                       day_of_year)) {
+						// Sim-done terminator from input module (mirrors
+						// getclimate's false-return semantics). Treat as
+						// end-of-simulation for this cell-year.
+						break;
+					}
+
+					simulate_day(gridcell, input_module.get());
+
+					output_modules.outdaily(gridcell);
+
+					if (date.islastday && date.islastmonth) {
+						// LAST DAY OF YEAR -- year-end actions per cell
+						// (mirrors gridcell_outer lines 481-516).
+						if (!just_phu_pvd) {
+							output_modules.outannual(gridcell);
+						}
+						if (!just_phu_pvd) {
+							gridcell.balance.check_year(gridcell);
+						}
+						if (abort_request_received()) {
+							return 99;
+						}
+					}
+
+					// Advance timer to next simulation day
+					date.next();
+				}
+			}
+		}
+
+		// ----- 4. Per-cell teardown -----
+		// Mirrors gridcell_outer lines 524-528.
+		for (int cell_idx = 0; cell_idx < num_cells; ++cell_idx) {
+			Gridcell& gridcell = *gridcells[cell_idx];
+			if (!just_phu_pvd) {
+				gridcell.balance.check_period(gridcell);
+			}
+		}
+
+		// ----- 5. Cleanup (mirrors framework.cpp lines 537-538) -----
+		// crop_gs_out is unsupported in year_outer (guarded above), so
+		// closelocalfiles_ggcmi is unreachable here -- but call it
+		// defensively to mirror gridcell_outer's structure.
+		if (crop_gs_out) {
+			output_modules.closelocalfiles_ggcmi();
+		}
+
+		dprintf("[year_outer] simulation complete: %d cell(s) x %d year(s)\n",
+		        num_cells, total_years);
+
+		// EARLY RETURN: skip the existing per-gridcell-outer code below.
+		// The existing code is preserved byte-exactly as the default
+		// gridcell_outer mode -- no whitespace or indentation change.
+		return 0;
+	}
+	// ===== End of step-17a year_outer additive block =====
+
 	while (true) {
 
 		// START OF LOOP THROUGH GRID CELLS

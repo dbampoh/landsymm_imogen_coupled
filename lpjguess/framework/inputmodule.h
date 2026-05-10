@@ -81,6 +81,51 @@ public:
 	 */
 	virtual bool getclimate(Gridcell& gridcell) = 0;
 
+	/// Pre-loads ALL climate data for a single gridcell across the year range.
+	/** Used by the year_outer framework loop ordering (see
+	 *  IMOGENConfig::framework_loop_mode = "year_outer"; added at
+	 *  step 17a as F-12 sub-milestone C1 of the unified-codebase rebuild).
+	 *  The default implementation here aborts with a clear error pointing
+	 *  the user at the limitation; input modules that need to support the
+	 *  year_outer ordering must override this and getclimate_for_year().
+	 *
+	 *  Called ONCE per cell after gridcell setup (getgridcell + reset +
+	 *  setup_multipart + climate.initdrivers + landcover_init), before
+	 *  the per-year-outer / per-cell-inner main loop begins.
+	 *
+	 *  \param gridcell             The cell whose climate to preload
+	 *  \param first_calendar_year  First calendar year to preload (inclusive)
+	 *  \param last_calendar_year   Last calendar year to preload (inclusive)
+	 */
+	virtual void preload_all_climate(Gridcell& gridcell,
+	                                 int first_calendar_year,
+	                                 int last_calendar_year);
+
+	/// Obtains climate data for one specific (calendar_year, day_of_year)
+	/// for a single gridcell, served from the per-cell cache populated by
+	/// preload_all_climate.
+	/** Used by the year_outer framework loop ordering. Mirrors getclimate's
+	 *  per-day Climate-struct population semantics, but takes the year +
+	 *  day as explicit parameters rather than reading them from the global
+	 *  date object. This decouples climate data access from the global
+	 *  date state machinery, which is needed because year_outer mode
+	 *  drives date per-cell-per-year-per-day in a different ordering
+	 *  than gridcell_outer mode.
+	 *
+	 *  Default implementation aborts with the same error message as
+	 *  preload_all_climate. Input modules that override one MUST override
+	 *  the other; the year_outer framework path calls them as a pair.
+	 *
+	 *  \param gridcell        The cell whose climate to populate
+	 *  \param calendar_year   The calendar year to serve climate for
+	 *  \param day_of_year     The day of year (0..364) to serve climate for
+	 *  \return true if climate was populated; false if the cell is done
+	 *          (sim-done terminator semantics, mirroring getclimate)
+	 */
+	virtual bool getclimate_for_year(Gridcell& gridcell,
+	                                 int calendar_year,
+	                                 int day_of_year);
+
 	/// Obtains land transitions for one year
 	virtual void getlandcover(Gridcell& gridcell) = 0;
 

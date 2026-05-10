@@ -339,6 +339,19 @@ IMOGENCFXInput::IMOGENCFXInput()
 	//  - DKB 2026-05-06]
 	declare_parameter("coupling_mode", &IMOGENConfig::coupling_mode, 20, "Coupling mode: tight | prescribed | loose (default tight)");
 
+	// [Step 17a (F-12 sub-milestone C1) of unified-codebase rebuild:
+	//  framework_loop_mode ins parameter. Selects framework.cpp's
+	//  per-cell-or-per-year loop ordering. Values:
+	//    "gridcell_outer" (default; preserves LTS-equivalent behaviour
+	//                      byte-exactly; F-10-deadlocked for single-
+	//                      process tight coupling)
+	//    "year_outer"     (additive Path A code path; resolves F-10
+	//                      deadlock; activates new InputModule virtuals
+	//                      preload_all_climate + getclimate_for_year)
+	//  See followup F-12 + EXECUTION_PLAN.md V.1 step rows 17a/17b/17c.
+	//  - DKB 2026-05-10]
+	declare_parameter("framework_loop_mode", &IMOGENConfig::framework_loop_mode, 20, "Framework loop ordering: gridcell_outer (default) | year_outer (F-12 C1)");
+
 	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
 	//  declare_parameter was added at step 9 then REMOVED at step 9's
 	//  wrap-up; see parameters.h same-named comment block for rationale.

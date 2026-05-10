@@ -503,6 +503,31 @@ namespace IMOGENConfig {
 	//  applies to "tight" in v1.0. - DKB 2026-05-06]
 	extern xtring coupling_mode;
 
+	// [Step 17a (F-12 sub-milestone C1) of unified-codebase rebuild:
+	//  framework loop ordering selector. Values:
+	//    "gridcell_outer" (DEFAULT; preserves LTS-equivalent
+	//                      per-gridcell-outer / per-day-inner-across-
+	//                      all-years loop ordering byte-exactly. Use for
+	//                      standalone, loose, prescribed coupling, and
+	//                      MPI parallel runs. F-10-deadlocked for
+	//                      single-process tight; works for everything else.)
+	//    "year_outer"     (ADDITIVE Path A code path; per-year-outer /
+	//                      per-gridcell-inner loop. Resolves F-10's
+	//                      architectural deadlock at root by providing
+	//                      the year-boundary synchronization point that
+	//                      tight coupling requires. Activates the new
+	//                      InputModule::preload_all_climate +
+	//                      getclimate_for_year virtuals; only input
+	//                      modules that override these can be paired
+	//                      with this mode.)
+	//  Default at parameters.cpp is "gridcell_outer". See followup F-12
+	//  + EXECUTION_PLAN.md V.1 step rows 17a/17b/17c + the session-2
+	//  chat handoff Part 9 for the staged C1 -> C2 -> C3 rollout. The
+	//  additive-parameter pattern mirrors the LandSyMM-fork-into-LTS
+	//  integration pattern from the predecessor integration project.
+	//  - DKB 2026-05-10]
+	extern xtring framework_loop_mode;
+
 	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
 	//  was added at step 9 as a V.1 step-9 verification helper, then
 	//  REMOVED at step 9's wrap-up (per user code-integrity preference)

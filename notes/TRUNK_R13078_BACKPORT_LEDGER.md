@@ -704,6 +704,148 @@ both backends will use.
 
 ---
 
+### Step 17a (FOUNDATION): F-12 sub-milestone C1 architectural foundation — framework_loop_mode parameter + InputModule virtuals + framework.cpp year_outer additive code path
+
+**Commit:** `_TBD_` (this commit; foundation only; full step-17a tag waits for IMOGENCFXInput overrides + cross-validation)  **Date:** 2026-05-10
+
+The architectural foundation for the per-year-outer / per-gridcell-inner
+loop ordering (which resolves F-10's deadlock for tight coupling at root)
+is in place. **Default mode `framework_loop_mode = "gridcell_outer"`
+preserves LTS-equivalent behaviour byte-exactly** (verifiable via
+`git diff -w` of `framework.cpp` lines 411-534: zero whitespace-only
+changes outside the new additive block; the existing per-gridcell-outer
+block is byte-untouched via the early-return-on-year_outer pattern).
+
+**Backport-relevance: HIGH.** All 6 file changes need to be replicated in
+`trunk_r13078`. The additive nature (new ins parameter; new non-pure
+virtuals on `InputModule` base class with default-fail implementations;
+new code block gated on parameter; existing code path byte-untouched)
+makes the backport mechanical.
+
+#### Files modified (~250 LOC added across 6 files; all in `lpjguess/`)
+
+- File: `framework/parameters.h`
+  - Operation: modify (add)
+  - Lines: +22 LOC, inserted adjacent to `coupling_mode` extern declaration
+  - Description: `extern xtring framework_loop_mode;` in `IMOGENConfig`
+    namespace, with inline doc block explaining `"gridcell_outer"` (default;
+    LTS-equivalent) and `"year_outer"` (additive Path A code path) values.
+    Cross-references FOLLOWUPS F-12, EXECUTION_PLAN V.1 rows 17a/17b/17c,
+    session-2 chat handoff Part 9.
+  - Backport guidance: trivial copy-paste; mirrors the proven step-8
+    `coupling_mode` declaration pattern.
+
+- File: `framework/parameters.cpp`
+  - Operation: modify (add)
+  - Lines: +8 LOC, inserted adjacent to `coupling_mode` definition
+  - Description: `xtring framework_loop_mode = "gridcell_outer";` default
+    value. The default preserves LTS-equivalent behaviour byte-exactly: no
+    .ins-file edit is required for any existing run to continue behaving
+    identically.
+  - Backport guidance: trivial copy-paste.
+
+- File: `modules/imogencfx.cpp`
+  - Operation: modify (add)
+  - Lines: +12 LOC, inserted in `IMOGENCFXInput::IMOGENCFXInput()` constructor
+    immediately after the existing `coupling_mode` declare_parameter call
+  - Description: `declare_parameter("framework_loop_mode",
+    &IMOGENConfig::framework_loop_mode, 20, ...)` registration; mirrors the
+    proven `coupling_mode` declare_parameter pattern from step 8.
+  - Backport guidance: trivial copy-paste; relative position to
+    `coupling_mode` declare_parameter is preserved.
+
+- File: `framework/inputmodule.h`
+  - Operation: modify (add)
+  - Lines: +50 LOC, two new virtual method declarations on `InputModule`
+    abstract base class with extensive doc blocks
+  - Description: `virtual void preload_all_climate(Gridcell&, int, int);`
+    + `virtual bool getclimate_for_year(Gridcell&, int, int);` declarations
+    (non-pure; default implementations live in inputmodule.cpp). The
+    non-pure-virtual choice preserves backward compatibility across all 9
+    existing input modules without forcing stub overrides; only modules
+    that opt in to year_outer mode need to override.
+  - Backport guidance: trivial copy-paste; pure-additive change to base
+    class; no existing virtual method signatures touched.
+
+- File: `framework/inputmodule.cpp`
+  - Operation: modify (add)
+  - Lines: +33 LOC, default-fail implementations of the two new virtuals
+  - Description: both call `fail()` (variadic; declared in
+    `framework/shell.h`; transitively included via `guess.h`) with an
+    actionable error pointing at `framework_loop_mode = "gridcell_outer"`
+    fallback + canonical docs (FOLLOWUPS F-12 + STEP_17a.md).
+  - Backport guidance: trivial copy-paste; uses existing `fail()` infrastructure.
+
+- File: `framework/framework.cpp`
+  - Operation: modify (add); EXISTING per-gridcell-outer block at lines
+    411-534 BYTE-UNTOUCHED (early-return pattern preserves byte-exactness)
+  - Lines: +218 LOC, new `if (IMOGENConfig::framework_loop_mode == "year_outer") { ... return 0; }`
+    block inserted between lines 409 and 411 (after `bool is_first_gridcell = true;`)
+  - Description: 5-phase year_outer code path:
+    (1) C1 limitation guards — fail fast on `restart`, `save_state`,
+        `crop_gs_out`, `printseparatestands` with clear pointers to
+        `gridcell_outer` fallback (deferred to C1.2/C1.3)
+    (2) Year range determination from `nyear_spinup`/`firsthistyear`/
+        `lasthistyear`
+    (3) Pre-load all gridcells with full per-cell setup pipeline
+        (mirrors gridcell_outer lines 425-452: `date.init(1)`, `getgridcell`,
+        `reset`, `setup_multipart`, `climate.initdrivers`, `landcover_init`)
+        + call `preload_all_climate(gridcell, first_yr, last_yr)` on input
+        module (default-fail virtual aborts here unless input module overrides)
+    (4) Per-year outer loop calling `getclimate_for_year(gridcell,
+        calendar_year, day_of_year)` + `simulate_day` + `outdaily` + year-end
+        `outannual` + `balance.check_year` + `abort_request_received` per
+        cell per day; `date.next()` per iteration. Per-cell `date` reset to
+        (year_idx, day=0) at start of each (year, cell) tuple via
+        `date.init(1) + date.year = year_idx`
+    (5) Per-cell teardown (`balance.check_period` per cell) + cleanup +
+        explicit `return 0;` to skip the existing per-gridcell-outer block below
+  - Backport guidance: this is the largest single block; copy-paste verbatim.
+    The block depends on:
+      - `IMOGENConfig::framework_loop_mode` (added in `parameters.h/cpp` above)
+      - `InputModule::preload_all_climate` + `getclimate_for_year`
+        (added in `inputmodule.h/cpp` above)
+      - `<memory>` header (already included via existing `framework.cpp` line 36)
+    No re-indentation of existing code; the new block is purely additive
+    with explicit early-return.
+
+#### Verification (this commit)
+
+- `cd lpjguess/build && make -j$(nproc)`: clean (only pre-existing
+  `simfire_input.h` `fread` warnings; unrelated to this commit)
+- `lpjguess/build/runtests --reporter compact`: "Passed all 25 test cases
+  with 162 assertions." (default-mode byte-exact regression preserved)
+- Default-fail virtuals: static verification only this commit; runtime
+  exercise deferred to next session (when an IMOGENCFXInput override
+  invokes the year_outer code path)
+
+#### Remaining work within step 17a (next session(s); subsequent commit(s); see notes/STEP_17a.md §7)
+
+1. **C1.1**: IMOGENCFXInput override of `preload_all_climate` +
+   `getclimate_for_year` (~3-5 days; ~150-300 LOC additional).
+   Critical complexity uncovered this session: the
+   `IMOGENCFXInput::spinup_year_idx` class-member counter persists
+   across cells in the existing gridcell_outer mode, causing
+   per-cell-different spinup `imogen_year` selections. Year_outer
+   override must reproduce this via the deterministic formula
+   `spinup_year_idx_at_cell_idx_year_idx = (cell_idx * nyear_spinup +
+   year_idx + 1) % NYEAR_SPINUP`. See STEP_17a.md §5.4 for the
+   detailed analysis.
+2. **C1.2**: Bit-exact cross-validation Run A (gridcell_outer) vs Run B
+   (year_outer) on smoke gridlist (single-cell first to bypass cell-
+   ordering complexity; multi-cell second to test the formula) (~1-2 days).
+3. **C1 close-out**: tag `v0.17.0-step17a-c1-year-outer-single-process`;
+   update this ledger with the C1.1 file changes; close C1 in FOLLOWUPS F-12.
+
+#### Net source-level change in `lpjguess/`: ~250 LOC across 6 files (all additive)
+
+Backport-relevance HIGH: the Backport Sprint (F-11) at end of Phase 1
+must replicate these changes mechanically into `trunk_r13078`. The
+purely-additive nature + the byte-untouched existing per-gridcell-outer
+block makes the replication straightforward.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

@@ -278,6 +278,15 @@ namespace IMOGENConfig {
 	//  See followup F-10 for v1.0 caveats. - DKB 2026-05-06]
 	 xtring coupling_mode = "tight";
 
+	// [Step 17a (F-12 sub-milestone C1) of unified-codebase rebuild:
+	//  framework loop ordering selector. Default "gridcell_outer"
+	//  preserves LTS-equivalent behaviour byte-exactly. New value
+	//  "year_outer" activates the additive code path in framework.cpp
+	//  that resolves F-10's architectural deadlock for tight coupling.
+	//  See parameters.h same-named comment block for the full
+	//  documentation. - DKB 2026-05-10]
+	 xtring framework_loop_mode = "gridcell_outer";
+
 	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
 	//  was added at step 9 then REMOVED at step 9's wrap-up; see
 	//  parameters.h same-named comment block for rationale. - DKB 2026-05-07]

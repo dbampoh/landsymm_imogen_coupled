@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-09 (post-step-16; Path A refined: skip Option B; staged Option C only — sub-milestones C1 (workstation single-process year_outer + cross-validation; ~1 week) → C2 (workstation MPI year_outer; ~3-5 days) → C3 (cluster MPI year_outer; ~1-2 weeks SSH iterative). Workstation specs verified (i9-11900K; 64 GB RAM; 16 cores). User decisions today: skip Option B; intermediary_py copy-over flow stays for v1.0; native LPJG filenames noted as v1.1+ refinement; local + cluster both matter equally.).
+**Last updated:** 2026-05-10 (step 17a F-12 sub-milestone C1 FOUNDATION landed; un-tagged commit on top of `09b40f0`. Foundation: `framework_loop_mode` ins parameter + `InputModule::preload_all_climate` + `getclimate_for_year` base-class virtuals + `framework.cpp` year_outer additive code path; default mode `gridcell_outer` byte-exact LTS-equivalent; 162 unit tests pass; ~250 LOC across 6 files; backport-relevance HIGH purely additive. Remaining within step 17a (next session(s)): IMOGENCFXInput overrides with the `spinup_year_idx` state-machine reproduction formula uncovered this session + bit-exact cross-validation. Revised C1 estimate: ~1.5-2 weeks total per session-2 §9.4. Full step-17a tag `v0.17.0-step17a-c1-year-outer-single-process` waits for cross-validation pass.)
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -776,6 +776,32 @@ provides the per-month aggregation point in the engine-output side).
      with more detail + design rationale). Then design the D1 (or D2/D3)
      implementation in the fresh chat with full context budget for the
      code work.
+- **C1 foundation landing + additional finding (2026-05-10 session)** —
+  the C1 FOUNDATION landed in an un-tagged commit on top of `09b40f0`:
+  `framework_loop_mode` ins parameter (default `"gridcell_outer"` byte-
+  exact LTS-equivalent) + `InputModule::preload_all_climate` +
+  `getclimate_for_year` base-class virtuals (default-fail; backward-compat
+  across all 9 input modules) + `framework.cpp` year_outer additive code
+  path (~218 LOC; existing per-gridcell-outer block at lines 411-534
+  byte-untouched via early-return pattern). 162 unit tests pass;
+  default-mode regression preserved. **D1 design choice CONFIRMED** per
+  the deeper investigation. **NEW FINDING from this session beyond the
+  2026-05-09 evening pre-flight: `IMOGENCFXInput::spinup_year_idx`
+  (line 220 of `imogencfx.h`) is a class-member counter that PERSISTS
+  ACROSS CELLS in the existing gridcell_outer mode** — each cell sees a
+  different starting value of `spinup_year_idx`, causing different spinup
+  `imogen_year` selections per cell. This is existing behaviour that must
+  be preserved EXACTLY per the byte-identical-default constraint, and
+  year_outer mode's IMOGENCFXInput override (next session) must reproduce
+  it via the deterministic formula
+  `spinup_year_idx_at_cell_idx_year_idx = (cell_idx * nyear_spinup +
+  year_idx + 1) % NYEAR_SPINUP`. Cross-validation strategy adapts:
+  single-cell smoke first (bypasses cell-ordering complexity); multi-cell
+  smoke second (tests formula reproduction). Captured in detail in
+  `notes/STEP_17a.md` §5.4 + `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md`
+  Part 10. Remaining within step 17a: IMOGENCFXInput overrides
+  (~3-5 days) + cross-validation (~1-2 days) + tag
+  `v0.17.0-step17a-c1-year-outer-single-process`.
 - **What was decided today (2026-05-09; user confirmation)**:
   1. Skip Option B; go straight to staged Option C (C1 → C2 → C3)
   2. `intermediary_py` cluster integration: keep existing copy-over

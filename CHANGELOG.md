@@ -17,6 +17,118 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-10 — Step 17a (F-12 sub-milestone C1) FOUNDATION: framework_loop_mode parameter + InputModule virtuals + framework.cpp year_outer additive code path (no tag — full step-17a tag waits for IMOGENCFXInput overrides + cross-validation)
+
+Foundation for the F-12 Option C staged implementation lands. The architectural
+foundation for the per-year-outer / per-gridcell-inner loop (which resolves
+F-10's per-gridcell-outer / per-day-inner-across-all-years deadlock for tight
+coupling at root) is in place; default mode (`framework_loop_mode = "gridcell_outer"`)
+preserves LTS-equivalent behaviour byte-exactly.
+
+#### What changed in `lpjguess/` source (6 files; ~250 LOC; backport-relevant)
+
+- **`lpjguess/framework/parameters.h`** (+22 LOC): new `extern xtring framework_loop_mode;`
+  in `IMOGENConfig` namespace, adjacent to `coupling_mode` (added at step 8).
+  Inline doc block explains both values + F-10 connection + cross-references.
+- **`lpjguess/framework/parameters.cpp`** (+8 LOC): `xtring framework_loop_mode = "gridcell_outer";`
+  default value preserves LTS-equivalent behaviour byte-exactly.
+- **`lpjguess/modules/imogencfx.cpp`** (+12 LOC): `declare_parameter("framework_loop_mode", ...)`
+  registration in `IMOGENCFXInput::IMOGENCFXInput()` constructor, mirroring
+  the proven `coupling_mode` pattern from step 8.
+- **`lpjguess/framework/inputmodule.h`** (+50 LOC): two new `virtual` methods
+  on the `InputModule` abstract base class — `preload_all_climate(Gridcell&,
+  int first_calendar_year, int last_calendar_year)` and `getclimate_for_year
+  (Gridcell&, int calendar_year, int day_of_year)`. Non-pure (default
+  implementations in inputmodule.cpp); preserves backward compatibility
+  across all 9 existing input modules without forcing stub overrides.
+- **`lpjguess/framework/inputmodule.cpp`** (+33 LOC): default-fail
+  implementations of the two new virtuals. Both abort with a clear error
+  pointing at `framework_loop_mode = "gridcell_outer"` fallback + canonical
+  docs (`notes/FOLLOWUPS.md` F-12 + `notes/STEP_17a.md`).
+- **`lpjguess/framework/framework.cpp`** (+218 LOC additive; existing 124-line
+  per-gridcell-outer block at lines 411-534 byte-untouched via early-return
+  pattern): new `if (IMOGENConfig::framework_loop_mode == "year_outer") { ... return 0; }`
+  block immediately before the existing `while (true)` per-gridcell-outer
+  loop. The new block has 5 phases: (1) C1 limitation guards (fail fast on
+  restart/save_state/crop_gs_out/printseparatestands; deferred to C1.2/C1.3);
+  (2) year range determination; (3) pre-load all gridcells + preload climate
+  per cell via the new InputModule virtual; (4) per-year outer loop calling
+  `simulate_day` per cell per day via `getclimate_for_year`; (5) per-cell
+  teardown + cleanup + explicit return.
+
+#### Verification (this commit)
+
+- `cd lpjguess/build && make -j$(nproc)`: ✅ clean (only pre-existing
+  `simfire_input.h` `fread` warnings; unrelated)
+- `lpjguess/build/runtests --reporter compact`: ✅ "Passed all 25 test
+  cases with 162 assertions." (default-mode byte-exact regression
+  preserved)
+- `git diff -w` of existing per-gridcell-outer block (`framework.cpp`
+  lines 411-534): ZERO whitespace-only changes (additive early-return
+  pattern preserves existing block structure)
+- Default-fail virtuals: static verification only this commit; runtime
+  exercise deferred to next session when an input module's override is
+  invoked
+
+#### What this commit does NOT yet do (next session(s) within step 17a)
+
+- IMOGENCFXInput override of `preload_all_climate` + `getclimate_for_year`
+  — substantial work (~3-5 days): includes the per-cell `spinup_year_idx`
+  state-machine reproduction formula uncovered this session
+  (`spinup_year_idx_at_cell_idx_year_idx = (cell_idx * nyear_spinup +
+  year_idx + 1) % NYEAR_SPINUP`), which year_outer mode needs to
+  reproduce gridcell_outer's existing cell-ordering-dependent imogen_year
+  selection
+- Bit-exact cross-validation of Run A (`gridcell_outer`) vs Run B
+  (`year_outer`) on smoke gridlist (single-cell first to bypass
+  cell-ordering complexity; multi-cell second to test the formula)
+- Tag `v0.17.0-step17a-c1-year-outer-single-process` (waits for
+  cross-validation pass)
+
+#### New finding from this session: `IMOGENCFXInput::spinup_year_idx` cross-cell coupling
+
+Beyond session-2 §9.5's PRNG audit, this session discovered that
+`IMOGENCFXInput::spinup_year_idx` (line 220 of `imogencfx.h`) is a
+class-member counter that **persists across cells** in the existing
+gridcell_outer mode — each cell sees a different starting value of
+`spinup_year_idx`, causing different spinup `imogen_year` selections per
+cell. This existing behaviour must be preserved EXACTLY per the
+"byte-identical default" constraint, and year_outer mode's IMOGENCFXInput
+override (next session) must reproduce it via the deterministic formula
+above. Cross-validation strategy adapts: single-cell smoke first
+(bypasses cell-ordering complexity); multi-cell smoke second (tests
+formula reproduction). Captured in `notes/STEP_17a.md` §5.4 +
+`notes/FOLLOWUPS.md` F-12.
+
+#### Updated documents
+
+- `notes/STEP_17a.md` (NEW): per-step verification record covering the
+  foundation work + design decision (D1 confirmed) + spinup_year_idx
+  finding + remaining-C1 work plan
+- `CHANGELOG.md` (this entry)
+- `EXECUTION_PLAN.md` V.1 step 17a row: status note "FOUNDATION LANDED"
+  added with reference to the foundation commit
+- `notes/FOLLOWUPS.md`: status dashboard date refreshed; F-12 entry
+  C1 pre-flight findings subsection extended with the spinup_year_idx
+  finding pointer
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md`: NEW step-17a-foundation
+  entry documenting the 6 file changes; backport-relevance HIGH
+  (purely additive; the new code applies cleanly to `trunk_r13078`
+  once F-11 Backport Sprint runs); plus backfilled `_TBD_` step-15
+  hash `cd68b29` and step-16 hash `572820c` as a free-rigor cleanup
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Part 10 (NEW;
+  outside-repo session-state preservation): documents this session's
+  C1 foundation work + design decisions + remaining work pointer for
+  the next chat session(s)
+
+#### Net source-level change in `lpjguess/`: ~250 LOC across 6 files
+
+All purely additive. The Backport Sprint (F-11) will replicate these
+changes mechanically into `trunk_r13078` at end of Phase 1 per the
+new step-17a-foundation entry in BACKPORT_LEDGER.md §3.
+
+---
+
 ### 2026-05-09 — Path A refinement: skip Option B; staged Option C only (no tag)
 
 Documentation-only commit refining the F-12 plan ahead of any code work,
