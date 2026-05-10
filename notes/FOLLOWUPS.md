@@ -13,7 +13,9 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-10 (very late evening; **F-12 SUB-MILESTONE C1 FULLY CLOSED OUT; TAGGED `v0.17.0-step17a-c1-year-outer-single-process`** at this commit. ALL FOUR cross-validation scenarios PASS bit-exact 37/37: imogen 1-cell ✅, imogen 4-cell ✅, imogencfx 1-cell ✅ (NEW), imogencfx 4-cell ✅ (NEW). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) empirically validated for BOTH input modules across BOTH single-cell + multi-cell + single-spinup-year + multi-spinup-year scenarios. **GO/NO-GO gate per session-2 §9.5: PASSED for ALL FOUR scenarios.** Sub-step 7.3.2 commit lands: NEW `skip_inprocess_engine_run` ins parameter (option a per STEP_17a.md §7.3.2; default `false` preserves LTS-equivalent behaviour) + IMOGENCFXInput year_outer overrides (preload_all_climate + getclimate_for_year; ~250 LOC additive in imogencfx.cpp + ~95 LOC in imogencfx.h; mirrors C1.1 ImogenInput pattern with IMOGENCFXInput-specific differences) + K→C latent-bug fix in IMOGENCFXInput::get_climate_for_gridcell (~25 LOC; 6 code-line changes; surfaced empirically when -input imogencfx mode reached LPJG main loop for the first time post-skip_inprocess_engine_run; aligns with CFXInput's Celsius-native pattern per user's 2026-05-10 clarification "imogencfx is meant to work like the cfx input module, with only caveat being instead of NetCDF climate forcing it takes in IMOGEN climate"). Cross-validation harness extended for `imogencfx` 2nd-arg variant. 162 unit tests pass throughout. **Earlier 4-cell smoke + engine writer fix context preserved in prior dashboard entry (see git history for the full chain).** All 37 standard LPJG outputs match bit-exact between Run A (`gridcell_outer`) and Run B (`year_outer`) for 4-cell `gridlist_test2.txt` × `nyear_spinup=2` × `lasthistyear=1879` (44 cell-year iterations per run; 9 distinct imogen_years). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is now empirically validated across BOTH cell_idx>0 AND year_idx>0 branches. Pre-requisite engine writer fix landed: `lpjguess/modules/climatemodel.cpp` 5-conditional-removals at lines ~787/~884/~963/~988/~998 (~76 LOC total incl. doc blocks) — fixes the alternating-year staged-climate quirk discovered at C1.2 (each engine call previously wrote climate ONLY for IYEAR == YEAR1; net effect: ODD years had full climate, EVEN years had only `done` marker). Post-fix: ALL 32 staged years (1871-1902) have full 13-file climate. Same bug exists in standalone Fortran engine (`imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099); deferred for symmetric fix as F-N follow-up. C1.2 PASS preserved (1-cell xval re-verified PASS post-fix). 162 unit tests still pass. **Remaining within step 17a (next session): sub-step 7.3.2 IMOGENCFXInput year_outer override (~1.5-2 days; with engine-bypass mechanism — NEW `skip_inprocess_engine_run` parameter recommended) + cross-validate single-cell first; multi-cell second + tag `v0.17.0-step17a-c1-year-outer-single-process` + close-out.**)
+**Last updated:** 2026-05-11 (early morning; this commit appends the **Comprehensive outstanding-work audit** below the dashboard table — triggered by user 2026-05-10 late-evening clarification + question about engine/input-module symmetry. Audit revealed: production path (`-input imogencfx` + C++ in-process engine port) IS fully wired post-C1 close-out at v0.17.0; non-production paths (standalone Fortran engine; `-input imogen` loose mode) have known asymmetries documented since step 9.5 (2026-05-07) that aggregate to ~9-15 days of additional in-v1.0-scope work previously omitted from chat-level "% remaining" estimates. Revised estimate: ~48-50% done; ~50-52% remaining (~33-37 days median); was ~70% / ~30% / ~20-32 days. See "Comprehensive outstanding-work audit" section below the dashboard table for full breakdown across in-v1.0-scope (A + B; ~25-45 days) + post-v1.0 (C; v1.1+/v2.0+/paper-stage). NO SOURCE-LEVEL CHANGE in this commit; docs-only.
+
+**Prior dashboard entry preserved for context (2026-05-10 very late evening; F-12 SUB-MILESTONE C1 FULLY CLOSED OUT; TAGGED `v0.17.0-step17a-c1-year-outer-single-process`):** ALL FOUR cross-validation scenarios PASS bit-exact 37/37: imogen 1-cell ✅, imogen 4-cell ✅, imogencfx 1-cell ✅ (NEW), imogencfx 4-cell ✅ (NEW). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) empirically validated for BOTH input modules across BOTH single-cell + multi-cell + single-spinup-year + multi-spinup-year scenarios. **GO/NO-GO gate per session-2 §9.5: PASSED for ALL FOUR scenarios.** Sub-step 7.3.2 commit lands: NEW `skip_inprocess_engine_run` ins parameter (option a per STEP_17a.md §7.3.2; default `false` preserves LTS-equivalent behaviour) + IMOGENCFXInput year_outer overrides (preload_all_climate + getclimate_for_year; ~250 LOC additive in imogencfx.cpp + ~95 LOC in imogencfx.h; mirrors C1.1 ImogenInput pattern with IMOGENCFXInput-specific differences) + K→C latent-bug fix in IMOGENCFXInput::get_climate_for_gridcell (~25 LOC; 6 code-line changes; surfaced empirically when -input imogencfx mode reached LPJG main loop for the first time post-skip_inprocess_engine_run; aligns with CFXInput's Celsius-native pattern per user's 2026-05-10 clarification "imogencfx is meant to work like the cfx input module, with only caveat being instead of NetCDF climate forcing it takes in IMOGEN climate"). Cross-validation harness extended for `imogencfx` 2nd-arg variant. 162 unit tests pass throughout. **Earlier 4-cell smoke + engine writer fix context preserved in prior dashboard entry (see git history for the full chain).** All 37 standard LPJG outputs match bit-exact between Run A (`gridcell_outer`) and Run B (`year_outer`) for 4-cell `gridlist_test2.txt` × `nyear_spinup=2` × `lasthistyear=1879` (44 cell-year iterations per run; 9 distinct imogen_years). The spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) is now empirically validated across BOTH cell_idx>0 AND year_idx>0 branches. Pre-requisite engine writer fix landed: `lpjguess/modules/climatemodel.cpp` 5-conditional-removals at lines ~787/~884/~963/~988/~998 (~76 LOC total incl. doc blocks) — fixes the alternating-year staged-climate quirk discovered at C1.2 (each engine call previously wrote climate ONLY for IYEAR == YEAR1; net effect: ODD years had full climate, EVEN years had only `done` marker). Post-fix: ALL 32 staged years (1871-1902) have full 13-file climate. Same bug exists in standalone Fortran engine (`imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099); deferred for symmetric fix as F-N follow-up. C1.2 PASS preserved (1-cell xval re-verified PASS post-fix). 162 unit tests still pass. **Remaining within step 17a (next session): sub-step 7.3.2 IMOGENCFXInput year_outer override (~1.5-2 days; with engine-bypass mechanism — NEW `skip_inprocess_engine_run` parameter recommended) + cross-validate single-cell first; multi-cell second + tag `v0.17.0-step17a-c1-year-outer-single-process` + close-out.**)
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -35,10 +37,72 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 | Item | Where to track | Best timing |
 |---|---|---|
-| Step 9 V.1 verification milestone (NEE 2× → CO2 shift) | EXECUTION_PLAN.md V.1 step 9 row | Gated on F-12 |
-| Step 9.5b: Fortran Rh/W port + Fortran Tmin/Tmax + C++ Tmin/Tmax in REGRID branch | EXECUTION_PLAN.md V.1 step 9.5 row | Next time we touch engine output code |
-| Step 11 input-data acquisition (RCMIP, FAIR ERF, EDGAR, PLUM, LPJG outputs ~1.8 GB) | EXECUTION_PLAN.md V.1 step 11 row | Step 11 |
-| Step 13 adapter (intermediary_py outputs → 4 narrow IMOGEN-readable files) | EXECUTION_PLAN.md V.1 step 13 row | Step 13 |
+| Step 9 V.1 verification milestone (NEE 2× → CO2 shift) | EXECUTION_PLAN.md V.1 step 9 row | Gated on F-12 (now: post-C1; testable in C2+ era) |
+| Step 9.5b: Fortran Rh/W port + Fortran Tmin/Tmax + C++ Tmin/Tmax in REGRID branch | EXECUTION_PLAN.md V.1 step 9.5 row | Next time we touch engine output code (still OUTSTANDING per audit 2026-05-11; see §"Comprehensive outstanding-work audit" below) |
+| Step 11 input-data acquisition (RCMIP, FAIR ERF, EDGAR, PLUM, LPJG outputs ~1.8 GB) | EXECUTION_PLAN.md V.1 step 11 row | Step 11 (DONE) |
+| Step 13 adapter (intermediary_py outputs → 4 narrow IMOGEN-readable files) | EXECUTION_PLAN.md V.1 step 13 row | Step 13 (DONE) |
+
+---
+
+## Comprehensive outstanding-work audit (2026-05-11; full v1.0 scope sweep)
+
+**Triggered by user 2026-05-10 late-evening clarification + question** about whether all IMOGEN climate variables (T, P, SW, WET, DTEMP, Rh, W, Tmin, Tmax, CO2 = 10 fields) are bidirectionally wired (engine writes + LPJG reads) for the v1.0 framework. Audit revealed: (a) **production path** (`-input imogencfx` + C++ in-process engine port) IS fully wired post-C1 close-out at v0.17.0; (b) **non-production paths** (standalone Fortran engine; `-input imogen` loose mode) have known asymmetries documented since step 9.5 (2026-05-07) but never aggregated into a single audit. This audit aggregates them and surfaces ~9-15 days of additional in-v1.0-scope work that was previously omitted from chat-level "% remaining" estimates.
+
+### A. Production critical path (5 remaining V.1 steps; NEXT ladder)
+
+| # | Item | Median effort | Status |
+|---|---|---|---|
+| A1 | Step 17b (F-12 C2; workstation MPI year_outer) | 3-5 days | ⏳ NEXT |
+| A2 | Step 17c (F-12 C3; cluster MPI iterative SSH on KIT IMK-IFU `owl`) | 1-2 weeks (5-15 days) | ⏳ after A1 |
+| A3 | Step 17d (end-to-end validation across 4 combinations: local/HPC × loose/tight) | 2-3 days | ⏳ after A2 |
+| A4 | Step 18 (docs completion + reproducibility verification) | 3-5 days | ⏳ after A3 |
+| A5 | Step 19 (CI/CD + Zenodo DOI + v1.0.0 release tag) | 2-3 days | ⏳ after A4 |
+
+**Subtotal A**: ~16-30 days (median ~22-25 days)
+
+### B. Deferred-from-earlier-steps follow-ups (in-v1.0-scope per audit; previously OMITTED from chat-level % estimates)
+
+| # | Item | Median effort | Triggered by |
+|---|---|---|---|
+| B1 | **Step 9.5b (a)**: Fortran Rh + Wind COMPUTATION port from C++ engine to Fortran engine. Per Decision #12 + STEP_9.5 §3.4: the C++ port added the entire Rh/Wind physics pipeline; Fortran doesn't compute these at all. NOT a writer-only port (~70-100 LOC of Fortran physics work). | **3-5 days** (the heaviest piece) | Decision #12; STEP_9.5 §3.4 |
+| B2 | **Step 9.5b (b)**: Fortran Tmin/Tmax write block (algebraic `Tmin = T − DTEMP/2`, `Tmax = T + DTEMP/2` per Decision #11; mirror climatemodel.cpp's non-REGRID branch addition). | 0.5 day | Decision #11; STEP_9.5 §3.3 |
+| B3 | **Step 9.5b (c)**: C++ engine Tmin/Tmax write in REGRID branch (currently only non-REGRID branch; "TODO at step 9.5b" comment in code). | 0.5 day | STEP_9.5 §3.3 |
+| B4 | **ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion** — 4 file_* declarations + read pipeline + climate.{relhum, u10, tmin, tmax} assignments + extension to the C1.1 year_outer override. Closes the loose-mode-vs-tight-mode 6-vs-10-fields gap discussed 2026-05-10 late evening. | 1 day | User clarification 2026-05-10 late evening; tonight's audit |
+| B5 | **F-9 / step 9.5c**: miscoutput diagnostic outputs (12 file_*_anom params already declared; needs Option A per FOLLOWUPS F-9 refinement: per-month Climate accumulator infrastructure ~50 LOC + create_output_table + outannual outlimit calls). | 1-2 days | STEP_8 §3.5 + STEP_9.5 §3.4 + FOLLOWUPS F-9 |
+| B6 | **F-2**: Fortran T_anom.dat 2× line count investigation + minor fix. Output is structurally sane; format/footprint discrepancy needs explanation + alignment. | 0.5 day | STEP_4 §6 + FOLLOWUPS F-2 |
+| B7 | **F-6**: CMIP6 `ql1_patt` unit alignment with IMOGEN's `DRH15M_PAT`. Magnitude differs 1500× at sample cell. Contact upstream (PRIME/Mathison 2025) author + possibly add unit-conversion factor. | 0.5 day | STEP_5 CAVEAT-A + FOLLOWUPS F-6 |
+| B8 | **F-7**: CMIP6 `pstar_patt` units vs CMIP5 `DPSTAR_C_PAT`. 150× magnitude diff + opposite sign at sample cell; likely Pa-vs-hPa unit mismatch (one-line fix). | 0.5 day | STEP_5 CAVEAT-B + FOLLOWUPS F-7 |
+| B9 | **F-8**: CMIP6 wind-magnitude split + precip rain/snow partition refinement (currently `U=V=wind/√2`, `rain=precip/snow=0`). | 0.5-1 day | STEP_5 CAVEAT-B/C + FOLLOWUPS F-8 |
+| B10 | **Symmetric Fortran engine writer fix** (alternating-year bug at `imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099). Same root cause as the C++ fix landed at C1.3 sub-step 7.3.1 commit `7be595a`. Fortran engine is currently used only for engine-only smoke testing (NOT on prescribed-mode launcher path); fix is for symmetric correctness. | 0.5 day | STEP_17a §5.6 + sub-step 7.3.1 commit doc block |
+| B11 | **Latent OOB fix in existing IMOGENCFXInput::getclimate cache** (`stored_years[i] = imogen_year` when `i >= nyears` due to undersized cache from formula `nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1`). Pre-existing latent bug surfaced at C1.3 sub-step 7.3.1 (worked around via lasthistyear bump in main_xval_loose.ins). Defensive hardening: add explicit bounds check + dynamic resize OR refactor the cache size formula. | 0.5 day | STEP_17a §6.3; surfaced at sub-step 7.3.1 |
+
+**Subtotal B**: ~9-15 days (median ~11-12 days)
+
+**TOTAL in-v1.0 remaining (A + B): ~25-45 days (median ~33-37 days)**
+
+### C. Post-v1.0 (v1.1+ / v2.0+ / paper-stage; not blocking v1.0 release tag)
+
+| # | Item | Median effort | Best timing |
+|---|---|---|---|
+| C1 | F-11 Backport Sprint to `trunk_r13078` (replicate all `lpjguess/` source changes from steps 7+8+9.5+17a-foundation+17a-C1.1+17a-C1.2+17a-C1.3-7.3.1+17a-C1.3-7.3.2+(any of B1-B11 that lands)). Scope expanded by F-12 in-v1.0 work (per FOLLOWUPS dashboard). | 3-5 days | End of Phase 1 (after step 19); paper-consistency required |
+| C2 | F-1 Zenodo upload of data tarballs (49 MB across 4 patterns + CRUNCEP tarballs; 460 MB ndep tarball). Easy task; gives DOI for citation. | 30 min | At v1.0 release time (~step 19) |
+| C3 | F-13 paper-stage comparative-analysis framework (3 axes per `paper/README.md`: GHG concentrations / climate trends / LPJG ecosystem outputs) + 9 paper revisions for GMD submission. | 1-2 weeks (paper work) | Post-v1.0 (post-step-19) |
+| C4 | F-3 Fortran ↔ C++ IMOGEN numerical parity work (Decision #2 Phase-2 milestone). | 1-2 weeks | Phase 2 (v1.1+) |
+| C5 | PLUM v2 embedding + Stage I re-coupling (per Decision #9; per `docs/v2_roadmap.md` §2). | 2-3 weeks | v2.0 (post-v1.0 release) |
+| C6 | v1.1+ refinement: simplify `intermediary_py` cluster copy-over filenames from `lpjg_<output>_<scenario>.gz` to native LPJG names (since dir hierarchy already encodes scenario). | 0.5 day | v1.1+ |
+
+### % done estimates (cross-method triangulation)
+
+| Method | % done | % remaining | Days remaining |
+|---|---|---|---|
+| Original (production critical path only; previous chat-level estimate) | ~70% | ~30% | ~20-32 |
+| Step-count weighted (17 of 21 sub-steps done) | ~80% | ~20% | n/a |
+| 4-combination weighted (3 of 4 combinations done) | ~75% | ~25% | n/a |
+| Risk-weighted (F-10 architectural mountain done; only mechanical work remains) | ~80% | ~20% | n/a |
+| LOC-weighted (most lpjguess source changes are landed) | ~90% | ~10% | n/a |
+| **REVISED: full v1.0 with engine + input-module symmetry (per tonight's audit)** | **~48-50%** | **~50-52%** | **~33-37 (median)** |
+
+**Adopted estimate going forward**: ~48-50% done; ~50-52% remaining (~33-37 days median; range 25-45). The audit-revised number is the most honest reflection of total v1.0 scope per user's stated requirements (full engine + input-module symmetry; not just production critical path).
 
 ### Tracking discipline (committed 2026-05-07)
 
