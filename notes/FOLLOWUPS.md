@@ -13,7 +13,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-10 (step 17a F-12 sub-milestone C1 FOUNDATION landed; un-tagged commit on top of `09b40f0`. Foundation: `framework_loop_mode` ins parameter + `InputModule::preload_all_climate` + `getclimate_for_year` base-class virtuals + `framework.cpp` year_outer additive code path; default mode `gridcell_outer` byte-exact LTS-equivalent; 162 unit tests pass; ~250 LOC across 6 files; backport-relevance HIGH purely additive. Remaining within step 17a (next session(s)): IMOGENCFXInput overrides with the `spinup_year_idx` state-machine reproduction formula uncovered this session + bit-exact cross-validation. Revised C1 estimate: ~1.5-2 weeks total per session-2 §9.4. Full step-17a tag `v0.17.0-step17a-c1-year-outer-single-process` waits for cross-validation pass.)
+**Last updated:** 2026-05-10 (later in same day; step 17a F-12 sub-milestone C1.1 IMOGENINPUT IMPLEMENTATION landed; un-tagged commit on top of foundation commit `2e918c0`. C1.1: `ImogenInput::preload_all_climate` + `getclimate_for_year` overrides with the CORRECTED spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` — NO `+1`; the foundation commit's docs incorrectly stated `+1`. ERRATUM corrected this commit; see `notes/STEP_17a.md` §5.4. 2 files modified (`imogen_input.h` +~80 LOC; `imogen_input.cpp` +~200 LOC). 162 unit tests pass; backward compat preserved. Strategic decision: ImogenInput first (no F-10 issue; ~95% identical pattern to IMOGENCFXInput) — see `notes/STEP_17a.md` §5.5. Remaining within step 17a: C1.2 cross-validation (~1-2 days runtime) + C1.3 IMOGENCFXInput year_outer override (~2-3 days). Full step-17a tag `v0.17.0-step17a-c1-year-outer-single-process` waits for cross-validation pass.)
 
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
@@ -776,8 +776,8 @@ provides the per-month aggregation point in the engine-output side).
      with more detail + design rationale). Then design the D1 (or D2/D3)
      implementation in the fresh chat with full context budget for the
      code work.
-- **C1 foundation landing + additional finding (2026-05-10 session)** —
-  the C1 FOUNDATION landed in an un-tagged commit on top of `09b40f0`:
+- **C1 foundation landing + additional finding (2026-05-10 morning session)** —
+  the C1 FOUNDATION landed in an un-tagged commit `2e918c0` on top of `09b40f0`:
   `framework_loop_mode` ins parameter (default `"gridcell_outer"` byte-
   exact LTS-equivalent) + `InputModule::preload_all_climate` +
   `getclimate_for_year` base-class virtuals (default-fail; backward-compat
@@ -802,6 +802,48 @@ provides the per-month aggregation point in the engine-output side).
   Part 10. Remaining within step 17a: IMOGENCFXInput overrides
   (~3-5 days) + cross-validation (~1-2 days) + tag
   `v0.17.0-step17a-c1-year-outer-single-process`.
+- **C1.1 IMOGENINPUT IMPLEMENTATION + ERRATUM (2026-05-10 later session)** —
+  the C1.1 IMOGENINPUT IMPLEMENTATION landed in an un-tagged commit on
+  top of foundation commit `2e918c0`. **Strategic decision**: ImogenInput
+  chosen over IMOGENCFXInput for C1.1 because ImogenInput has NO
+  `RUN_IMOGEN_ENGINE()` call in `init()` (verified via grep — only
+  `imogencfx.cpp:524` has it). Loose-mode runs (`-input imogen` +
+  `coupling_mode "loose"`) complete `init()` cleanly + reach the LPJG
+  main loop without F-10 deadlock — no engine-bypass workaround needed
+  for cross-validation. The two input modules' `getclimate()` patterns
+  are ~95% identical; the implementation strategy + spinup_year_idx
+  formula transfers ~95% to IMOGENCFXInput later (planned as C1.3
+  follow-up sub-step within step 17a). See `notes/STEP_17a.md` §5.5.
+  C1.1 implementation: `ImogenInput::preload_all_climate(gridcell,
+  first_yr, last_yr)` + `ImogenInput::getclimate_for_year(gridcell,
+  year, day)` overrides. 2 files modified (`imogen_input.h` +~80 LOC,
+  `imogen_input.cpp` +~200 LOC). 162 unit tests pass; backward compat
+  with existing `getclimate()` preserved.
+  **CRITICAL ERRATUM applied this commit**: the foundation commit's
+  docs (foundation CHANGELOG entry, this F-12 entry's preceding bullet,
+  STEP_17a.md §5.4, BACKPORT_LEDGER step-17a-foundation entry,
+  session-2 chat handoff Part 10) all stated the spinup_year_idx
+  reproduction formula as `(cell_idx * nyear_spinup + year_idx + 1) %
+  NYEAR_SPINUP` (with `+1`). The CORRECT formula has NO `+1`:
+  `spinup_year_idx_at_(cell_idx, year_idx) = (cell_idx * nyear_spinup
+  + year_idx) % NYEAR_SPINUP`. Derivation (verified by tracing the
+  EXACT code at `imogen_input.cpp:781-805` + `imogencfx.cpp:1071-1095`
+  during C1.1 implementation): the existing `getclimate()` reads
+  spinup_year_idx VALUE BEFORE incrementing it on day 0, so for cell C
+  spinup year Y, the value READ equals the count of prior day-0
+  increments `(C * nyear_spinup + Y)` modulo `NYEAR_SPINUP`. The C1.1
+  implementation uses the CORRECTED formula; subsequent doc updates
+  (STEP_17a.md §5.4 erratum, the CHANGELOG entry, this F-12 entry,
+  BACKPORT_LEDGER step-17a-c1.1 entry, session-2 handoff Part 11) all
+  reflect the CORRECTED formula. Remaining within step 17a:
+  - C1.2 cross-validation (~1-2 days runtime; bit-exact Run A vs Run B
+    on smoke gridlist; pre-stage climate via launcher per session-1
+    §49.1 operational pattern; custom .ins; bash harness; iterate on
+    divergences). The GO/NO-GO gate for C1.
+  - C1.3 IMOGENCFXInput year_outer override (~2-3 days; replicates
+    C1.1 pattern + handles relhum/wind/tmin/tmax fields + optional
+    engine-bypass parameter for testing). Cross-validate identically.
+  Then tag `v0.17.0-step17a-c1-year-outer-single-process`.
 - **What was decided today (2026-05-09; user confirmation)**:
   1. Skip Option B; go straight to staged Option C (C1 → C2 → C3)
   2. `intermediary_py` cluster integration: keep existing copy-over

@@ -17,6 +17,136 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-10 (later) — Step 17a (F-12 sub-milestone C1.1) IMOGENINPUT IMPLEMENTATION: ImogenInput year_outer overrides (preload_all_climate + getclimate_for_year) with corrected spinup_year_idx state-machine reproduction formula (no tag — full step-17a tag waits for runtime cross-validation)
+
+C1.1 implementation lands the FIRST input-module override pair for the
+year_outer code path: `ImogenInput::preload_all_climate(gridcell, first_yr,
+last_yr)` + `ImogenInput::getclimate_for_year(gridcell, year, day)`. This
+makes the year_outer code path runnable end-to-end with `-input imogen`
+(loose-coupling input module) once climate is pre-staged on disk.
+
+#### Strategic decision: ImogenInput first; IMOGENCFXInput follow-up
+
+**ImogenInput chosen over IMOGENCFXInput for C1.1** because ImogenInput
+has NO `RUN_IMOGEN_ENGINE()` call in `init()` (verified via grep — only
+`imogencfx.cpp:524` has it). This means loose-mode runs (`-input imogen`
++ `coupling_mode "loose"`) complete `init()` cleanly + reach the LPJG
+main loop, regardless of `framework_loop_mode` setting — **no engine-bypass
+workaround needed for cross-validation**. The two input modules have
+~95% identical `getclimate()` patterns; the implementation strategy +
+spinup_year_idx formula derived in C1.1 transfers near-verbatim to
+`IMOGENCFXInput` (planned as C1.3 follow-up sub-step within step 17a).
+Per the foundation-vs-full-C1 staging in `notes/STEP_17a.md` §5.5.
+
+#### What changed in `lpjguess/` source (2 files; ~280 LOC; backport-relevant)
+
+- **`lpjguess/modules/imogen_input.h`** (+~80 LOC):
+  - 3 new includes: `<map>`, `<utility>`, (already-existing) `lamarquendep.h`
+  - 2 new `virtual` method declarations (overrides of `InputModule`
+    base-class virtuals added at the foundation commit `2e918c0`):
+    - `preload_all_climate(Gridcell&, int first_calendar_year, int last_calendar_year)`
+    - `getclimate_for_year(Gridcell&, int calendar_year, int day_of_year)`
+    Both have extensive doc blocks documenting the design rationale +
+    the spinup_year_idx state-machine reproduction formula + cross-references.
+  - 2 new private cache members for year_outer state:
+    - `std::map<std::pair<double,double>, int> year_outer_cell_idx`
+      — keyed by (lon, lat); maps to `current_grid_index` value at
+      preload time
+    - `std::map<std::pair<double,double>, Lamarque::NDepData> year_outer_ndep_cache`
+      — keyed by (lon, lat); maps to value-copy of `ndep` member at
+      preload time (right after `getgridcell -> ndep.getndep()`)
+
+- **`lpjguess/modules/imogen_input.cpp`** (+~200 LOC):
+  - `ImogenInput::preload_all_climate(gridcell, first_yr, last_yr)`
+    implementation: caches `cell_idx` + `ndep` value-copy, then for each
+    year_idx in [0, total_years): computes `imogen_year` via the formula
+    below, looks up in `stored_years[]` cache, on cache miss assigns
+    next `last_store_index++` slot + calls existing `readenv()` + loads
+    CO2 via `co2.load_file(...)`. Reuses existing infrastructure
+    verbatim; pre-loads eagerly (memory bounded for smoke-scale runs).
+  - `ImogenInput::getclimate_for_year(gridcell, calendar_year, day_of_year)`
+    implementation: looks up cached `cell_idx` + `cell_ndep`, computes
+    `imogen_year` via same formula, finds `store_index` in cache. On
+    day 0: calls existing `get_climate_for_gridcell(...)` to populate
+    per-day arrays + ndep distribution + CO2. Every day: assigns
+    `climate.{temp - 273.15 K→degC, prec, insol, dtr conditional}` +
+    `gridcell.{dNH4dep, dNO3dep}` from per-day arrays. Returns false at
+    sim-done terminator + on missing-grid-point conditions.
+
+#### CORRECTED spinup_year_idx state-machine reproduction formula
+
+**ERRATUM applied this commit**: the foundation commit's docs (CHANGELOG
+2026-05-10 entry, FOLLOWUPS F-12 C1 pre-flight findings extension,
+STEP_17a.md §5.4, BACKPORT_LEDGER step-17a-foundation entry,
+session-2 chat handoff Part 10) all stated the formula as
+`(cell_idx * nyear_spinup + year_idx + 1) % NYEAR_SPINUP` (with `+1`).
+The CORRECT formula has NO `+1`:
+
+```
+spinup_year_idx_at_(cell_idx, year_idx)
+    = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+```
+
+Derivation (verified by tracing the EXACT code at `imogen_input.cpp`
+lines 781-805 + `imogencfx.cpp` lines 1071-1095 during C1.1
+implementation):
+- `init()` sets `spinup_year_idx = 0`
+- Per the existing `getclimate()`: on day 0 of each spinup year,
+  `imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx` is computed
+  using the CURRENT spinup_year_idx, THEN the counter is incremented.
+- For cell C, spinup year Y, day 0: cumulative spinup-year-day-0
+  increments BEFORE this call = `C * nyear_spinup + Y` (since cell C
+  is preceded by C cells × nyear_spinup spinup years; within cell C,
+  Y prior spinup years have been processed).
+- Each such call increments `spinup_year_idx` by 1 (modulo NYEAR_SPINUP).
+- So `spinup_year_idx_BEFORE_this_call = (C * nyear_spinup + Y) % NYEAR_SPINUP`.
+
+The C1.1 implementation in `ImogenInput::preload_all_climate` +
+`ImogenInput::getclimate_for_year` uses the CORRECTED formula.
+Subsequent doc updates (this CHANGELOG entry, FOLLOWUPS F-12 erratum,
+STEP_17a.md §5.4 erratum, BACKPORT_LEDGER step-17a-c1.1 entry,
+session-2 chat handoff Part 11) all reflect the CORRECTED formula.
+
+#### Verification (this commit)
+
+- `cd lpjguess/build && make -j$(nproc)` (full clean rebuild): clean
+  (only pre-existing `simfire_input.h` `cruncep_*.h`
+  `GlobalNitrogenDeposition*.h` `gutil.{cpp,h}` `indata.cpp` warnings;
+  ZERO warnings introduced by C1.1 additions)
+- `lpjguess/build/runtests --reporter compact`: "Passed all 25 test
+  cases with 162 assertions." (default-mode + new-input-module
+  byte-exact regression preserved)
+- Spinup_year_idx formula correct (NO +1): hand-traced against
+  `imogen_input.cpp:781-805`
+- Per-cell ndep cache copies are independent: `Lamarque::NDepData` is
+  value type (no pointers; just arrays); `std::map<key, NDepData>`
+  value-copies on insert
+- K → degC temperature conversion preserved: `getclimate_for_year` line
+  `climate.temp = dtemp[day_of_year] - 273.15;` matches existing
+  `getclimate` line 876
+- Backward compatibility with existing `getclimate()` (gridcell_outer
+  mode): `getclimate()` body unchanged; new methods are SEPARATE
+  additions; existing code path completely intact
+
+#### What this commit does NOT yet do (next session(s) within step 17a)
+
+- **C1.2 cross-validation** (~1-2 days): runtime bit-exact verification
+  of Run A (`gridcell_outer`) vs Run B (`year_outer`) on smoke gridlist.
+  Operational pre-requisites: pre-stage climate (re-run launcher per
+  session-1 §49.1 operational pattern; ~3-5 min wall-clock + Ctrl-C);
+  custom .ins with `coupling_mode "loose"`; bash harness; iterate on
+  any divergences. **GO/NO-GO gate for C1.**
+- **C1.3 IMOGENCFXInput year_outer override** (~2-3 days): replicate
+  the C1.1 implementation pattern for IMOGENCFXInput (with the
+  additional climate fields it handles + an optional engine-bypass
+  parameter for testing). Cross-validate identically.
+- **C1 close-out**: tag `v0.17.0-step17a-c1-year-outer-single-process`.
+
+Backport-relevance HIGH (purely additive). Per the new step-17a-c1.1
+entry in `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3.
+
+---
+
 ### 2026-05-10 — Step 17a (F-12 sub-milestone C1) FOUNDATION: framework_loop_mode parameter + InputModule virtuals + framework.cpp year_outer additive code path (no tag — full step-17a tag waits for IMOGENCFXInput overrides + cross-validation)
 
 Foundation for the F-12 Option C staged implementation lands. The architectural

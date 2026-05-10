@@ -846,6 +846,154 @@ block makes the replication straightforward.
 
 ---
 
+### Step 17a (C1.1 IMPLEMENTATION): F-12 sub-milestone C1.1 — ImogenInput year_outer overrides (preload_all_climate + getclimate_for_year) with corrected spinup_year_idx state-machine reproduction formula
+
+**Commit:** `_TBD_` (this commit; C1.1 implementation only; full step-17a tag waits for C1.2 cross-validation + optional C1.3 IMOGENCFXInput follow-up)  **Date:** 2026-05-10 (later in same day as foundation commit `2e918c0`)
+
+C1.1 implementation lands the FIRST input-module override pair for the
+year_outer code path: `ImogenInput::preload_all_climate` +
+`ImogenInput::getclimate_for_year`. This makes the year_outer code path
+runnable end-to-end with `-input imogen` (loose-coupling input module)
+once climate is pre-staged on disk.
+
+**Strategic choice**: ImogenInput first; IMOGENCFXInput follow-up. See
+`notes/STEP_17a.md` §5.5 for full rationale; in short:
+- ImogenInput has NO `RUN_IMOGEN_ENGINE()` call in `init()` (verified via
+  grep — only `imogencfx.cpp:524` has it). Loose-mode runs complete
+  `init()` cleanly + reach the LPJG main loop; no F-10 deadlock; no
+  engine-bypass workaround needed for cross-validation.
+- ImogenInput's `getclimate()` pattern is ~95% identical to
+  `IMOGENCFXInput::getclimate()`. Implementation strategy + the
+  spinup_year_idx formula derived in C1.1 transfer near-verbatim to
+  IMOGENCFXInput.
+- Cross-validation purpose (per session-2 §9.5): validate the year_outer
+  code path's CORRECTNESS vs gridcell_outer's. Input module choice is
+  secondary; what matters is bit-exact comparison between modes WITH
+  SAME input module + SAME climate forcing.
+
+**Backport-relevance: HIGH.** Both file changes need to be replicated in
+`trunk_r13078`. The additive nature (new methods on a derived class
+overriding base virtuals; extensive doc blocks; reuses existing
+infrastructure verbatim; no existing code changed) makes the backport
+mechanical. When C1.3 (IMOGENCFXInput year_outer override) lands, that
+will add a parallel set of file changes to this ledger.
+
+**CRITICAL ERRATUM applied this commit**: the foundation commit
+`2e918c0`'s docs (CHANGELOG 2026-05-10 entry, FOLLOWUPS F-12 C1
+pre-flight findings extension, STEP_17a.md §5.4, this BACKPORT_LEDGER's
+preceding step-17a-foundation entry's "Description" of the
+year_outer block, session-2 chat handoff Part 10) all stated the
+spinup_year_idx reproduction formula as `(cell_idx * nyear_spinup +
+year_idx + 1) % NYEAR_SPINUP` (with `+1`). The CORRECT formula
+(verified by tracing the EXACT code at `imogen_input.cpp:781-805` +
+`imogencfx.cpp:1071-1095` during C1.1 implementation) has NO `+1`:
+
+```
+spinup_year_idx_at_(cell_idx, year_idx)
+    = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+```
+
+Derivation: the existing `getclimate()` reads `spinup_year_idx` VALUE
+BEFORE incrementing it on day 0, so for cell C, spinup year Y, the
+value READ equals the count of prior day-0 increments
+(C * nyear_spinup + Y) modulo NYEAR_SPINUP. The C1.1 implementation
+uses the CORRECTED formula; subsequent doc updates (STEP_17a.md §5.4
+erratum, CHANGELOG entry, FOLLOWUPS F-12 erratum, session-2 chat
+handoff Part 11, this BACKPORT_LEDGER entry) all reflect the CORRECTED
+formula. **The Backport Sprint must use the CORRECTED formula** when
+applying these changes to `trunk_r13078`.
+
+#### Files modified (~280 LOC added across 2 files)
+
+- File: `lpjguess/modules/imogen_input.h`
+  - Operation: modify (add)
+  - Lines: +~80 LOC
+  - Description: 3 new includes (`<map>`, `<utility>`, already-existing
+    `lamarquendep.h`); 2 new `virtual` method declarations on
+    `ImogenInput` (overrides of base-class virtuals from foundation
+    commit `2e918c0`):
+    - `preload_all_climate(Gridcell&, int first_calendar_year, int last_calendar_year)`
+    - `getclimate_for_year(Gridcell&, int calendar_year, int day_of_year)`
+    Both have extensive doc blocks documenting the design rationale +
+    spinup_year_idx state-machine reproduction formula + cross-references.
+    2 new private cache members:
+    - `std::map<std::pair<double,double>, int> year_outer_cell_idx`
+      (keyed by (lon, lat); maps to `current_grid_index` value at preload time)
+    - `std::map<std::pair<double,double>, Lamarque::NDepData> year_outer_ndep_cache`
+      (keyed by (lon, lat); maps to value-copy of `ndep` member at preload time)
+  - Backport guidance: trivial copy-paste; pure-additive; no existing
+    declarations touched. The cache members rely on `Lamarque::NDepData`
+    being a value type (which it is — verified at `lamarquendep.h`
+    member inspection).
+
+- File: `lpjguess/modules/imogen_input.cpp`
+  - Operation: modify (add)
+  - Lines: +~200 LOC
+  - Description: implementations of the 2 new virtual methods inserted
+    between `getclimate()` body end and `getsoil()`. Both implementations
+    are documented with cross-references to the .h doc blocks +
+    STEP_17a.md §5.4 + FOLLOWUPS F-12. They use the CORRECTED
+    spinup_year_idx formula throughout. Reuse existing infrastructure
+    (`readenv`, `get_climate_for_gridcell`, `gen_filename`, `co2.load_file`,
+    `distribute_ndep`, `Lamarque::NDepData::get_one_calendar_year`)
+    without modification. Per-day field assignments mirror existing
+    `getclimate()` lines 876-887, INCLUDING the K → degC temperature
+    conversion at line 876 specific to ImogenInput
+    (`climate.temp = dtemp[day_of_year] - 273.15;` — IMOGENCFXInput's
+    getclimate at line 1166 does NOT do this conversion; the two input
+    modules have different temperature-unit conventions; this is
+    preserved here for bit-exact reproduction of ImogenInput's
+    gridcell_outer behaviour).
+  - Backport guidance: trivial copy-paste; pure-additive; no existing
+    function bodies touched. The `getclimate()` body is byte-untouched
+    (verifiable via `git diff -w` showing zero whitespace-only changes
+    outside the new block).
+
+#### Verification (this commit)
+
+- `cd lpjguess/build && make -j$(nproc)` (full clean rebuild): clean
+  (only pre-existing warnings; ZERO warnings introduced by C1.1)
+- `lpjguess/build/runtests --reporter compact`: "Passed all 25 test
+  cases with 162 assertions." (default-mode + new-input-module
+  byte-exact regression preserved)
+- Spinup_year_idx formula correct (NO +1): hand-traced against
+  `imogen_input.cpp:781-805`
+- Per-cell ndep cache copies are independent: NDepData is value type
+- K → degC conversion preserved: `getclimate_for_year` line matches
+  existing `getclimate` line 876
+- Backward compatibility: `getclimate()` body unchanged
+
+#### Remaining work within step 17a (next session(s))
+
+1. **C1.2** (~1-2 days): runtime bit-exact cross-validation Run A vs
+   Run B on smoke gridlist (single-cell first; multi-cell second).
+   Operational pre-requisites: pre-stage climate via launcher per
+   session-1 §49.1 operational pattern; custom .ins file with
+   `coupling_mode "loose"` + framework_loop_mode override; bash
+   harness; iterate on divergences. The GO/NO-GO gate for C1.
+2. **C1.3** (~2-3 days): replicate C1.1 implementation pattern for
+   `IMOGENCFXInput`. Same structure + the additional climate fields
+   (relhum, wind, tmin, tmax) handled via the additional
+   `read_lines_from_file` calls already in `IMOGENCFXInput::readenv()`.
+   Optional NEW ins parameter `skip_inprocess_engine_run` (default
+   `false`) gating the `RUN_IMOGEN_ENGINE()` call in
+   `IMOGENCFXInput::init()` to enable IMOGENCFX-mode cross-validation
+   without F-10 deadlock. Cross-validate identically (single-cell
+   first; multi-cell second).
+3. **C1 close-out**: tag `v0.17.0-step17a-c1-year-outer-single-process`;
+   update this ledger with C1.2/C1.3 file changes.
+
+#### Net source-level change in `lpjguess/`: ~280 LOC across 2 files (all additive)
+
+Backport-relevance HIGH (purely additive). The Backport Sprint (F-11)
+at end of Phase 1 must replicate these changes mechanically into
+`trunk_r13078`. The CORRECTED formula must be used when applying the
+C1.1 changes; do NOT use the foundation commit's incorrect `+1`
+formulation that propagated into multiple docs and was corrected
+this commit.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

@@ -1,11 +1,15 @@
 # STEP 17a — F-12 sub-milestone C1 (Workstation single-process year_outer + cross-validation)
 
 **Date opened:** 2026-05-10
-**Date foundation landed:** 2026-05-10 (this commit)
-**Date C1 fully closed:** _pending — IMOGENCFXInput year_outer override + cross-validation_
-**Foundation commit:** _to be filled in after `git commit`_
-**Full C1 commit / tag:** _pending — `v0.17.0-step17a-c1-year-outer-single-process` (per [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 + [`EXECUTION_PLAN.md`](../EXECUTION_PLAN.md) V.1 row 17a)_
-**Status:** ⚠️ **FOUNDATION LANDED; FULL C1 IN PROGRESS.** The architectural foundation for the year_outer code path is in place and verified non-breaking (162 unit tests pass; default mode `gridcell_outer` preserved byte-exactly). The IMOGENCFXInput override of `preload_all_climate` + `getclimate_for_year` (with the spinup_year_idx state-machine reproduction formula) and the bit-exact cross-validation against gridcell_outer baseline are deferred to subsequent work within step 17a — see [§7](#7-remaining-work-within-c1-c11-c12) for the staged plan and [§5.4](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session) for the substantive new finding from this session.
+**Date foundation landed:** 2026-05-10 (commit `2e918c0`)
+**Date C1.1 implementation landed:** 2026-05-10 (this commit)
+**Date C1 fully closed:** _pending — runtime cross-validation (C1.2)_
+**Foundation commit:** `2e918c0` (un-tagged; on top of `09b40f0`)
+**C1.1 implementation commit:** _to be filled in after `git commit`_ (un-tagged; on top of `2e918c0`)
+**Full C1 commit / tag:** _pending — `v0.17.0-step17a-c1-year-outer-single-process` (per [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 + [`EXECUTION_PLAN.md`](../EXECUTION_PLAN.md) V.1 row 17a). Tag waits for bit-exact cross-validation pass per [§7.2](#72-c12--cross-validation-next-session-1-2-days)._
+**Status:** ⚠️ **FOUNDATION + C1.1 IMPLEMENTATION LANDED; C1.2 CROSS-VALIDATION PENDING.** The architectural foundation (parameter + base virtuals + `framework.cpp` year_outer block) landed at `2e918c0` and is verified non-breaking. The C1.1 implementation (this commit) adds the first input-module override pair (`ImogenInput::preload_all_climate` + `ImogenInput::getclimate_for_year`) using the corrected spinup_year_idx state-machine reproduction formula (no `+1`; see [§5.4 Erratum](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum)). 162 unit tests still pass; build clean. The runtime bit-exact cross-validation Run A vs Run B on smoke gridlist (C1.2; the GO/NO-GO gate) is the next session's work.
+
+**Strategic decision (this session)**: C1.1 starts with **`ImogenInput`** (loose-coupling input module) rather than `IMOGENCFXInput`, because ImogenInput has NO `RUN_IMOGEN_ENGINE()` call in `init()` — so loose-mode runs are not blocked by F-10 and end-to-end cross-validation is achievable without an engine-bypass workaround. The two input modules have nearly-identical `getclimate()` patterns; the implementation strategy + spinup_year_idx formula transfer ~95% to `IMOGENCFXInput` later (a natural follow-up sub-step within step 17a, possibly bundled with an engine-bypass parameter or with C2's per-year-inline engine-drive integration). See [§5.5](#55-revised-c1-staging-imogeninput-first-imogencfxinput-follow-up).
 
 This session's work: ~3-4 hours wall-clock for inherited-handoff ingest (sessions 1+2; ~554 KB / 8 199 lines), live verification anchors, deeper C1 pre-flight investigation, foundation implementation (parameter + virtuals + framework block), default-mode regression verification, and documentation.
 
@@ -196,37 +200,62 @@ The year_outer block fails fast on:
 
 These are not needed for the SSP1-2.6 smoke test cross-validation. Adding support is purely additive future work; the `fail` calls give actionable fallback pointers.
 
-### 5.4 The `spinup_year_idx` state-machine finding (flagged this session)
+### 5.4 The `spinup_year_idx` state-machine finding (flagged this session) [ERRATUM applied at C1.1 implementation]
 
-The session-2 §9.5 PRNG audit established that LPJ-GUESS's `Stand.seed` + `Gridcell.seed` are per-instance + ordering-friendly, supporting bit-exact cross-validation. **This session's deeper investigation found a separate ordering-sensitive state in `IMOGENCFXInput`**: the `spinup_year_idx` class-member counter (line 220 of `imogencfx.h`) **persists across cells** in gridcell_outer mode.
+The session-2 §9.5 PRNG audit established that LPJ-GUESS's `Stand.seed` + `Gridcell.seed` are per-instance + ordering-friendly, supporting bit-exact cross-validation. **This session's deeper investigation (foundation phase) found a separate ordering-sensitive state in `IMOGENCFXInput` and `ImogenInput`**: the `spinup_year_idx` class-member counter (line 220 of `imogencfx.h`; line 199 of `imogen_input.h`) **persists across cells** in gridcell_outer mode.
 
 Concretely, with `nyear_spinup = 100` and `NYEAR_SPINUP = 30` (LandSyMM defaults):
-- After `IMOGENCFXInput::init()` (line 411): `spinup_year_idx = 0`
-- Cell 0's spinup years 0..99: `spinup_year_idx` cycles `1, 2, ..., 29, 0, 1, ..., 29, 0, 1, ..., 29, 0, 1, ..., 9` — ending at 10
-- Cell 1's spinup years 0..99: starts from `spinup_year_idx = 10` (NOT 0); imogen_year sequence differs from cell 0's
-- Cell 2's spinup years: starts from `(10 + 100) % 30 = 20`
-- ...etc.
+- After `init()`: `spinup_year_idx = 0`
+- Cell 0's spinup year 0, day 0: `imogen_year = FIRST_SPINUP_YEAR + 0 = 1871` is computed using the OLD value, then `spinup_year_idx` is incremented to 1
+- Cell 0's spinup year 1, day 0: `imogen_year = FIRST_SPINUP_YEAR + 1 = 1872`; then incremented to 2
+- ...
+- Cell 0's spinup year 29, day 0: `imogen_year = FIRST_SPINUP_YEAR + 29 = 1900`; then incremented to 30 → wrap to 0
+- Cell 0's spinup year 30, day 0: `imogen_year = FIRST_SPINUP_YEAR + 0 = 1871`; incremented to 1
+- ...
+- Cell 0's spinup year 99 (LAST spinup year): `spinup_year_idx_BEFORE` = 99 % 30 = 9; `imogen_year = FIRST_SPINUP_YEAR + 9 = 1880`; AFTER = 10
+- Cell 1's spinup year 0, day 0: starts from `spinup_year_idx = 10` (carried from cell 0); `imogen_year = FIRST_SPINUP_YEAR + 10 = 1881`; then incremented to 11
+- ...
 
-`imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx`, so each cell sees DIFFERENT spinup climate forcing. This is the existing gridcell_outer behaviour and must be preserved EXACTLY per session-2 §9.5's "byte-identical default" constraint.
+`imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_BEFORE_THIS_CALL`, so each cell sees DIFFERENT spinup climate forcing per its starting `spinup_year_idx`. This is the existing gridcell_outer behaviour and must be preserved EXACTLY per session-2 §9.5's "byte-identical default" constraint.
 
-**For year_outer mode to produce bit-identical outputs to gridcell_outer**, the IMOGENCFXInput year_outer override (next session's work) must reproduce this state-machine progression by computing per-cell `spinup_year_idx_at_cell_start` deterministically. The formula is:
+**For year_outer mode to produce bit-identical outputs to gridcell_outer**, the input-module year_outer override must reproduce this state-machine progression by computing per-cell `spinup_year_idx` deterministically. The CORRECTED formula (verified by tracing the exact code at `imogen_input.cpp` lines 781-805 / `imogencfx.cpp` lines 1071-1095 during C1.1 implementation):
 
 ```
-spinup_year_idx_at_cell_idx_year_idx
-    = (cell_idx * nyear_spinup + year_idx + 1) % NYEAR_SPINUP
+spinup_year_idx_at_(cell_idx, year_idx)
+    = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
 ```
 
-(Derived from: increment count from `init()` at start of cell C, spinup year Y is `C * nyear_spinup + Y + 1`; spinup_year_idx after the K-th increment is `K % NYEAR_SPINUP`.)
+**NOTE: NO `+1`.** The CHAT_HANDOFF Part 10 + earlier draft of this §5.4 + earlier CHANGELOG entry + earlier FOLLOWUPS F-12 update + earlier BACKPORT_LEDGER entry incorrectly stated `(cell_idx * nyear_spinup + year_idx + 1) % NYEAR_SPINUP`. The CORRECT formula has no `+1` because the existing `getclimate()` reads the spinup_year_idx VALUE BEFORE incrementing it on day 0 (the increment happens AFTER imogen_year is computed). Derivation:
+- `init()` sets `spinup_year_idx = 0`
+- Cumulative spinup-year-day-0 increments BEFORE (cell C, year Y, day 0) = `C * nyear_spinup + Y` (cell C has been preceded by C cells × nyear_spinup spinup years; within cell C, Y prior spinup years have been processed)
+- Each such call increments `spinup_year_idx` by 1 (modulo NYEAR_SPINUP)
+- So `spinup_year_idx_BEFORE_THIS_CALL = (C * nyear_spinup + Y) % NYEAR_SPINUP`
+- And `imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_BEFORE_THIS_CALL`
 
-This is a 1-line formula in the year_outer input-module override. **No source change to gridcell_outer mode is required** — the formula reproduces what gridcell_outer's stateful counter would have produced, given knowledge of the cell index in the gridlist.
+The C1.1 implementation in `ImogenInput::preload_all_climate` + `ImogenInput::getclimate_for_year` uses the CORRECT formula (no `+1`). Subsequent doc updates (this STEP_17a.md §5.4, the CHANGELOG entry, the FOLLOWUPS F-12 extension, the BACKPORT_LEDGER step-17a-c1.1 entry, the session-2 handoff Part 11) all reflect the corrected formula.
 
-Cross-validation simplification for the next session: a **single-cell smoke gridlist** bypasses cell-ordering complexity entirely (cell 0 is the only cell; spinup_year_idx starts from 0 in both modes). After single-cell cross-validation passes, multi-cell cross-validation tests the formula reproduction.
+Cross-validation simplification (preserved from foundation-phase plan): a **single-cell smoke gridlist** bypasses cell-ordering complexity entirely (cell 0 is the only cell; `spinup_year_idx_at_(0, year_idx) = year_idx % NYEAR_SPINUP` regardless of formula edge cases). After single-cell cross-validation passes, multi-cell cross-validation tests the cell-ordering aspect of the formula.
 
-This finding is captured in [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 entry as a refinement of the C1 pre-flight findings.
+This finding is captured in [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 entry as a refinement of the C1 pre-flight findings (with the erratum corrected).
+
+### 5.5 Revised C1 staging: `ImogenInput` first; `IMOGENCFXInput` follow-up
+
+Foundation + C1.1 implementation deliberately scoped to `ImogenInput` (loose-coupling input module) for these reasons:
+
+1. **`ImogenInput::init()` does NOT call `RUN_IMOGEN_ENGINE()`** (verified via `grep RUN_IMOGEN_ENGINE` — only `imogencfx.cpp:524` has it). So loose-mode runs (`-input imogen` + `coupling_mode "loose"`) complete `init()` cleanly + reach the LPJG main loop, regardless of `framework_loop_mode` setting. **No engine-bypass workaround needed for cross-validation.**
+2. **`ImogenInput`'s `getclimate()` pattern is ~95% identical to `IMOGENCFXInput::getclimate()`** (same `spinup_year_idx` state machine; same `stored_years[]` cache; same `readenv()` + `get_climate_for_gridcell()` infrastructure). The implementation strategy + spinup_year_idx formula derived in C1.1 transfers to `IMOGENCFXInput` near-verbatim.
+3. **Cross-validation purpose (per session-2 §9.5)**: validate the year_outer code path's CORRECTNESS vs gridcell_outer's. The input module choice is secondary; what matters is bit-exact comparison between modes WITH SAME input module + SAME climate forcing.
+4. **`IMOGENCFXInput` year_outer override is a natural follow-up sub-step within step 17a**, bundled with one of:
+   - A NEW ins parameter (e.g., `skip_inprocess_engine_run`) that gates the `RUN_IMOGEN_ENGINE()` call in `IMOGENCFXInput::init()` — useful for testing scenarios where climate is already pre-staged on disk
+   - C2's MPI work, which inherently involves rethinking the engine-drive integration (per session-2 §6.3.2's Option C sketch: per-year-inline `climatemodel.run_year(yr+1)` call within the year_outer loop's year-boundary block)
+
+This staging keeps each commit reviewable + bug-bounded. The full `v0.17.0-step17a-c1-year-outer-single-process` tag waits for the bit-exact cross-validation pass with at least one input module's year_outer override (ImogenInput, per this C1.1 work).
 
 ---
 
-## 6. Verification (this commit)
+## 6. Verification
+
+### 6.1 Foundation commit (`2e918c0`; 2026-05-10)
 
 | Check | Method | Result |
 |---|---|---|
@@ -234,65 +263,92 @@ This finding is captured in [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 entry as a
 | 162 unit tests pass | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
 | Default mode (`gridcell_outer`) byte-exact behaviour | Default value preserved; existing per-gridcell-outer code byte-untouched (early-return pattern) | ✅ verified via 162-test pass + visual inspection of `git diff -w` (zero whitespace-only changes outside new block) |
 | `framework_loop_mode` parameter parses correctly | `declare_parameter` call wired in `IMOGENCFXInput` constructor; mirrors the proven `coupling_mode` pattern from step 8 | ✅ build succeeds; test instantiation paths exercise the parameter declaration without failure |
-| Default-fail virtuals produce clear error message | `inputmodule.cpp` `fail()` calls have actionable text pointing at `gridcell_outer` fallback + canonical docs | ✅ static verification (live runtime test deferred to next session when an input module's override is invoked, allowing both code paths to exercise) |
+| Default-fail virtuals produce clear error message | `inputmodule.cpp` `fail()` calls have actionable text pointing at `gridcell_outer` fallback + canonical docs | ✅ static verification (live runtime test deferred to C1.1 when an input module's override is invoked, allowing both code paths to exercise) |
 | Cross-references resolve | All inline references to STEP_17a.md, FOLLOWUPS.md F-12, EXECUTION_PLAN V.1 row 17a are added/exist | ✅ |
-| BACKPORT_LEDGER updated | New step-17a-foundation entry documenting the 6 file changes; `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | ✅ (this commit) |
+| BACKPORT_LEDGER updated | New step-17a-foundation entry documenting the 6 file changes; `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | ✅ |
 
-**Empirical year_outer-mode end-to-end test deferred** to next session, when the IMOGENCFXInput overrides land. The foundation alone cannot be empirically end-to-end-verified because year_outer mode immediately default-fails at the `preload_all_climate` call (which is the intended semantics for the foundation).
+**Empirical year_outer-mode end-to-end test was deferred** to C1.1 (this commit) at foundation time, because the foundation alone cannot be empirically end-to-end-verified — year_outer mode immediately default-fails at the `preload_all_climate` call (which is the intended semantics for the foundation).
+
+### 6.2 C1.1 implementation commit (this commit; 2026-05-10)
+
+| Check | Method | Result |
+|---|---|---|
+| Build clean | `cd lpjguess/build && make -j$(nproc)` (full clean rebuild) | ✅ (only pre-existing `simfire_input.h` `cruncep_*.h` `GlobalNitrogenDeposition*.h` `gutil.{cpp,h}` `indata.cpp` warnings; ZERO warnings introduced by C1.1 additions) |
+| 162 unit tests pass | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| Header includes resolved (`<map>`, `<utility>`, `lamarquendep.h`) | `imogen_input.h` modifications | ✅ included |
+| Spinup_year_idx formula correct (NO `+1`) | Hand-traced against `imogen_input.cpp:781-805` | ✅ formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` matches |
+| Per-cell ndep cache copies are independent | `Lamarque::NDepData` is value type (no pointers; just arrays); `std::map<key, NDepData>` value-copies on insert | ✅ verified via `lamarquendep.h` member inspection |
+| K → degC temperature conversion preserved | `getclimate_for_year` line: `climate.temp = dtemp[day_of_year] - 273.15;` matches existing `getclimate` line 876 | ✅ |
+| Per-day field assignments mirror existing `getclimate` | All 6 fields (temp/prec/insol/dtr conditional/dNH4dep/dNO3dep) populated identically | ✅ |
+| `fail()` paths produce actionable messages on cache miss / sim-done / corrupt state | All 5 fail() call sites have specific context (cell coords + year + day + cache state) | ✅ |
+| Backward compatibility with existing `getclimate()` (gridcell_outer mode) | `getclimate()` body unchanged; new methods are SEPARATE additions; existing code path completely intact | ✅ |
+| BACKPORT_LEDGER updated | New step-17a-c1.1 entry documenting the 2 file changes (`imogen_input.h` + `imogen_input.cpp`); `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | ✅ (this commit) |
+
+**Empirical year_outer-mode end-to-end test still deferred** to C1.2 (next session), because cross-validation requires:
+1. Pre-staged climate output at `runs/SSP1-2.6/Common-directory/IMOGEN/output/{1871..1900+}/` (currently MISSING after a previous post-smoke cleanup)
+2. A custom cross-validation .ins file with `coupling_mode "loose"` (uses ImogenInput) + `framework_loop_mode "year_outer"` for Run B (Run A uses default `gridcell_outer`)
+3. A bash harness that runs both modes + diffs the .out files cell-by-cell
+4. Iteration on any divergences found
+
+Per the strategic decision in [§5.5](#55-revised-c1-staging-imogeninput-first-imogencfxinput-follow-up), each commit is bug-bounded; cross-validation is a separate runtime exercise that's bounded by what an empirical run reveals.
 
 ---
 
-## 7. Remaining work within C1 (C1.1, C1.2)
+## 7. Remaining work within C1 (C1.2 cross-validation; IMOGENCFXInput follow-up)
 
-Per the foundation-vs-full-C1 staging in [§5.2](#52-foundation-vs-full-c1-staging-within-step-17a):
+Per the revised staging in [§5.5](#55-revised-c1-staging-imogeninput-first-imogencfxinput-follow-up), foundation + C1.1 implementation are landed; the runtime cross-validation (C1.2) and the IMOGENCFXInput year_outer follow-up are the remaining work.
 
-### 7.1 C1.1 — IMOGENCFXInput year_outer override (next session; ~3-5 days)
+### 7.1 C1.1 — ImogenInput year_outer override [DONE this commit]
 
-Implement two virtuals on `IMOGENCFXInput`:
+Implemented two virtuals on `ImogenInput`:
 
-#### `IMOGENCFXInput::preload_all_climate(Gridcell& gridcell, int first_calendar_year, int last_calendar_year)`
+- **`ImogenInput::preload_all_climate(gridcell, first_calendar_year, last_calendar_year)`** — pre-loads all needed years' climate for ONE cell into the existing `all_temp/all_prec/all_wetdays/all_insol/all_dtr` cache via `readenv()`. Caches per-cell `cell_idx` (== `current_grid_index` at preload time) + per-cell `Lamarque::NDepData` value-copy in `year_outer_cell_idx` + `year_outer_ndep_cache` maps respectively. Uses the corrected spinup_year_idx state-machine reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`; per [§5.4 erratum](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum)) to compute per-(cell, year) `imogen_year` values that match what gridcell_outer mode would have selected.
 
-Pre-loads all needed climate for ONE cell across the year range. Implementation steps:
-1. Determine cell index in gridlist (`current_grid_index`; existing class member, set by `getgridcell`)
-2. For each year_idx in [0, total_years):
-   - Compute calendar_year = first_calendar_year + year_idx
-   - Determine if spinup: year_idx < nyear_spinup
-   - Compute imogen_year:
-     - If spinup: `imogen_year = FIRST_SPINUP_YEAR + ((current_grid_index * nyear_spinup + year_idx + 1) % NYEAR_SPINUP)` (per [§5.4](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session))
-     - If historical: `imogen_year = calendar_year`
-   - Cache lookup via `stored_years[]`; if miss, allocate slot via `last_store_index++`
-   - If reread: call `readenv(...)` for `imogen_year` (loads ALL cells' data for that year; reuses existing infrastructure)
-   - Call `get_climate_for_gridcell(store_index, current_grid_index, gridcell.seed)` to fill per-day arrays for THIS cell THIS year
-   - Store the per-day arrays into a NEW per-cell-per-year cache structure (TBD whether to reuse existing `dtemp[]`/`dprec[]`/etc. with overwrite semantics, or to add a per-(cell,year)-keyed cache)
+- **`ImogenInput::getclimate_for_year(gridcell, calendar_year, day_of_year)`** — reads from cache. On day 0 of each (cell, year) tuple: looks up `cell_idx` + cached `NDepData`, calls existing `get_climate_for_gridcell()` to populate per-day arrays, calls `cell_ndep.get_one_calendar_year(...)` + `distribute_ndep(...)`, sets `climate.co2`. Every day: assigns `climate.{temp - 273.15 (K→degC), prec, insol, dtr conditional}` + `gridcell.{dNH4dep, dNO3dep}` from per-day arrays. Returns false at sim-done terminator (`calendar_year > lasthistyear`) or on missing-grid-point conditions.
 
-Pre-requisites: ensure `nyears` (the `stored_years` cache size; line 230 of `imogencfx.h`) is large enough to hold all simulation years. Default value needs to be checked + possibly raised.
+Implementation files:
+- `lpjguess/modules/imogen_input.h` (+~80 LOC: 3 includes, 2 method declarations with extensive doc blocks, 2 cache map members)
+- `lpjguess/modules/imogen_input.cpp` (+~200 LOC: 2 method implementations with doc blocks, error handling, cross-references)
 
-#### `IMOGENCFXInput::getclimate_for_year(Gridcell& gridcell, int calendar_year, int day_of_year)`
-
-Reads from the per-cell-per-year cache populated by preload_all_climate. Assigns to `gridcell.climate.{temp, prec, insol, dtr, relhum, u10, tmin, tmax, co2}` and `gridcell.{dNH4dep, dNO3dep}` exactly as the existing `getclimate(gridcell)` does (lines 1166-1193 of `imogencfx.cpp`). Returns true (sim-done terminator handled by the year-outer loop's `total_years` bound, not by this method).
+Verified per [§6.2](#62-c11-implementation-commit-this-commit-2026-05-10): build clean; 162 unit tests pass; backward compatibility preserved.
 
 ### 7.2 C1.2 — Cross-validation (next session; ~1-2 days)
 
 Run BOTH modes with byte-identical inputs (.ins / gridlist / seeds / climate / LU forcing):
 - **Run A**: `framework_loop_mode = "gridcell_outer"` (existing trusted baseline)
-- **Run B**: `framework_loop_mode = "year_outer"` (new additive code path)
+- **Run B**: `framework_loop_mode = "year_outer"` (new additive code path; uses C1.1's overrides)
 
-Cross-validation gridlist progression:
-1. **Single-cell smoke first** — bypasses spinup_year_idx cell-ordering complexity; tests pure year_outer code path. Tolerance: bit-exact for ALL outputs.
-2. **Multi-cell smoke (4-5 cells) second** — tests the spinup_year_idx state-machine reproduction formula. Tolerance: bit-exact for ALL outputs.
+**Operational pre-requisites** (next session must handle these):
+1. **Pre-stage climate output**. The `runs/SSP1-2.6/Common-directory/IMOGEN/output/{1871..1900+}/` directories must exist. Recommended: launcher in default config (`./scripts/run_coupled.sh`) for ~3-5 min wall-clock; user Ctrl-Cs after engine produces 32 year-output dirs (per session-1 §49.1's documented operational pattern). Alternatively, run engine standalone (`./imogen/code/imogen_lpjg`) with appropriate IYEND in `imogen_settings.txt`, or a similar one-shot mechanism.
+2. **Custom cross-validation .ins file** with `coupling_mode "loose"` (gates ImogenOutput writes) + smoke gridlist + 5-10 historical years + 0-50 spinup years.
+3. **Bash harness script** (e.g., `scripts/cross_validate_year_outer.sh`) that runs LPJG twice with the .ins overridden via `param "framework_loop_mode" (str "...")` directives; saves outputs to separate dirs; diffs with `cmp` or `diff` for bit-exact comparison.
 
-Outputs to compare: `cflux.out`, `cmass.out`, `mch4.out`, `ngases.out`, `cpool.out`, `nflux.out` (the standard LPJ-GUESS commonoutput suite).
+**Cross-validation gridlist progression** (per the revised strategy in [§5.4](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum)):
+1. **Single-cell smoke first** (NEW gridlist `gridlist_test1.txt`; just one cell) — bypasses spinup_year_idx cell-ordering complexity entirely; tests pure year_outer code path mechanics. Tolerance: bit-exact for ALL outputs.
+2. **Multi-cell smoke** (existing `gridlist_test2.txt`; 4 cells) — tests the spinup_year_idx state-machine reproduction formula across cells. Tolerance: bit-exact for ALL outputs.
 
-Bit-exact cross-validation is the GO/NO-GO gate. If single-cell cross-validation fails, debug the year_outer code path. If multi-cell fails (after single-cell passes), debug the spinup_year_idx formula.
+Outputs to compare: `cflux.out`, `cmass.out`, `mch4.out`, `ngases.out`, `cpool.out`, `nflux.out`, `agpp.out`, `anpp.out`, etc. — the full standard LPJ-GUESS commonoutput suite, plus crop_n outputs if applicable.
 
-### 7.3 C1 close-out (next session; ~0.5 day)
+**GO/NO-GO gate**: bit-exact cross-validation. If single-cell fails, debug year_outer code path mechanics (most likely bug locations: framework.cpp year_outer block; ImogenInput::getclimate_for_year per-day field assignments; date.year setting). If single-cell passes but multi-cell fails, debug the spinup_year_idx formula or other cell-ordering-dependent state.
 
-After cross-validation passes:
-- Update this STEP_17a.md with C1.1 + C1.2 outcomes (replace this §7)
+### 7.3 C1.3 — IMOGENCFXInput year_outer override (next session(s); ~2-3 days)
+
+Once C1.2 cross-validation passes for ImogenInput, replicate the implementation pattern for `IMOGENCFXInput`:
+
+- `IMOGENCFXInput::preload_all_climate(gridcell, first_yr, last_yr)` — identical structure to `ImogenInput::preload_all_climate` plus the additional climate fields IMOGENCFXInput handles (relhum, wind, tmin, tmax — populated via the additional `read_lines_from_file` calls in `readenv()` for the corresponding `file_*` params)
+- `IMOGENCFXInput::getclimate_for_year(gridcell, calendar_year, day_of_year)` — identical to `ImogenInput::getclimate_for_year` PLUS the relhum/wind/tmin/tmax assignments AND the BLAZE compatibility check. NOTE: IMOGENCFXInput's `getclimate` does NOT do the K→degC conversion (the existing line is `climate.temp = dtemp[date.day]` without `-273.15`); preserve this difference for byte-exactness.
+- Optional: NEW ins parameter `skip_inprocess_engine_run` (default `false`) gating the `RUN_IMOGEN_ENGINE()` call in `IMOGENCFXInput::init()`. Allows imogencfx-mode cross-validation against pre-staged climate without F-10 deadlock.
+
+Cross-validate IMOGENCFXInput year_outer mode against gridcell_outer baseline (same single-cell-first then multi-cell pattern).
+
+### 7.4 C1 close-out (after C1.2 + C1.3; ~0.5 day)
+
+After both ImogenInput AND IMOGENCFXInput cross-validations pass bit-exactly:
+- Update this STEP_17a.md with C1.2 + C1.3 outcomes
 - Update CHANGELOG `[Unreleased]` → `[v0.17.0-step17a-c1-year-outer-single-process]`
-- Update EXECUTION_PLAN V.1 row 17a status: ⏳ → ✅ DONE
+- Update EXECUTION_PLAN V.1 row 17a status: ⏳/🔧 → ✅ DONE
 - Update FOLLOWUPS F-12 entry: C1 closed; C2 next
-- Update BACKPORT_LEDGER with C1.1 file changes (likely `lpjguess/modules/imogencfx.cpp/h` additions + possible reuse of existing infrastructure)
+- Update BACKPORT_LEDGER with C1.2/C1.3 file changes
 - Tag `v0.17.0-step17a-c1-year-outer-single-process`; push to all 3 remotes
 
 ---

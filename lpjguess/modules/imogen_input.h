@@ -14,6 +14,8 @@
 #include "soilinput.h"
 #include "inputmodule.h"
 #include <vector>
+#include <map>
+#include <utility>
 #include "gutil.h"
 #include "globalco2file.h"
 #include "lamarquendep.h"
@@ -41,6 +43,59 @@ public:
 
 	/// See base class for documentation about this function's responsibilities
 	bool getclimate(Gridcell& gridcell);
+
+	/// Year_outer mode support: pre-load all years' climate for one cell.
+	/** Override of InputModule::preload_all_climate, added at step 17a as
+	 *  F-12 sub-milestone C1.1 of the unified-codebase rebuild (2026-05-10).
+	 *  Pre-loads all years' climate data for ONE cell into the existing
+	 *  all_temp/all_prec/all_wetdays/all_insol/all_dtr cache via the
+	 *  existing readenv() helper. Reproduces gridcell_outer mode's
+	 *  per-cell-stateful spinup_year_idx selection deterministically via
+	 *  the formula:
+	 *
+	 *      spinup_year_idx_at_(cell_idx, year_idx)
+	 *          = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+	 *
+	 *  (NO +1; the existing getclimate() reads the spinup_year_idx VALUE
+	 *  BEFORE incrementing it, on day 0 of each spinup year. cell_idx is
+	 *  0-indexed in the order getgridcell returned cells; year_idx is
+	 *  0-indexed within the spinup phase. For cell C, spinup year Y, the
+	 *  cumulative spinup-year-increments before this point equals
+	 *  C * nyear_spinup + Y, and spinup_year_idx is incremented exactly
+	 *  that many times since init's 0; modulo NYEAR_SPINUP for wrap.)
+	 *
+	 *  Also caches per-cell ndep state (a copy of `ndep` member at
+	 *  preload time, populated by getgridcell -> ndep.getndep) so
+	 *  getclimate_for_year can serve per-cell ndep without mutating
+	 *  the shared `ndep` member across cell-switches in year_outer mode.
+	 *
+	 *  Cross-references:
+	 *  - notes/STEP_17a.md §5.4 (the spinup_year_idx state-machine finding)
+	 *  - notes/FOLLOWUPS.md F-12 (canonical revised plan)
+	 *  - inputmodule.h preload_all_climate doc block (base-class contract)
+	 */
+	void preload_all_climate(Gridcell& gridcell,
+	                         int first_calendar_year,
+	                         int last_calendar_year);
+
+	/// Year_outer mode support: serve cached climate for one (cell, year, day).
+	/** Override of InputModule::getclimate_for_year, added at step 17a.
+	 *  Looks up the cell_idx + per-cell ndep from the cache populated by
+	 *  preload_all_climate(); on day 0 of each (cell, year) tuple,
+	 *  populates the per-day arrays via the existing
+	 *  get_climate_for_gridcell() helper + ndep + co2; on every day
+	 *  (including day 0) assigns gridcell.climate.{temp, prec, insol, dtr}
+	 *  + gridcell.{dNH4dep, dNO3dep} from the per-day arrays
+	 *  (mirrors getclimate lines 876-887 INCLUDING the K -> degC
+	 *  temperature conversion specific to ImogenInput at line 876).
+	 *
+	 *  Returns false at the sim-done terminator (calendar_year > lasthistyear)
+	 *  or on missing-grid-point conditions (mirrors getclimate's
+	 *  false-return semantics).
+	 */
+	bool getclimate_for_year(Gridcell& gridcell,
+	                         int calendar_year,
+	                         int day_of_year);
 
 	/// See base class for documentation about this function's responsibilities
 	void getlandcover(Gridcell& gridcell);
@@ -227,7 +282,33 @@ private:
 	// Timers for keeping track of progress through the simulation
 	Timer tprogress,tmute;
 	static const int MUTESEC=20; // minimum number of sec to wait between progress messages
-	
+
+	// [Step 17a (F-12 sub-milestone C1.1) of unified-codebase rebuild
+	//  (2026-05-10): per-cell state cache for year_outer mode, populated
+	//  by preload_all_climate(gridcell, ...) and consumed by
+	//  getclimate_for_year(gridcell, ...). Allows year_outer to serve
+	//  per-cell-per-year climate without invoking the existing per-day
+	//  stateful getclimate() driver, which would otherwise leak per-cell
+	//  state (current_grid_index, ndep, spinup_year_idx) across
+	//  year-outer's cell-switches.
+	//
+	//  Both maps keyed by (lon, lat) coordinate pair to identify the
+	//  cell — avoids Gridcell* identity issues if the framework
+	//  re-creates Gridcell objects between phases (preload phase uses
+	//  a different Gridcell instance than the year-outer per-cell-inner
+	//  loop's main Gridcell objects in framework.cpp).
+	//  - DKB 2026-05-10]
+
+	/// Per-cell cache of cell_idx (== current_grid_index at preload time);
+	/// looked up by getclimate_for_year via (lon, lat).
+	std::map<std::pair<double,double>, int> year_outer_cell_idx;
+
+	/// Per-cell cache of NDepData state. Each entry is a value-copy of
+	/// `ndep` taken right after getgridcell -> ndep.getndep set it for
+	/// that cell. getclimate_for_year calls get_one_calendar_year on the
+	/// cached NDepData (NOT on the shared `ndep` member).
+	std::map<std::pair<double,double>, Lamarque::NDepData> year_outer_ndep_cache;
+
 };
 
 #endif // LPJ_GUESS_IMOGEN_INPUT_H

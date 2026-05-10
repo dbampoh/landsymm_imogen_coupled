@@ -911,6 +911,251 @@ bool ImogenInput::getclimate(Gridcell& gridcell) {
   return true;
 }
 
+
+// ============================================================================
+// [Step 17a (F-12 sub-milestone C1.1) of unified-codebase rebuild
+//  (2026-05-10): year_outer mode support for ImogenInput. Overrides
+//  InputModule's preload_all_climate + getclimate_for_year virtuals
+//  added at the C1 foundation step. Together these enable LPJ-GUESS's
+//  framework() to drive simulation in per-year-outer / per-gridcell-inner
+//  ordering (gated on IMOGENConfig::framework_loop_mode == "year_outer")
+//  while reproducing gridcell_outer mode's climate-input semantics
+//  bit-exactly per cell-year-day.
+//
+//  Cross-references:
+//  - imogen_input.h doc blocks on these methods (the public-facing
+//    contract + the spinup_year_idx state-machine reproduction formula)
+//  - notes/STEP_17a.md §5.4 (the spinup_year_idx finding) + §7.1 (the
+//    full C1.1 implementation plan + revised formula)
+//  - notes/FOLLOWUPS.md F-12 (canonical revised plan)
+//  - lpjguess/framework/framework.cpp year_outer additive block (the
+//    caller of these methods; see step-17a comment block there)
+//  - DKB 2026-05-10]
+// ============================================================================
+
+void ImogenInput::preload_all_climate(Gridcell& gridcell,
+                                      int first_calendar_year,
+                                      int last_calendar_year) {
+
+	// 1. Cache per-cell state for getclimate_for_year lookups.
+	//    current_grid_index was set by the framework's getgridcell call
+	//    immediately preceding this preload (per the year_outer block
+	//    structure: per-cell setup -> preload_all_climate -> next cell ...).
+	//    NDepData was likewise set by getgridcell -> ndep.getndep().
+	const int cell_idx = current_grid_index;
+	const std::pair<double,double> coord_key =
+		std::make_pair(gridcell.get_lon(), gridcell.get_lat());
+
+	year_outer_cell_idx[coord_key]   = cell_idx;
+	year_outer_ndep_cache[coord_key] = ndep;  // value-copy NDepData
+
+	// 2. Sanity check: cache size.
+	if (last_store_index >= nyears) {
+		fail("ImogenInput::preload_all_climate: stored_years cache already full "
+		     "(last_store_index=%d >= nyears=%d) when preloading cell (%g,%g). "
+		     "Check init() nyears computation.",
+		     last_store_index, nyears,
+		     gridcell.get_lon(), gridcell.get_lat());
+	}
+
+	// 3. Pre-load all needed years for this cell.
+	//    For each year in [first_calendar_year, last_calendar_year]:
+	//      a. Compute imogen_year via the spinup_year_idx state-machine
+	//         reproduction formula (see header doc block + STEP_17a.md §5.4).
+	//      b. Look up imogen_year in the existing stored_years[] cache.
+	//      c. On cache miss: assign next slot, call readenv() to load year-Y
+	//         climate for ALL cells (mirrors existing getclimate lines 825-848).
+	const int firsthist = getfirsthistyear();
+	const int total_years = last_calendar_year - first_calendar_year + 1;
+
+	for (int year_idx = 0; year_idx < total_years; ++year_idx) {
+
+		const int calendar_year = first_calendar_year + year_idx;
+		const bool is_spinup = (calendar_year < firsthist);
+
+		// Compute imogen_year reproducing gridcell_outer's spinup_year_idx
+		// state-machine progression.
+		int imogen_year;
+		if (is_spinup) {
+			const int spinup_year_idx_for_this =
+				(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+			imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
+		} else {
+			imogen_year = calendar_year;
+		}
+
+		// Look up imogen_year in stored_years[] cache (hit means already loaded).
+		int store_index = -1;
+		for (int idx = 0; idx < nyears; ++idx) {
+			if (stored_years[idx] == imogen_year) {
+				store_index = idx;
+				break;
+			}
+		}
+
+		if (store_index < 0) {
+			// Cache miss: load year-imogen_year climate for ALL cells.
+			store_index = last_store_index++;
+			if (store_index >= nyears) {
+				fail("ImogenInput::preload_all_climate: store_index %d >= nyears %d "
+				     "for imogen_year %d (cell (%g,%g), year_idx %d). Cache size "
+				     "insufficient; check init() nyears computation.",
+				     store_index, nyears, imogen_year,
+				     gridcell.get_lon(), gridcell.get_lat(), year_idx);
+			}
+
+			const int nfound = readenv(all_lon, all_lat, imogen_year, store_index, coord_line);
+			if (nfound == 0) {
+				fail("ImogenInput::preload_all_climate: failed reading climate "
+				     "for imogen_year %d (cell (%g,%g), year_idx %d)",
+				     imogen_year,
+				     gridcell.get_lon(), gridcell.get_lat(), year_idx);
+			}
+
+			// Load CO2 too (mirrors existing getclimate lines 837-845).
+			xtring filename = gen_filename(param["file_co2"].str, imogen_year, false);
+			co2.load_file(filename);
+			all_co2[store_index] = co2[imogen_year];
+
+			stored_years[store_index] = imogen_year;
+		}
+		// (cache hit: imogen_year already loaded for some prior cell or
+		//  earlier year_idx of THIS cell; no I/O needed.)
+	}
+}
+
+
+bool ImogenInput::getclimate_for_year(Gridcell& gridcell,
+                                      int calendar_year,
+                                      int day_of_year) {
+
+	Climate& climate = gridcell.climate;
+
+	// 1. Look up cached cell_idx + ndep.
+	const std::pair<double,double> coord_key =
+		std::make_pair(gridcell.get_lon(), gridcell.get_lat());
+
+	auto cell_idx_it = year_outer_cell_idx.find(coord_key);
+	if (cell_idx_it == year_outer_cell_idx.end()) {
+		fail("ImogenInput::getclimate_for_year: cell (%g,%g) not in preload "
+		     "cache. preload_all_climate() must be called for this cell first "
+		     "(framework.cpp year_outer block does this in its preload phase).",
+		     gridcell.get_lon(), gridcell.get_lat());
+	}
+	const int cell_idx = cell_idx_it->second;
+
+	auto ndep_it = year_outer_ndep_cache.find(coord_key);
+	if (ndep_it == year_outer_ndep_cache.end()) {
+		fail("ImogenInput::getclimate_for_year: ndep cache miss for cell (%g,%g)",
+		     gridcell.get_lon(), gridcell.get_lat());
+	}
+	Lamarque::NDepData& cell_ndep = ndep_it->second;
+
+	// 2. Compute imogen_year via the same formula as preload_all_climate.
+	//    For spinup years: cycling formula with cell_idx + year_idx.
+	//    For historical years: imogen_year = calendar_year (no formula).
+	const int firsthist = getfirsthistyear();
+	const bool is_spinup = (calendar_year < firsthist);
+
+	int imogen_year;
+	if (is_spinup) {
+		const int year_idx = calendar_year - (firsthist - nyear_spinup);
+		const int spinup_year_idx_for_this =
+			(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+		imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
+	} else {
+		imogen_year = calendar_year;
+	}
+
+	// 3. Sim-done terminator: matches existing getclimate line 789's check.
+	//    (Note: this also fires once at the start of any post-historical-window
+	//    call, regardless of day_of_year. The framework's year_outer loop
+	//    bounds prevent us from reaching this in normal operation, but
+	//    defensive-guard for safety.)
+	if (calendar_year > lasthistyear) {
+		return false;
+	}
+
+	// 4. Find store_index for imogen_year (must be in cache after preload).
+	int store_index = -1;
+	for (int idx = 0; idx < nyears; ++idx) {
+		if (stored_years[idx] == imogen_year) {
+			store_index = idx;
+			break;
+		}
+	}
+	if (store_index < 0) {
+		fail("ImogenInput::getclimate_for_year: imogen_year %d not in cache "
+		     "(cell (%g,%g) cell_idx=%d, calendar_year %d, day %d). preload_all_climate() "
+		     "should have loaded it; check that calendar_year is within the range "
+		     "passed to preload_all_climate().",
+		     imogen_year, gridcell.get_lon(), gridcell.get_lat(), cell_idx,
+		     calendar_year, day_of_year);
+	}
+
+	// 5. On day 0 of year: populate per-day arrays + ndep + co2.
+	//    Mirrors existing getclimate's day_0 block (lines 850-872) but uses
+	//    the cached cell-specific NDepData (cell_ndep) instead of the
+	//    shared `ndep` member.
+	if (day_of_year == 0) {
+		// Missing-grid-point check (mirrors existing getclimate line 850).
+		if (coord_line[cell_idx] < 0) {
+			dprintf("ImogenInput::getclimate_for_year: no climate data for "
+			        "cell (%g,%g) cell_idx=%d (coord_line=%d)\n",
+			        gridcell.get_lon(), gridcell.get_lat(), cell_idx,
+			        coord_line[cell_idx]);
+			return false;
+		}
+
+		// Populate dtemp[]/dprec[]/dinsol[]/ddtr[] (class members) from
+		// cache for THIS (cell, year). The seed parameter is gridcell.seed
+		// passed by reference; interp_climate inside get_climate_for_gridcell
+		// advances it via randfrac (Park-Miller LCG; deterministic).
+		get_climate_for_gridcell(store_index, cell_idx, gridcell.seed);
+
+		// Get monthly ndep values from the cell-specific cached NDepData
+		// (NOT from the shared `ndep` member; see year_outer_ndep_cache
+		// rationale in the header doc block).
+		double mNHxdrydep[12], mNOydrydep[12];
+		double mNHxwetdep[12], mNOywetdep[12];
+		cell_ndep.get_one_calendar_year(calendar_year,
+		                                mNHxdrydep, mNOydrydep,
+		                                mNHxwetdep, mNOywetdep);
+
+		// Distribute monthly ndep to daily arrays (mirrors getclimate line 865).
+		distribute_ndep(mNHxdrydep, mNOydrydep,
+		                mNHxwetdep, mNOywetdep,
+		                dprec, dNH4dep, dNO3dep);
+
+		// CO2 for this year (mirrors getclimate line 869).
+		climate.co2 = all_co2[store_index];
+		if (climate.co2 < 200) {
+			dprintf("ImogenInput::getclimate_for_year: co2 %f < 200ppm in year %d, day %d\n",
+			        climate.co2, calendar_year, day_of_year);
+		}
+	}
+
+	// 6. Per-day field assignments (mirrors existing getclimate lines 876-887).
+	//    INCLUDES the K -> degC temperature conversion at line 876 specific
+	//    to ImogenInput (IMOGENCFXInput's getclimate at line 1166 does NOT
+	//    do this conversion; the two input modules have different
+	//    temperature-unit conventions; this is preserved here for bit-exact
+	//    reproduction of ImogenInput's gridcell_outer behaviour).
+	climate.temp = dtemp[day_of_year] - 273.15;  // K -> degC
+	climate.prec = dprec[day_of_year];
+	climate.insol = dinsol[day_of_year];
+
+	if (ifbvoc) {
+		climate.dtr = ddtr[day_of_year];
+	}
+
+	gridcell.dNH4dep = dNH4dep[day_of_year];
+	gridcell.dNO3dep = dNO3dep[day_of_year];
+
+	return true;
+}
+
+
 bool ImogenInput::getsoil(Gridcell& gridcell, const int soilmap_index){
   return true;
 }
