@@ -203,6 +203,15 @@ ImogenInput::ImogenInput()
  
 	declare_parameter("monthly_imogen", &monthly, "imogen produced monthly climate data (default=true)");
 
+	// [Step 17a (F-12 sub-milestone C1.2 cross-validation prerequisite) of
+	//  unified-codebase rebuild (2026-05-10): mirror IMOGENCFXInput's
+	//  declare_parameter call for framework_loop_mode so that the parameter
+	//  is recognized when running with `-input imogen` (loose-coupling mode).
+	//  This enables C1.2 bit-exact cross-validation: Run A (gridcell_outer) vs
+	//  Run B (year_outer) using ImogenInput against pre-staged engine climate.
+	//  Per notes/STEP_17a.md §5.5 (strategic decision: ImogenInput first;
+	//  IMOGENCFXInput follow-up). - DKB 2026-05-10]
+	declare_parameter("framework_loop_mode", &IMOGENConfig::framework_loop_mode, 20, "Framework loop ordering: gridcell_outer (default) | year_outer (F-12 C1)");
 
 	//disabled since I am not using mPI
 #ifdef HAVE_MPI

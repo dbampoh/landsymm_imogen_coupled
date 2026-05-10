@@ -1,0 +1,121 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! Step 17a (F-12 sub-milestone C1.2 cross-validation) — Loose-mode .ins for
+! year_outer cross-validation
+!
+! This .ins file is used by the cross-validation harness at
+! scripts/cross_validate_year_outer.sh. It runs LPJ-GUESS with `-input imogen`
+! (LOOSE-coupling input module; ImogenInput) against pre-staged engine
+! climate at runs/SSP1-2.6/Common-directory/IMOGEN/output/<YYYY>/.
+!
+! Cross-validation pattern: 2 runs with identical inputs except
+! framework_loop_mode:
+!   Run A: framework_loop_mode "gridcell_outer" (existing trusted baseline)
+!   Run B: framework_loop_mode "year_outer"     (new additive code path; C1.1)
+! Compared bit-exactly per the spinup_year_idx formula reproduction
+! (per notes/STEP_17a.md §5.4 + §7.2; per FOLLOWUPS F-12).
+!
+! The harness sets framework_loop_mode by writing a small wrapper .ins
+! that imports this file + adds the framework_loop_mode override.
+! file_gridlist is also overridden by the harness per smoke-test stage
+! (1-cell first, then 4-cell).
+!
+! IMPORTANT: this .ins is intended to be loaded with cwd =
+! runs/SSP1-2.6/Common-directory/ so that the relative file_temp etc.
+! paths resolve to the staged engine climate. Absolute paths are used
+! for non-climate inputs (gridlist, soildata) so cwd doesn't matter for
+! those.
+!
+! - Daniel Bampoh, 2026-05-10 (step 17a C1.2 of unified-codebase rebuild)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard PFT definitions + run config
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+import "crop_n.ins"
+
+! Wetland PFTs
+import "wetlandpfts.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Smoke-test overrides — these REPLACE values set in global.ins / imported files
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Smoke gridlist: harness will override file_gridlist below to either
+! gridlist_test1.txt (1-cell smoke; bypasses cell-ordering complexity) or
+! gridlist_test2.txt (4-cell smoke; tests spinup_year_idx formula).
+! Default here is the 4-cell variant; harness overrides for 1-cell run.
+! ABSOLUTE PATHS (not affected by cwd).
+param "file_gridlist"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+param "file_gridlist_cf"  (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+
+! Soil map (Tier-1 committed data) — ABSOLUTE PATH
+param "file_soildata"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition: empty -> LPJG uses pre-industrial constant 2 kgN/ha/yr.
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP26")
+
+! Climate forcing files (relative to cwd; cwd MUST be
+! runs/SSP1-2.6/Common-directory/ for these to resolve).
+param "file_temp"         (str "./IMOGEN/output/YYYY/T_anom.dat")
+param "file_prec"         (str "./IMOGEN/output/YYYY/P_anom.dat")
+param "file_insol"        (str "./IMOGEN/output/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "./IMOGEN/output/YYYY/WET.dat")
+param "file_dtr"          (str "./IMOGEN/output/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
+
+! ImogenInput-specific tuning. searchradius (climate) is 50 = generous so
+! ImogenInput's IDWC nearest-neighbour search succeeds against the engine's
+! native 1631-cell grid for whatever LPJG cells we ask for.
+! searchradius_soil is the SoilInput counterpart (per soilinput.h:32) which
+! enables nearest-cell lookup in the 62892-cell soilmap when the requested
+! cell isn't an exact match. Necessary because IMOGEN's 3.75° x 2.5° HadCM3
+! grid + LPJG's 0.5° soilmap grid have NO exact intersections.
+! NOTE: searchradius is declared as a class-member param (custom-param
+! table syntax `param "X" (num Y)`); searchradius_soil is declared via
+! declare_parameter as a global plib item (bare-global syntax "X Y").
+param "searchradius" (num 50)
+searchradius_soil    50
+
+! Smoke overrides — keep run minimal: 1-year smoke to bypass the staged-climate
+! odd-year-only constraint. The launcher-staged engine climate at
+! Common-directory/IMOGEN/output/<YYYY>/ has only ODD years (1871, 1873, ..., 1901)
+! fully populated; EVEN years have just the 'done' marker (engine intentionally
+! alternates per its NCALLYR/STEP_DAY internals). For C1.2 cross-validation we
+! constrain the smoke to need only odd-year imogen_year values.
+!
+! With nyear_spinup=1 + firsthistyear=lasthistyear=1871 + cell_idx=0 (single-cell):
+!   Spinup year_idx=0: spinup_year_idx_at_(0,0) = (0*1+0) % 30 = 0
+!                      imogen_year = FIRST_SPINUP_YEAR + 0 = 1871 ✓ ODD
+!   Historical year_idx=1: imogen_year = calendar_year = 1871 ✓ ODD
+! Total: 2 simulation years, both using imogen_year=1871; single climate year
+! needed. Eliminates the alternating-climate-availability constraint.
+nyear_spinup        1              ! Minimal 1-year spinup (smoke); validator: freenyears < nyear_spinup
+freenyears          0              ! 0 N-free spinup years (the spinup year IS the N-free year)
+
+! Year-range parameters. Set BOTH the bare-global syntax (which framework.cpp
+! reads via the global firsthistyear/lasthistyear ints) AND the custom-param
+! syntax (which ImogenInput::init() reads via param["firsthistyear"].num at
+! imogen_input.cpp:304). Both must be set for ImogenInput to work.
+firsthistyear       1871
+lasthistyear        1871
+firstoutyear        1871
+lastoutyear         1871
+
+param "firsthistyear" (num 1871)
+param "lasthistyear"  (num 1871)
+
+firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency
+run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
+npatch              1              ! Single patch for smoke speed
+ifcalcsla           0              ! Standard
+ifcalccton          0              ! Standard
+
+! framework_loop_mode: harness writes a wrapper .ins that imports this
+! file + adds the override. Default here is gridcell_outer (the
+! existing baseline) so this .ins works standalone if invoked directly.
+param "framework_loop_mode" (str "gridcell_outer")
+
+! Output directory: harness sets cwd to a per-run dir; outputs go there.
+outputdirectory "./"

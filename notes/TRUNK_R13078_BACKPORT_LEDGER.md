@@ -994,6 +994,110 @@ this commit.
 
 ---
 
+### Step 17a (C1.2 1-CELL CROSS-VALIDATION): F-12 sub-milestone C1.2 — runtime bit-exact validation of year_outer code path on 1-cell smoke
+
+**Commit:** `_TBD_` (this commit; C1.2 1-cell PASS only; full step-17a tag waits for multi-cell + IMOGENCFXInput follow-up C1.3)  **Date:** 2026-05-10 (evening, same day as C1.1 commit `90401f2`)
+
+C1.2 lands the runtime cross-validation milestone for the year_outer
+code path. Both Run A (`framework_loop_mode = "gridcell_outer"`) and
+Run B (`framework_loop_mode = "year_outer"`) ran end-to-end against
+the same pre-staged engine climate using `-input imogen` (loose-coupling
+input module + ImogenInput's C1.1 year_outer overrides). All 37
+standard LPJ-GUESS outputs match BIT-EXACT.
+
+**GO/NO-GO gate per session-2 §9.5: ✅ PASSED for 1-cell smoke.**
+
+Cross-validation harness output:
+```
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+PASS: All .out files are bit-exact between Run A and Run B.
+```
+
+#### Files modified (1 file; 9 LOC; backport-relevant)
+
+- File: `lpjguess/modules/imogen_input.cpp`
+  - Operation: modify (add)
+  - Lines: +9 LOC, inserted in `ImogenInput::ImogenInput()` constructor
+    after the existing `declare_parameter("monthly_imogen", ...)` call
+  - Description: new `declare_parameter("framework_loop_mode",
+    &IMOGENConfig::framework_loop_mode, 20, ...)` mirroring
+    `IMOGENCFXInput`'s identical declaration at `imogencfx.cpp:353`.
+    Required for `-input imogen` (loose-mode) runs to recognize the
+    parameter (without it, `Paramlist::operator[]` aborts with
+    "framework_loop_mode not found" when the .ins file sets
+    `framework_loop_mode`).
+  - Backport guidance: trivial copy-paste; pure-additive; mirrors the
+    foundation commit `2e918c0`'s `IMOGENCFXInput`-side declaration.
+    The same parameter declared in two input modules + same address
+    is fine: plib accepts both registrations + each binds to the same
+    `IMOGENConfig::framework_loop_mode` global. Pre-existing pattern;
+    `searchradius` is also declared in both ImogenInput +
+    IMOGENCFXInput identically.
+
+#### Files added (NOT in `lpjguess/`; backport-IRRELEVANT)
+
+(None of these need replication in trunk_r13078; they're testing /
+operational artifacts, not LPJG source.)
+
+- `data/gridlist/gridlist_test1.txt` (NEW; 17 bytes; 1-cell IMOGEN grid
+  cell at `-78.75 82.50`)
+- `runs/SSP1-2.6/main_xval_loose.ins` (NEW; ~5.5 KB; loose-mode .ins
+  for cross-validation)
+- `scripts/cross_validate_year_outer.sh` (NEW; ~8.4 KB / 230 LOC bash;
+  cross-validation harness)
+
+#### Verification (this commit)
+
+- `scripts/cross_validate_year_outer.sh 1cell`: ✅ PASS — 37/37
+  bit-exact matches; 0 mismatches; 0 missing files
+- `cd lpjguess/build && make -j$(nproc)`: clean (only pre-existing
+  warnings)
+- `lpjguess/build/runtests --reporter compact`: "Passed all 25 test
+  cases with 162 assertions."
+- Backward compatibility: gridcell_outer mode (Run A) unchanged
+
+#### Operational discoveries (informs C1.3 + production)
+
+1. **Engine output is alternating-year**: only ODD years (1871, 1873,
+   ..., 1901) have full climate; EVEN years have only `done` marker.
+   Engine NCALLYR/STEP_DAY internals; resolved at C1.2 by constraining
+   nyear_spinup=1 + firsthistyear=1871 so all imogen_year selections
+   land on 1871 (ODD ✓).
+2. **IMOGEN grid (3.75°×2.5° HadCM3) vs LPJG soilmap grid (0.5°
+   .25-centered)**: ZERO exact-cell intersections. Resolved via
+   `searchradius` (climate; class member; custom-param syntax) +
+   `searchradius_soil` (SoilInput; declare_parameter; bare-global
+   syntax). Per user's 2026-05-10 evening guidance.
+3. **Engine REGRID parameter** at
+   `runs/SSP1-2.6/imogen_intermediary.ins:244` (currently FALSE)
+   regrids climate to user-specified gridlist when TRUE. Alternative
+   to searchradius approach for production runs.
+
+#### Remaining work within step 17a (next session(s); per STEP_17a.md §7.3 + §7.4)
+
+1. **Sub-step 7.3.1 multi-cell cross-validation** (~0.5 day):
+   Test the spinup_year_idx state-machine reproduction formula across
+   cells. With `nyear_spinup=2` + 4-cell gridlist, all per-cell
+   imogen_year selections land on ODD staged years.
+2. **Sub-step 7.3.2 IMOGENCFXInput year_outer override** (~1.5-2 days):
+   Replicate C1.1 pattern for `IMOGENCFXInput` + handle additional
+   climate fields (relhum, wind, tmin, tmax) + BLAZE compatibility +
+   engine-bypass mechanism (NEW `skip_inprocess_engine_run`
+   parameter OR REGRID=1 alternative OR defer to C2).
+3. **C1 close-out**: tag
+   `v0.17.0-step17a-c1-year-outer-single-process`; update this ledger
+   with the C1.3 file changes.
+
+#### Net source-level change in `lpjguess/`: 9 LOC across 1 file (purely additive)
+
+Backport-relevance HIGH (the 9-LOC declare_parameter mirror is purely
+additive; it makes ImogenInput's parameter table consistent with
+IMOGENCFXInput's). The Backport Sprint must replicate this single
+declare_parameter call in `trunk_r13078`'s `imogen_input.cpp` along
+with the foundation + C1.1 changes.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

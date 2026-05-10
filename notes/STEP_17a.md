@@ -2,12 +2,16 @@
 
 **Date opened:** 2026-05-10
 **Date foundation landed:** 2026-05-10 (commit `2e918c0`)
-**Date C1.1 implementation landed:** 2026-05-10 (this commit)
-**Date C1 fully closed:** _pending — runtime cross-validation (C1.2)_
-**Foundation commit:** `2e918c0` (un-tagged; on top of `09b40f0`)
-**C1.1 implementation commit:** _to be filled in after `git commit`_ (un-tagged; on top of `2e918c0`)
-**Full C1 commit / tag:** _pending — `v0.17.0-step17a-c1-year-outer-single-process` (per [`notes/FOLLOWUPS.md`](FOLLOWUPS.md) F-12 + [`EXECUTION_PLAN.md`](../EXECUTION_PLAN.md) V.1 row 17a). Tag waits for bit-exact cross-validation pass per [§7.2](#72-c12--cross-validation-next-session-1-2-days)._
-**Status:** ⚠️ **FOUNDATION + C1.1 IMPLEMENTATION LANDED; C1.2 CROSS-VALIDATION PENDING.** The architectural foundation (parameter + base virtuals + `framework.cpp` year_outer block) landed at `2e918c0` and is verified non-breaking. The C1.1 implementation (this commit) adds the first input-module override pair (`ImogenInput::preload_all_climate` + `ImogenInput::getclimate_for_year`) using the corrected spinup_year_idx state-machine reproduction formula (no `+1`; see [§5.4 Erratum](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum)). 162 unit tests still pass; build clean. The runtime bit-exact cross-validation Run A vs Run B on smoke gridlist (C1.2; the GO/NO-GO gate) is the next session's work.
+**Date C1.1 implementation landed:** 2026-05-10 (commit `90401f2`)
+**Date C1.2 cross-validation 1-cell PASS landed:** 2026-05-10 (this commit)
+**Date C1 fully closed:** _pending — multi-cell cross-validation + IMOGENCFXInput follow-up (C1.3)_
+**Foundation commit:** `2e918c0` (un-tagged)
+**C1.1 implementation commit:** `90401f2` (un-tagged; on top of `2e918c0`)
+**C1.2 1-cell cross-validation commit:** _to be filled in after `git commit`_ (un-tagged; on top of `90401f2`)
+**Full C1 commit / tag:** _pending — `v0.17.0-step17a-c1-year-outer-single-process`. Tag waits for multi-cell bit-exact cross-validation + IMOGENCFXInput year_outer override per [§7.3 + §7.4](#73-c13--imogencfxinput-year_outer-override-next-sessions-2-3-days)._
+**Status:** ✅ **FOUNDATION + C1.1 IMPLEMENTATION + C1.2 1-CELL CROSS-VALIDATION PASS LANDED; multi-cell + C1.3 PENDING.** This commit lands the runtime 1-cell smoke cross-validation: Run A (`framework_loop_mode = "gridcell_outer"`) vs Run B (`framework_loop_mode = "year_outer"`) produced **all 37 .out files bit-exact (37/37 matches; 0 mismatches)**. The year_outer code path is empirically validated for the smoke-test critical path. **GO/NO-GO gate per session-2 §9.5: PASSED.** Multi-cell cross-validation (tests the spinup_year_idx formula across cells) + IMOGENCFXInput year_outer override (C1.3) are the next session(s) of work within step 17a, before tagging.
+
+**User's strategic guidance applied this session (2026-05-10 evening)**: per the user's reminder, both `searchradius` (climate; declared as ImogenInput class member; custom-param table syntax `param "X" (num Y)`) and `searchradius_soil` (declared via `declare_parameter` at `soilinput.h:32`; global plib syntax `X Y` bare assignment) parameters were essential to make ImogenInput's loose-mode runs succeed against staged engine climate (1631-cell IMOGEN grid) + 62892-cell soilmap with NO exact-cell intersections. The IMOGEN engine also has a `REGRID` parameter (`runs/SSP1-2.6/imogen_intermediary.ins:244`; currently `0`/FALSE) that, when enabled, makes the engine regrid climate output to a user-specified gridlist — alternative path to the searchradius approach for cases where the user wants engine output AT specific LPJG cells. Documented for the IMOGENCFXInput follow-up (C1.3).
 
 **Strategic decision (this session)**: C1.1 starts with **`ImogenInput`** (loose-coupling input module) rather than `IMOGENCFXInput`, because ImogenInput has NO `RUN_IMOGEN_ENGINE()` call in `init()` — so loose-mode runs are not blocked by F-10 and end-to-end cross-validation is achievable without an engine-bypass workaround. The two input modules have nearly-identical `getclimate()` patterns; the implementation strategy + spinup_year_idx formula transfer ~95% to `IMOGENCFXInput` later (a natural follow-up sub-step within step 17a, possibly bundled with an engine-bypass parameter or with C2's per-year-inline engine-drive integration). See [§5.5](#55-revised-c1-staging-imogeninput-first-imogencfxinput-follow-up).
 
@@ -312,24 +316,67 @@ Implementation files:
 
 Verified per [§6.2](#62-c11-implementation-commit-this-commit-2026-05-10): build clean; 162 unit tests pass; backward compatibility preserved.
 
-### 7.2 C1.2 — Cross-validation (next session; ~1-2 days)
+### 7.2 C1.2 — Cross-validation 1-cell smoke [DONE this commit; PASSED bit-exact]
 
-Run BOTH modes with byte-identical inputs (.ins / gridlist / seeds / climate / LU forcing):
+Ran BOTH modes with byte-identical inputs (.ins / gridlist / climate / seeds):
 - **Run A**: `framework_loop_mode = "gridcell_outer"` (existing trusted baseline)
 - **Run B**: `framework_loop_mode = "year_outer"` (new additive code path; uses C1.1's overrides)
 
-**Operational pre-requisites** (next session must handle these):
-1. **Pre-stage climate output**. The `runs/SSP1-2.6/Common-directory/IMOGEN/output/{1871..1900+}/` directories must exist. Recommended: launcher in default config (`./scripts/run_coupled.sh`) for ~3-5 min wall-clock; user Ctrl-Cs after engine produces 32 year-output dirs (per session-1 §49.1's documented operational pattern). Alternatively, run engine standalone (`./imogen/code/imogen_lpjg`) with appropriate IYEND in `imogen_settings.txt`, or a similar one-shot mechanism.
-2. **Custom cross-validation .ins file** with `coupling_mode "loose"` (gates ImogenOutput writes) + smoke gridlist + 5-10 historical years + 0-50 spinup years.
-3. **Bash harness script** (e.g., `scripts/cross_validate_year_outer.sh`) that runs LPJG twice with the .ins overridden via `param "framework_loop_mode" (str "...")` directives; saves outputs to separate dirs; diffs with `cmp` or `diff` for bit-exact comparison.
+**Setup files added this commit**:
+- `data/gridlist/gridlist_test1.txt` (NEW; 1-cell IMOGEN grid cell at `-78.75 82.50`; corresponds to IMOGEN native cell `281.25 82.50` via ImogenInput's `lon > 180 → lon - 360` normalization at `imogen_input.cpp:466`)
+- `runs/SSP1-2.6/main_xval_loose.ins` (NEW; loose-mode .ins; absolute paths for gridlist + soilmap + relative paths for engine climate so cwd=Common-directory resolves correctly; `param "searchradius" (num 50)` + `searchradius_soil 50` to handle the IMOGEN-grid-vs-soilmap mismatch; minimal nyear_spinup=1 + firsthistyear=lasthistyear=1871 to use only ODD-numbered staged climate years)
+- `scripts/cross_validate_year_outer.sh` (NEW; bash harness; cd into Common-directory; per-run wrapper .ins generation with framework_loop_mode + gridlist + outputdirectory overrides; cmp -s loop for bit-exact comparison; clean PASS/FAIL summary)
 
-**Cross-validation gridlist progression** (per the revised strategy in [§5.4](#54-the-spinup_year_idx-state-machine-finding-flagged-this-session-erratum)):
-1. **Single-cell smoke first** (NEW gridlist `gridlist_test1.txt`; just one cell) — bypasses spinup_year_idx cell-ordering complexity entirely; tests pure year_outer code path mechanics. Tolerance: bit-exact for ALL outputs.
-2. **Multi-cell smoke** (existing `gridlist_test2.txt`; 4 cells) — tests the spinup_year_idx state-machine reproduction formula across cells. Tolerance: bit-exact for ALL outputs.
+**1-LOC code addition this commit** (in `lpjguess/modules/imogen_input.cpp`):
+- `declare_parameter("framework_loop_mode", &IMOGENConfig::framework_loop_mode, 20, ...)` mirroring `IMOGENCFXInput`'s identical declaration. Required for `-input imogen` (loose-mode) runs to recognize the parameter (without it, `Paramlist::operator[]` aborts with "framework_loop_mode not found").
 
-Outputs to compare: `cflux.out`, `cmass.out`, `mch4.out`, `ngases.out`, `cpool.out`, `nflux.out`, `agpp.out`, `anpp.out`, etc. — the full standard LPJ-GUESS commonoutput suite, plus crop_n outputs if applicable.
+**Operational pre-requisites** (resolved this session):
+1. **Climate pre-staged** via `timeout --foreground 300 ./scripts/run_coupled.sh --no-build` per session-1 §49.1's documented operational pattern. Engine produced 32 year-output dirs at `runs/SSP1-2.6/Common-directory/IMOGEN/output/{1871..1902}/` (~3-5 min wall-clock; SIGTERM via timeout + launcher's `||` graceful exit handler). **Discovered**: only ODD years (1871, 1873, ..., 1901) have full climate (13 files); EVEN years have only `done` marker. The smoke config was constrained to need only odd-year imogen_year values to bypass this constraint.
 
-**GO/NO-GO gate**: bit-exact cross-validation. If single-cell fails, debug year_outer code path mechanics (most likely bug locations: framework.cpp year_outer block; ImogenInput::getclimate_for_year per-day field assignments; date.year setting). If single-cell passes but multi-cell fails, debug the spinup_year_idx formula or other cell-ordering-dependent state.
+2. **Per the user's 2026-05-10 evening guidance**, the searchradius (climate) and searchradius_soil mechanisms enabled both the IMOGEN grid + soilmap mismatches to be resolved via nearest-neighbour fallback. The user also noted the `REGRID` parameter (`runs/SSP1-2.6/imogen_intermediary.ins:244`; currently `0`/FALSE) as an alternative engine-side mechanism to regrid climate to a user-specified gridlist — useful for IMOGENCFXInput follow-up (C1.3) and production runs.
+
+**1-cell cross-validation result (this commit)**:
+
+```
+================================================================================
+SUMMARY: 37/37 bit-exact matches; 0 mismatches
+================================================================================
+PASS: All .out files are bit-exact between Run A and Run B.
+```
+
+All 37 standard LPJ-GUESS outputs match bit-exactly: `aaet.out`, `agpp.out`, `anpp.out` (+ cropland/natural/pasture variants), `cflux.out` (+ cropland/natural/pasture), `clitter.out`, `cmass.out`, `cpool.out` (+ cropland/natural/pasture), `cton_leaf.out`, `fpc.out`, `lai.out`, `mch4.out` (+ diffusion/ebullition/plant), `nflux.out` (+ cropland/natural/pasture), `ngases.out`, `nlitter.out`, `nmass.out`, `npool.out` (+ cropland/natural/pasture), `nsources.out`, `nuptake.out`, `tot_runoff.out`.
+
+**GO/NO-GO gate per session-2 §9.5: ✅ PASSED for 1-cell smoke.** The year_outer code path is empirically validated to produce bit-identical outputs to gridcell_outer for the smoke-test critical path. The corrected spinup_year_idx formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` (NO `+1`) verified correct in single-cell scenarios (cell_idx=0).
+
+### 7.3 C1.3 — Multi-cell cross-validation + IMOGENCFXInput year_outer override (next session(s); ~2-3 days)
+
+After 1-cell cross-validation PASSED bit-exact this commit, two follow-up sub-steps remain within step 17a:
+
+**Sub-step 7.3.1 — Multi-cell cross-validation** (~0.5 day):
+- Use 4-cell `gridlist_test2.txt` OR a custom 4-5 cell gridlist with cells in IMOGEN's native grid
+- Configure `nyear_spinup` so each cell's `imogen_year_at_(cell_idx, 0)` lands on an ODD year that's available in staged climate. With nyear_spinup=2, formula gives cell C → imogen_year = 1871 + 2C, all odd ✓ for cells 0..14 (covers 4-5 cells).
+- Or alternatively: re-stage climate with `REGRID=1` so engine produces climate at exactly the LPJG gridlist cells (no nearest-neighbor needed).
+- Cross-validate; target bit-exact to validate the spinup_year_idx formula across cells.
+
+**Sub-step 7.3.2 — IMOGENCFXInput year_outer override** (~1.5-2 days):
+- Replicate the C1.1 implementation pattern for `IMOGENCFXInput` (the `-input imogencfx` tight-coupling input module)
+- Per the user's 2026-05-10 evening note: IMOGENCFXInput supports more input types than ImogenInput (NetCDF ndep + population data etc.), so the implementation needs more careful handling for the additional fields
+- Add additional climate fields (relhum, wind, tmin, tmax) to the override + handle the BLAZE compatibility check
+- IMPORTANT: `IMOGENCFXInput::init()` calls `RUN_IMOGEN_ENGINE()` which deadlocks per F-10. For C1.3 cross-validation, options:
+  - (a) NEW `skip_inprocess_engine_run` ins parameter (~10 LOC) gating the engine call — simplest
+  - (b) `REGRID=1` engine run + cross-validation against the regridded climate — uses existing config knobs
+  - (c) Defer IMOGENCFXInput cross-validation to C2 (when proper per-year-inline engine drive lands per session-2 §6.3.2's Option C sketch)
+- Cross-validate identically (single-cell first; multi-cell second).
+
+### 7.4 C1 close-out (after C1.3; ~0.5 day)
+
+After both multi-cell + IMOGENCFXInput cross-validations pass bit-exactly:
+- Update this STEP_17a.md with C1.3 outcomes
+- Update CHANGELOG `[Unreleased]` → `[v0.17.0-step17a-c1-year-outer-single-process]`
+- Update EXECUTION_PLAN V.1 row 17a status: 🔧 → ✅ DONE
+- Update FOLLOWUPS F-12 entry: C1 closed; C2 next
+- Update BACKPORT_LEDGER with C1.3 file changes
+- Tag `v0.17.0-step17a-c1-year-outer-single-process`; push to all 3 remotes
 
 ### 7.3 C1.3 — IMOGENCFXInput year_outer override (next session(s); ~2-3 days)
 

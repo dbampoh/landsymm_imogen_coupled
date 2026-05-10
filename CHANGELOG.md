@@ -17,6 +17,106 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-10 (evening) — Step 17a (F-12 sub-milestone C1.2) 1-CELL CROSS-VALIDATION PASS: year_outer code path empirically validated (37/37 .out files bit-exact); GO/NO-GO gate per session-2 §9.5 PASSED for 1-cell smoke (no tag — full step-17a tag waits for multi-cell + IMOGENCFXInput follow-up)
+
+C1.2 lands the runtime cross-validation milestone for the year_outer code
+path. Both Run A (`framework_loop_mode = "gridcell_outer"`) and Run B
+(`framework_loop_mode = "year_outer"`) ran end-to-end against the same
+pre-staged engine climate using `-input imogen` (loose-coupling input
+module + ImogenInput's C1.1 year_outer overrides). All 37 standard
+LPJ-GUESS outputs (cflux, cmass, mch4, ngases, nuptake, nflux, etc.)
+match BIT-EXACT between the two modes.
+
+#### What changed in `lpjguess/` source (1 file; 9 LOC; backport-relevant)
+
+- **`lpjguess/modules/imogen_input.cpp`** (+9 LOC): new `declare_parameter`
+  call in `ImogenInput::ImogenInput()` mirroring `IMOGENCFXInput`'s
+  identical declaration. Required for `-input imogen` (loose-mode) runs
+  to recognize the `framework_loop_mode` parameter (without it,
+  `Paramlist::operator[]` aborts with "framework_loop_mode not found").
+  Same parameter declared in two input modules; same address
+  (`&IMOGENConfig::framework_loop_mode`); plib accepts both. Pre-existing
+  pattern; same as `searchradius` (declared in both ImogenInput +
+  IMOGENCFXInput).
+
+#### Setup files added (NOT in `lpjguess/`; backport-irrelevant)
+
+- `data/gridlist/gridlist_test1.txt` (NEW; 17 bytes; 1-cell IMOGEN grid
+  cell at `-78.75 82.50`, corresponding to IMOGEN native cell
+  `281.25 82.50` via ImogenInput's `lon > 180 → lon - 360` normalization)
+- `runs/SSP1-2.6/main_xval_loose.ins` (NEW; ~5.5 KB; loose-mode .ins
+  for cross-validation; absolute paths for gridlist + soilmap; relative
+  paths for engine climate so cwd=Common-directory resolves correctly;
+  `param "searchradius" (num 50)` + `searchradius_soil 50` to handle
+  IMOGEN-grid-vs-soilmap mismatch; minimal nyear_spinup=1 +
+  firsthistyear=lasthistyear=1871 to use only ODD-numbered staged
+  climate years)
+- `scripts/cross_validate_year_outer.sh` (NEW; ~8.4 KB / 230 LOC bash;
+  cross-validation harness; cd into Common-directory; per-run wrapper
+  .ins generation with framework_loop_mode + gridlist + outputdirectory
+  overrides; cmp -s loop for bit-exact comparison; clean PASS/FAIL
+  summary; usage: `scripts/cross_validate_year_outer.sh [1cell|4cell]`)
+
+#### Operational discoveries this session (informs C1.3 + production runs)
+
+1. **Engine output is alternating-year**: launcher's prescribed-mode
+   smoke produces 32 year-output dirs at
+   `Common-directory/IMOGEN/output/{1871..1902}/`, but ONLY ODD years
+   (1871, 1873, ..., 1901) have the full 13 climate files; EVEN years
+   have only the `done` marker. Likely due to engine's NCALLYR/STEP_DAY
+   internals; documented for the C1.3 / production work to address (e.g.
+   via REGRID=1 or longer engine run).
+
+2. **IMOGEN grid (3.75° × 2.5° HadCM3) vs LPJG soilmap grid (0.5°
+   centered on .25)**: ZERO exact-cell intersections. Resolved via
+   `searchradius` (climate; ImogenInput class member; custom-param
+   syntax `param "X" (num Y)`) + `searchradius_soil` (SoilInput class
+   member; declare_parameter at `soilinput.h:32`; bare-global syntax
+   `X Y`). Per the user's 2026-05-10 guidance.
+
+3. **Engine has a `REGRID` parameter** at
+   `runs/SSP1-2.6/imogen_intermediary.ins:244` (currently `0`/FALSE)
+   that, when enabled, makes the engine regrid climate output to a
+   user-specified gridlist. Alternative path to the searchradius
+   approach for cases where the user wants engine output AT specific
+   LPJG cells. Documented for IMOGENCFXInput follow-up + production.
+
+4. **`searchradius` declared as ImogenInput class member uses
+   custom-param syntax** (`param "searchradius" (num 50)`), while
+   `searchradius_soil` declared via `declare_parameter` at
+   `soilinput.h:32` uses bare-global syntax (`searchradius_soil 50`).
+   Both bindings end up in the same plib parameter table internally,
+   but the .ins-file syntax differs based on declaration site.
+
+#### Verification (this commit)
+
+- `scripts/cross_validate_year_outer.sh 1cell`: ✅ PASS — 37/37
+  bit-exact matches; 0 mismatches; 0 missing files
+- `cd lpjguess/build && make -j$(nproc)`: clean (only pre-existing
+  warnings; ZERO introduced by C1.2)
+- `lpjguess/build/runtests --reporter compact`: "Passed all 25 test
+  cases with 162 assertions."
+- Backward compatibility: gridcell_outer mode (Run A) unchanged
+
+#### What this commit does NOT yet do (next session(s) within step 17a)
+
+- **Sub-step 7.3.1 multi-cell cross-validation** (~0.5 day): Run A vs
+  Run B on 4-5 cell gridlist with `nyear_spinup=2` (so per-cell
+  imogen_year selections all land on ODD staged years). Tests the
+  spinup_year_idx state-machine reproduction formula across cells.
+- **Sub-step 7.3.2 IMOGENCFXInput year_outer override** (~1.5-2 days):
+  replicate C1.1 pattern for IMOGENCFXInput with the additional climate
+  fields (relhum, wind, tmin, tmax) + BLAZE compatibility check + an
+  engine-bypass mechanism (NEW `skip_inprocess_engine_run` parameter
+  OR REGRID=1 alternative OR defer to C2).
+- **C1 close-out**: tag `v0.17.0-step17a-c1-year-outer-single-process`.
+
+Backport-relevance: HIGH (the 9-LOC declare_parameter addition is purely
+additive). Per the new step-17a-c1.2 entry in
+`notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3.
+
+---
+
 ### 2026-05-10 (later) — Step 17a (F-12 sub-milestone C1.1) IMOGENINPUT IMPLEMENTATION: ImogenInput year_outer overrides (preload_all_climate + getclimate_for_year) with corrected spinup_year_idx state-machine reproduction formula (no tag — full step-17a tag waits for runtime cross-validation)
 
 C1.1 implementation lands the FIRST input-module override pair for the
