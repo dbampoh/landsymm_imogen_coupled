@@ -17,6 +17,110 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-11 (evening; session 3) — Step 17b (F-12 sub-milestone C2; **B12 RESOLVED**): substantive-validation NaN root cause identified + fix applied; ALL 4 xval scenarios now PASS substantive validation (bit-exact AND non-NaN); un-tagged checkpoint
+
+The substantive-validation NaN finding documented at session-2 commit `f13b302` and audit item B12 is **fully resolved** in this commit. ALL 4 cross-validation scenarios (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) now pass `scripts/cross_validate_year_outer.sh`'s substantive-validation gate (bit-exact AND non-NaN); 0/37 NaN-laden output files in any run; against both `build/guess` and `build_mpi/guess` single-process. 162 unit tests pass on both builds.
+
+#### Root cause (full forensic chain in `notes/STEP_17b.md` §3a.7.4c)
+
+Smoke `.ins` files explicitly set `ifcalccton 0` and `ifcalcsla 0`. With `ifcalccton 0`, `parameters.cpp::CB_CHECKPFT` (lines 2333-2337) skips `init_cton_min()` for each PFT. `init_cton_min()` is what populates `cton_leaf_min` from `leaflong` via the Reich et al. 1992 relation. Without it, `cton_leaf_min` stays at its default-initialized value of `0`. Then `init_cton_limits()` (called UNCONDITIONALLY at parameters.cpp:2345) cascades 0 through `cton_leaf_max → cton_root_max → cton_sap_max` (and the avr/min siblings; `avg_cton(0,0)` returns 0 per its `2/(1/min + 1/max)` formula). For new individuals with `cmass_sap=nmass_sap=0`, `Individual::cton_sap()` returns `pft.cton_sap_max = 0`. In `respiration()` at `canexch.cpp:2494`:
+
+```cpp
+resp_sap = respcoeff * K * cmass_sap / cton_sap * gtemp_air;
+         = respcoeff * K * 0 / 0 * gtemp_air            // 0/0 = NaN per IEEE 754
+         = NaN * gtemp_air = NaN;
+```
+
+`resp = NaN → indiv.dnpp = NaN → indiv.anpp = NaN → cmass_* = NaN at year-end growth() → ESTC debit at growth.cpp:1524 = NaN → cascades to ALL .out files`.
+
+#### Fix applied (this commit; backport-IRRELEVANT)
+
+Two `.ins` file changes (no `lpjguess/` source change):
+
+1. `runs/SSP1-2.6/main_xval_loose.ins`: changed `ifcalcsla 0 → 1` and `ifcalccton 0 → 1`. Added 13-line explanatory comment documenting the root cause + fix rationale + cross-references to STEP_17b.md §3a.7.4c.
+2. `runs/SSP1-2.6/main_xval_imogencfx.ins`: same change with shorter cross-reference comment.
+
+Optional 1-cell mid-latitude smoke gridlist `data/gridlist/gridlist_test_temperate.txt` (1 cell at Switzerland 7.50°E 47.50°N) added during diagnostic narrowing; preserved as a useful additional test cell for future investigations.
+
+#### Why predecessor `version_A` doesn't NaN
+
+Predecessor's `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/main.ins` does NOT set `ifcalcsla` or `ifcalccton` explicitly, so they take the LPJ-GUESS defaults (= 1). With `ifcalccton 1`, `init_cton_min()` IS called for each PFT, populating `cton_leaf_min` correctly, and the entire cascade produces sensible non-zero C:N ratios. The user's empirical observation that "version_A did not produce any NaNs that I was aware of" was a key clue — the LPJG code itself works fine; only our smoke configuration triggered the latent trap.
+
+#### Why this only surfaced in v1.0
+
+The LPJG main loop never ran in our rebuild prior to step 17a's C1 close-out (F-10 deadlock blocked it pre-C1; C1's `skip_inprocess_engine_run` parameter unlocked it for `-input imogencfx`; `-input imogen` was always F-10-free for loose-mode but our smoke .ins still had the same `ifcalccton 0`). So this latent bug from setting `ifcalccton 0` in our smoke `.ins` was never exercised. Once the LPJG main loop started running for the first time post-C1, the bug surfaced as the substantive-validation NaN finding.
+
+#### Diagnostic methodology
+
+A 4-stage diagnostic-narrowing process landed the root cause in ~2 hours of session-3 work (vs the 2-10 d unbounded estimate at B12 audit item creation):
+
+1. Stage 1: spinup-duration hypothesis — REFUTED (longer spinup made NaN appear earlier).
+2. Stage 2: extreme-cold-cell hypothesis — REFUTED (temperate Switzerland cell → same NaN).
+3. Stage 3: wetlandpfts.ins hypothesis — REFUTED (dropping it → identical NaN).
+4. Stage 4: surgical NaN-source instrumentation in `lpjguess/framework/guess.cpp::Fluxes::report_flux` + `lpjguess/modules/growth.cpp::1524` (ESTC debit) + `lpjguess/modules/canexch.cpp::2635` (dnpp accumulation) + `lpjguess/modules/canexch.cpp::2626` (respiration inputs). The diagnostic chain definitively traced from `dnpp NaN at Year 2 Day 0` → `resp NaN with finite inputs` → `0/0 inside respiration()` → `cton_sap = 0` → `init_cton_limits()` cascade → `cton_leaf_min = 0` → `init_cton_min()` not called → `ifcalccton 0` in smoke .ins.
+
+All diagnostic instrumentation has been REMOVED in this same commit; the lpjguess/ source is back to its v0.17.0-step17a-c1-year-outer-single-process baseline (verified via `git status` showing only `runs/SSP1-2.6/main_xval_*.ins` as modified, no lpjguess/ source files modified post-cleanup).
+
+#### Verification
+
+- ✅ `cd lpjguess/build && make -j$(nproc)`: clean
+- ✅ `cd lpjguess/build_mpi && make -j$(nproc)`: clean
+- ✅ `lpjguess/build/runtests --reporter compact`: "Passed all 25 test cases with 162 assertions."
+- ✅ `lpjguess/build_mpi/runtests --reporter compact`: same
+- ✅ All 4 xval scenarios PASS substantive (bit-exact AND non-NaN) against `build/guess`:
+  - imogen 1cell:    37/37 byte-equal; 0/37 NaN-laden
+  - imogen 4cell:    37/37 byte-equal; 0/37 NaN-laden
+  - imogencfx 1cell: 37/37 byte-equal; 0/37 NaN-laden
+  - imogencfx 4cell: 37/37 byte-equal; 0/37 NaN-laden
+- ✅ All 4 xval scenarios PASS substantive against `build_mpi/guess` single-process (same results)
+
+#### Sample post-fix output for sanity
+
+`nflux.out` for cell (7.50, 47.50) Switzerland:
+```
+      Lon      Lat Year   NH4dep   NO3dep      fix     fert     flux    leach      NEE
+     7.50    47.50 1871    -1.00    -1.00    -0.00    -0.00     0.17     1.03    -0.80
+     7.50    47.50 1872    -1.00    -1.00    -2.78    -0.00     0.02     0.24    -4.53
+     7.50    47.50 1879    -1.00    -1.00    -9.21    -0.00     0.04     1.07   -10.10
+```
+Sensible: NH4/NO3dep -1.00 kgN/ha/yr (pre-industrial deposition; LPJG sign convention); N fixation ramps from 0 to -9.21; system reaches near-equilibrium.
+
+#### Defensive hardening (NEW audit item B13)
+
+The bug was a **trap** in the LPJG configuration system: `ifcalccton 0` is a documented option (means "use cton_leaf_min from .ins") but with TeBE not setting `cton_leaf_min` explicitly in `global.ins`, the default-init-to-zero produces NaN downstream. **NEW audit item B13** added: defensive hardening — make LPJG `init_cton_limits()` fail-fast with a clear message if `cton_leaf_min == 0`. Tracked in `notes/FOLLOWUPS.md` "B-item bundling commitment" sub-section. Effort: 0.5 day. Bundle: step 18 (docs/cleanup era).
+
+#### Process hardening (NEW audit item B14 + persistent Operational heuristics)
+
+In session continuation 2026-05-11 evening, the user asked whether predecessor `version_A`'s `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` `.ins` files set `ifcalcsla` and `ifcalccton` to 1. Empirical answer: **yes** — both are set in `version_A/.../landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/global.ins` (lines 96, 98); `main.ins` imports `global.ins` so the production-style coupled run inherits those `1` values. This makes B12 a config-divergence-from-canonical-baseline issue, not an LPJG code defect.
+
+User direction (recorded persistently): **do not** undertake a full `.ins` realignment audit now (the `ifcalcsla`/`ifcalccton` fix sufficed); **do** document the lesson so future chats see it. Operationalised via two additions to `notes/FOLLOWUPS.md`:
+
+1. **NEW audit item B14**: one-time `.ins` parity audit of `runs/SSP1-2.6/main_xval_*.ins` (and import chain) vs `version_A/.../landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` and `version_B/.../landsymm_imogen/SSP1_RCP26/`; classify each divergent parameter as **intentional** (document rationale at site) or **unintentional** (open follow-up). Effort: 0.5–1 d. Bundle: step 18 (docs/reproducibility era; opportunistically usable earlier on any output anomaly). Tracked in `notes/FOLLOWUPS.md` "B-item bundling commitment" sub-section.
+2. **NEW persistent "Operational heuristics — lessons learned" subsection** in `notes/FOLLOWUPS.md` (placed after "Tracking discipline" so any onboarding chat reading the file inherits these defaults). Five standing rules of thumb distilled from B12 + Part 19 forensics, with the `.ins`-parity-with-original heuristic as **rule #1** ("FIRST-LINE forensic step when outputs look wacky"). Other rules: byte-equality is necessary but not sufficient; skip-by-default `if<flag> 0` paths are silent traps; production gridlists are not interchangeable with smoke gridlists; "when in doubt, ask the original codebase what it would have done."
+
+#### Status
+
+- B12: ✅ DONE
+- C2 era combined sprint estimate revised back to ~9-13 d remaining (was 11-23+ before B12 closure).
+- v1.0 % done estimate revised UP to ~52-55%; ~45-48% remaining (~28-37 d median).
+- Substantive-validation gate now PASSES for the first time in our rebuild — meaningful science output is being produced by LPJG main loop in `-input imogen` and `-input imogencfx` modes.
+
+#### Files changed
+
+- `runs/SSP1-2.6/main_xval_loose.ins` (~17 LOC change; 2 lines flipped + ~15 LOC explanatory comment)
+- `runs/SSP1-2.6/main_xval_imogencfx.ins` (~12 LOC change; 2 lines flipped + ~10 LOC explanatory comment)
+- `data/gridlist/gridlist_test_temperate.txt` (NEW; 1 cell at 7.50°E 47.50°N; useful for future temperate-latitude smoke tests)
+- `notes/STEP_17b.md` (+~150 LOC; new §3a.7.4c B12 RESOLUTION sub-section + revised §7 remaining work)
+- `CHANGELOG.md` (this entry; ~150 LOC)
+- `EXECUTION_PLAN.md` (row 17b status update)
+- `notes/FOLLOWUPS.md` (~110 LOC total; status dashboard refresh + B-bundling table updates with B12 done + B13 added + B14 added; revised % done table + adopted estimate; NEW persistent "Operational heuristics — lessons learned" subsection with 5 standing rules of thumb)
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (small entry noting the B12 fix is .ins-only; no lpjguess/ source change so backport-IRRELEVANT)
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Part 20 (NEW; outside repo; gitignored)
+
+Net `lpjguess/` source-level change THIS COMMIT: **ZERO**. Backport-IRRELEVANT.
+
+Refs: notes/STEP_17b.md §3a.7.4c (full forensic record + verification + sample output); notes/FOLLOWUPS.md "Substantive-validation NaN finding (2026-05-11 evening)" sub-section + B-item bundling table updated; EXECUTION_PLAN.md V.1 row 17b status; notes/TRUNK_R13078_BACKPORT_LEDGER.md (B12 fix is config-only); session-2 chat handoff Part 20.
+
 ### 2026-05-11 (evening) — Step 17b (F-12 sub-milestone C2 CORE + CRITICAL substantive-validation NaN finding + xval harness hardening + NEW audit item B12): `MPI_Barrier(MPI_COMM_WORLD)` at year boundary in `framework.cpp` year_outer block + NEW `ImogenOutput::flush_year_globally_synchronized(int year)` method with `MPI_Allreduce(MPI_SUM)` over per-rank flux contributions + lead-rank-only write + singleton-pointer pattern + xval harness substantive-validation NaN gate (FAILs on NaN-laden outputs; was: PASS based on byte-equality alone — masked the C1 substantive-validation gap); both builds rebuild clean; 162 unit tests pass on both; mpirun -np 1 -parallel smoke verified MPI mechanics; full mpirun -np 4 mimic deferred to C2 close-out (alongside B-bundles); un-tagged checkpoint
 
 C2 core landing for F-12 sub-milestone C2 on top of C2 prep commit `1405ada`. This is an intermediate checkpoint commit (no tag); the full step-17b tag `v0.17.5-step17b-c2-mpi-sync` waits for **B12 (NEW; CRITICAL PATH; substantive-validation NaN root-cause investigation + fix; 2-10 d unbounded)** + B1+B2+B3+B4+B6+B10 bundles + close-out validation. **REVISED C2 era combined sprint estimate: ~11-23+ days** (was 9-13 d) due to B12 addition.

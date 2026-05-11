@@ -137,8 +137,29 @@ param "lasthistyear"  (num 1879)
 firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency
 run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
 npatch              1              ! Single patch for smoke speed
-ifcalcsla           0              ! Standard
-ifcalccton          0              ! Standard
+
+! [B12 FIX 2026-05-11 (session 3): ifcalcsla and ifcalccton MUST be 1 (LPJ-GUESS
+!  default) so initsla() and init_cton_min() are called for each PFT during
+!  parameters.cpp::CB_CHECKPFT (lines 2327-2337). Previously these were set to 0
+!  to mean "use values from .ins"; but at parameters.cpp:2345, init_cton_limits()
+!  is called UNCONDITIONALLY and propagates cton_leaf_min through cton_leaf_max,
+!  cton_root_max, cton_sap_max via avg_cton(). With ifcalccton=0 and PFTs that
+!  don't override cton_leaf_min in .ins (e.g., TeBE in global.ins), cton_leaf_min
+!  stays at 0 (default), and the cascade gives cton_sap_max = cton_root_max =
+!  cton_*_avr = 0. For new individuals with cmass_sap=nmass_sap=0, cton_sap()
+!  returns pft.cton_sap_max=0. Then in respiration() at canexch.cpp:2494:
+!    resp_sap = respcoeff * K * cmass_sap / cton_sap * gtemp_air
+!             = respcoeff * K * 0 / 0 * gtemp_air     ← 0/0 = NaN
+!  resp = NaN → indiv.dnpp = NaN → indiv.anpp = NaN → cmass_* = NaN at year-end
+!  growth() → ESTC debit = NaN at growth.cpp:1524 → NaN cascades to all .out
+!  files. This was the substantively-validation NaN found 2026-05-11; full
+!  forensic chain documented in notes/STEP_17b.md §3a.7 + §3a.7.4b.
+!  Verified empirically: with ifcalccton=1 + ifcalcsla=1, ALL 37 .out files
+!  produce non-NaN sensible values (NEE around -0.8 → -10 kgN/ha/yr; vegetation
+!  establishes Year 2; soil C builds up).
+!  - Daniel Bampoh, 2026-05-11 evening session 3 B12 resolution]
+ifcalcsla           1              ! REQUIRED: enable initsla() per PFT
+ifcalccton          1              ! REQUIRED: enable init_cton_min() per PFT
 
 ! framework_loop_mode: harness writes a wrapper .ins that imports this
 ! file + adds the override. Default here is gridcell_outer (the

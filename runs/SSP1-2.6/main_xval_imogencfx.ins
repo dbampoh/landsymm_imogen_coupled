@@ -158,8 +158,17 @@ param "lasthistyear"  (num 1879)
 firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency (BLAZE check still has actionable error path; NOFIRE is the safe smoke default)
 run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
 npatch              1              ! Single patch for smoke speed
-ifcalcsla           0              ! Standard
-ifcalccton          0              ! Standard
+
+! [B12 FIX 2026-05-11 (session 3): ifcalcsla and ifcalccton MUST be 1 (LPJ-GUESS
+!  default); see main_xval_loose.ins for full forensic chain. Empirically:
+!  with ifcalccton=0, init_cton_min() is skipped at parameters.cpp:2333-2337,
+!  cton_leaf_min stays 0, init_cton_limits cascades 0 through cton_*_max/avr,
+!  cton_sap() returns 0 for fresh individuals, respiration() at canexch.cpp:2494
+!  computes 0/0 = NaN → NaN cascades to ALL .out files. Resolved by setting
+!  these to 1.  Documented in notes/STEP_17b.md §3a.7 + §3a.7.4c.
+!  - Daniel Bampoh, 2026-05-11 evening session 3 B12 resolution]
+ifcalcsla           1              ! REQUIRED: enable initsla() per PFT
+ifcalccton          1              ! REQUIRED: enable init_cton_min() per PFT
 
 ! framework_loop_mode: harness writes a wrapper .ins that imports this
 ! file + adds the override per run. Default here is gridcell_outer (the

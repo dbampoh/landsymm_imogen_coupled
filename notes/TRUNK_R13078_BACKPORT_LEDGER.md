@@ -1332,7 +1332,34 @@ While verifying C2 core via `mpirun -np 1 -parallel` smoke testing, isolation ex
 **Backport Sprint implications**: when applying step-17b-core changes to `trunk_r13078` at F-11 sprint:
 1. Apply the 3 `lpjguess/` file changes per above (mechanical replication).
 2. Replicate the xval harness substantive-validation NaN-gate (best practice; prevents the same byte-equality-of-garbage gap from appearing in `trunk_r13078` validation).
-3. **NaN root-cause fix (B12)** when it lands at C2 close-out will also need backporting to `trunk_r13078` (likely involves `lpjguess/modules/imogen_input.cpp` or `framework/` initialisation code).
+3. **NaN root-cause fix (B12)** ✅ LANDED 2026-05-11 evening session 3 — see step-17b-B12-resolved entry below.
+
+### Step 17b (B12 RESOLVED): substantive-validation NaN root cause fix — config-only (.ins file changes); no `lpjguess/` source change
+
+**Commit:** _to be determined_ (this commit; un-tagged checkpoint on top of `d7f6c74`)
+**Backport relevance:** **IRRELEVANT FOR `lpjguess/` SOURCE.** The fix is entirely in `runs/SSP1-2.6/main_xval_*.ins` (config files; not part of the LPJG source tree). Backport Sprint does NOT need to apply this fix to `trunk_r13078`'s `lpjguess/` directly. HOWEVER, if `trunk_r13078`-based smoke runs are set up in the future, they MUST also use `ifcalccton 1` and `ifcalcsla 1` (the LPJ-GUESS defaults) — same trap exists in `trunk_r13078`'s LPJG code (the `init_cton_min()` / `init_cton_limits()` cascade behaviour is unchanged from upstream).
+
+**Why this fix is config-only and NOT a `lpjguess/` source fix:**
+The original LPJG code logic at `parameters.cpp:2333-2337` (skip `init_cton_min()` if `ifcalccton == 0`) is by design — the documented purpose is to allow users to set `cton_leaf_min` directly in `.ins` files rather than have it auto-computed via the Reich et al. 1992 relation. The TRAP is that `init_cton_limits()` is then called UNCONDITIONALLY at line 2345 and cascades 0 if `cton_leaf_min` is also 0 (default-init for unset PFTs). For a user setting `ifcalccton 0`, they'd ALSO need to set `cton_leaf_min` for every PFT in the .ins file to avoid the cascade. Our smoke `.ins` did NOT set `cton_leaf_min` per PFT (PFTs come from imported `global.ins` which doesn't set it); so the trap fired silently.
+
+**Net `lpjguess/` source change in this commit: ZERO.**
+
+**Files changed in this commit (none in `lpjguess/`):**
+- `runs/SSP1-2.6/main_xval_loose.ins` — change `ifcalcsla 0 → 1` and `ifcalccton 0 → 1`; ~17 LOC change incl. ~15 LOC explanatory comment block
+- `runs/SSP1-2.6/main_xval_imogencfx.ins` — same change with shorter comment; ~12 LOC change
+- `data/gridlist/gridlist_test_temperate.txt` (NEW; 1 cell at Switzerland 7.50°E 47.50°N; preserved from B12 diagnostic narrowing as a useful additional test cell)
+- Documentation updates (STEP_17b.md §3a.7.4c; CHANGELOG; EXECUTION_PLAN row 17b; FOLLOWUPS B-bundling table; this LEDGER entry)
+
+**Verification this commit:**
+- `cd lpjguess/build && make -j$(nproc)`: clean (no source change so should be no-op build)
+- `cd lpjguess/build_mpi && make -j$(nproc)`: clean
+- 162 unit tests pass on both builds
+- All 4 xval scenarios PASS substantive (bit-exact AND non-NaN; 0/37 NaN-laden files in any run): imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell
+- Same 4 xval scenarios PASS substantive against `build_mpi/guess` single-process
+
+**Defensive-hardening NEW audit item B13** (added per the B12 RESOLUTION post-mortem; bundled with step 18 docs/cleanup era; ~0.5 day): make LPJG `parameters.cpp::CB_CHECKPFT` (or `init_cton_limits()`) fail-fast with a clear error message if `cton_leaf_min == 0` post-PFT-init, so the trap that caused B12 cannot recur silently. Tracked in `notes/FOLLOWUPS.md` "B-item bundling commitment" sub-section.
+
+**Process-hardening NEW audit item B14** (added per session-continuation user direction 2026-05-11 evening, after empirical confirmation that `version_A/.../landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/global.ins` sets `ifcalcsla 1` + `ifcalccton 1`; bundled with step 18; ~0.5–1 day): one-time `.ins` parity audit of `runs/SSP1-2.6/main_xval_*.ins` (and import chain) vs `version_A`'s `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` and `version_B`'s `landsymm_imogen/SSP1_RCP26/`; each divergent parameter classified as intentional (rationale documented at site) or unintentional (open follow-up). **Backport relevance: IRRELEVANT** — B14 is a process audit on `runs/` configs, not on `lpjguess/` source. Persistent companion: NEW "Operational heuristics — lessons learned" subsection in `notes/FOLLOWUPS.md` (5 standing rules; `.ins`-parity-with-original as rule #1).
 
 ---
 
