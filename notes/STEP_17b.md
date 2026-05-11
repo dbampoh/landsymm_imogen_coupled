@@ -324,7 +324,51 @@ The cross-validation harness's `cmp -s` byte-equality logic is **necessary but n
 4. **A LandSyMM_LPJ-GUESS fork-specific issue** (the "integrated LTS" base per Decision #3) that wouldn't appear in `trunk_r13078`. Could be diagnosed by F-11 Backport Sprint preparation work.
 5. **A NaN-aware code path** in soil-N integration (e.g., a divide-by-zero guarded by IFNLIM that the smoke .ins config bypasses).
 
-#### 3a.7.5 Path forward — NEW audit item B12 (CRITICAL PATH)
+#### 3a.7.4b B12 first-investigation findings (2026-05-11 evening; post-f13b302)
+
+After commit `f13b302` landed cleanly on all 3 remotes, the user explicitly asked about units disparity (imogen vs LPJG climate variable conventions), dataset completeness (LU, ndep, CO2, simfire), and inspiration from predecessor configs at `version_A/landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` + `version_B/landsymm_imogen/SSP1_RCP26/`. ~30 minutes investigation; key findings:
+
+**Predecessor SSP1_RCP26 main.ins (`version_A/.../landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/main.ins`)** — major differences from our `main_xval_loose.ins`:
+
+| Setting | Predecessor production | Our `main_xval_loose.ins` |
+|---|---|---|
+| `nyear_spinup` | **500** | 2 |
+| `freenyears` | **100** | 0 |
+| `file_ndep` | `Data/Ndep/ndep_cruncep/GlobalNitrogenDeposition.bin` (REAL) | `""` (empty) |
+| `file_simfire` | real path | NOT SET |
+| `file_popdens` | `""` for SimFire-NOFIRE-mode | NOT SET |
+| `firsthistyear`-`lasthistyear` | 1901-2100 | 1871-1879 |
+| `file_gridlist` | `gridlist_in_62892_and_climate.txt` (62892 cells; aligned with all data archives) | `gridlist_test1.txt` or `gridlist_test2.txt` (test cells; NOT necessarily aligned with archives) |
+| Intended invocation | `-input cf` (with NetCDF climate; though all `file_temp1`..`file_temp2` commented out — so actually engine ASCII via imogen_intermediary.ins) | `-input imogen` |
+
+**N-deposition data IS available locally**: `data/ndep/ndep_cruncep/GlobalNitrogenDeposition.bin` (138 MB) + RCP26/45/60/85 variants (each ~96-98 MB). NOT in git (gitignored; Tier-2 per step 6 manifest). Predecessor's main.ins uses `GlobalNitrogenDeposition.bin`.
+
+**Code-path inspection** (`lpjguess/cru/guessio/lamarquendep.cpp`):
+
+- Line 119-122: when `file_ndep == ""`, `getndep()` calls `set_to_pre_industrial()` which sets all NHx/NOy Dry/Wet arrays to a well-defined constant (~2 kgN/ha/yr per line 281-292). NOT NaN. **So empty file_ndep is NOT the NaN cause.**
+- Line 127-128: when `file_ndep != ""`, archive is opened. Archive is exact-match-only (no search radius). Line 135-138: if cell not found in archive, `fail()` aborts execution.
+
+**Empirical test**: set `file_ndep` to the real path with our smoke cell (-78.75, 82.50). Result: `getndep(): Grid cell (lon, lat: -78.75,82.5) not found in /home/.../GlobalNitrogenDeposition.bin` → exit code 99 (fail). Our smoke gridcells aren't in the N-dep archive (which uses production-style 0.5°-aligned cells from `gridlist_in_62892_and_climate.txt`).
+
+**Conclusion**: N-deposition is NOT the cause of NaN. The pre-industrial constant fallback is well-defined and correct. We have ruled out one more hypothesis.
+
+**Remaining plausible root causes (UNCHANGED from §3a.7.4)**:
+1. LPJ-GUESS vegetation/soil initialization for `-input imogen` was never substantively validated (F-10 deadlock blocked LPJG main loop pre-C1)
+2. LPJG-internal bug in `ImogenInput::get_climate_for_gridcell` or monthly→daily interpolation (NEW: also worth checking if climate values are being stored correctly in the per-cell cache vs being read with wrong indexing)
+3. `wetlandpfts.ins` + `global.ins` initialisation interaction (NEW: predecessor production main.ins also imports both; not unique to xval)
+4. LandSyMM_LPJ-GUESS fork-specific issue
+5. NaN-aware code path in soil-N integration
+
+**Unit disparity check (user's other angle)**: ImogenInput::getclimate at `imogen_input.cpp:876` converts `climate.temp = dtemp[date.day] - 273.15` (K→C). IMOGENCFXInput's `get_climate_for_gridcell` does the K→C conversion at the input-reading layer (post-C1.3 sub-step 7.3.2 fix at `8aafe84`). Other variables (P, SW, WET, DTEMP) — units should match (precip mm/day, insol W/m², wetdays count, DTR K → maybe should also be K converted to C? would need investigation). **This is a remaining angle that could be relevant** if any non-T climate variable has units mismatch causing biogeochemistry NaN.
+
+**Next investigation angles (for next session continuation)**:
+1. Inspect `imogen_input.cpp:get_climate_for_gridcell` line-by-line for any uninitialized data or wrong-units assignment for non-T variables (P, SW, WET, DTEMP, Rh, W, Tmin, Tmax)
+2. Try a gridcell that IS in `gridlist_in_62892_and_climate.txt` AND in the engine climate grid (= the natural intersection point that predecessor production uses) — even if it requires `searchradius > 0` for climate
+3. Run `-input cru_ncep` (standard CRU climate) on the same gridcell to isolate whether NaN is IMOGEN-input-specific or fundamental
+4. Inspect xval's `run.log` for the FIRST appearance of NaN — pinpoint which subroutine produces it (somdynam.cpp:574 is just the diagnostic; actual NaN-generation may be upstream in canexch.cpp or vegdynam.cpp)
+5. Read `lpjguess/cru/guessio/cruinput.cpp::getclimate` for reference of how the production-validated code path works; diff against ImogenInput::getclimate
+
+
 
 This commit introduces audit item **B12: Substantive-validation NaN root-cause investigation + fix** as a NEW critical-path item bundled with the C2 era. B12 is NOT optional and is NOT post-v1.0. It must land BEFORE the `v0.17.5-step17b-c2-mpi-sync` tag because the tag should be on a substantively-validated baseline, not on byte-equal-but-NaN-laden output.
 
