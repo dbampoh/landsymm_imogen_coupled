@@ -1,11 +1,11 @@
 # STEP 17b — F-12 sub-milestone C2 (Workstation MPI year_outer + B1+B4 + small bundles)
 
 **Date opened:** 2026-05-11
-**Date C2 prep landed:** 2026-05-11 (this commit; un-tagged checkpoint)
-**Date C2 core (MPI_Barrier + flush_year_globally_synchronized) landed:** _pending_
+**Date C2 prep landed:** 2026-05-11 (commit `1405ada`; un-tagged checkpoint; pushed to all 3 remotes)
+**Date C2 core (MPI_Barrier + flush_year_globally_synchronized) landed:** 2026-05-11 (this commit; un-tagged checkpoint)
 **Date B1+B4 bundled with C2 era landed:** _pending_
 **Date C2 close-out + tag `v0.17.5-step17b-c2-mpi-sync` landed:** _pending_
-**Status:** 🔧 IN PROGRESS — C2 prep phase ✅ done; C2 core ⏳ next; B1+B4 + small bundles ⏳ after core; tag at close-out.
+**Status:** 🔧 IN PROGRESS — C2 prep phase ✅ done (`1405ada`); C2 core ✅ done (this commit; LPJG source ~317 LOC additive across 3 files); B1+B4+B2+B3+B6+B10 bundles ⏳ NEXT; full mpirun -np 4 mimic + tag at close-out.
 
 ---
 
@@ -194,7 +194,158 @@ Empirical evidence: with `--mpi` skipping Anaconda3 NetCDF, the MPI workstation 
 
 ---
 
-## 4. C2 core implementation plan (next phase)
+## 3a. C2 core implementation — LANDED this commit (2026-05-11)
+
+### 3a.1 What landed (3 files modified; +317 LOC additive)
+
+| File | Change | LOC |
+|---|---|---|
+| `lpjguess/modules/imogenoutput.h` | NEW: `static ImogenOutput* get_instance()` accessor + `flush_year_globally_synchronized(int year)` method declaration + `static ImogenOutput* instance_` private member + extensive doc blocks | +60 |
+| `lpjguess/modules/imogenoutput.cpp` | NEW: `#include <mpi.h>` (HAVE_MPI-guarded) + static `instance_` definition + ctor sets `instance_ = this` + dtor clears it + `flush_year_globally_synchronized(int year)` implementation (~120 LOC incl. doc block + MPI_Allreduce over per-rank flux contributions + lead-rank-only write delegation to existing `flush_year` + post-flush reset + per-rank diagnostic dprintf) | +181 |
+| `lpjguess/framework/framework.cpp` | NEW: `#include <mpi.h>` (HAVE_MPI-guarded) + `#include "../modules/imogenoutput.h"` + year-boundary `MPI_Barrier` block (HAVE_MPI + `MPI_Initialized` guarded) + explicit call to `ImogenOutput::get_instance()->flush_year_globally_synchronized(calendar_year)` between per-year cell-inner loop body close and per-cell teardown in the year_outer additive block | +76 |
+
+**Total**: +317 LOC purely additive (zero deletions). Backport-relevance HIGH for all 3 files.
+
+### 3a.2 Design decision — singleton-pointer pattern over virtual-method-on-base
+
+Considered two integration approaches:
+
+| Option | Touch surface | Cleanliness | Chosen? |
+|---|---|---|---|
+| **(A)** Add new non-pure virtual `flush_year_globally_synchronized(int)` to `OutputModule` abstract base in `framework/outputmodule.h` + matching dispatch in `OutputModuleContainer` + override in `ImogenOutput` | 3 shared upstream files (`outputmodule.h/cpp`, container methods) + 1 LandSyMM module file | OOP-canonical | NO |
+| **(B)** Singleton-pointer pattern in `ImogenOutput`: `static ImogenOutput* instance_` set in ctor, cleared in dtor; `static get_instance()` accessor; framework.cpp looks up the instance + calls the method directly | 2 LandSyMM module files (`imogenoutput.h/cpp`) + 1 framework file | Mirrors existing `output_channel` global at `outputmodule.h:227` | **YES** |
+
+Option (B) chosen because:
+1. **Smaller backport surface** (Option A would touch `framework/outputmodule.h/cpp` which are part of upstream LPJ-GUESS infrastructure; trunk_r13078 backport would have to apply OO changes to those files too)
+2. **Mirrors existing LPJ-GUESS pattern** — `output_channel` is a process-global singleton at outputmodule.h:227 (an `extern OutputChannel*`). The pattern is mainstream in this codebase.
+3. **Avoids forcing all 9 registered output modules to either get the new virtual or document its no-op default** — keeps the change localised to ImogenOutput which is the only module that needs it
+4. **Defensive null-check at call site**: framework.cpp uses `if (ImogenOutput* imout = get_instance())` so a runtime scenario where ImogenOutput wasn't registered (e.g., a non-IMOGEN input mode that somehow ended up in year_outer) silently skips the flush rather than null-dereferencing
+
+### 3a.3 MPI integration discipline — mirrors existing LPJ-GUESS conventions
+
+Verified live against the existing MPI usage in the codebase (per user's 2026-05-11 query): the new C2 code follows the established LPJ-GUESS MPI integration pattern at `imogencfx.cpp:381` + `imogen_input.cpp:221` exactly:
+
+| Aspect | Existing LPJ-GUESS pattern | C2 code | Match |
+|---|---|---|---|
+| `mpi.h` include placement | `#ifdef HAVE_MPI #include <mpi.h> #endif` at file top (before any std header) | Same | ✓ |
+| MPI-alive guard | `int flag; MPI_Initialized(&flag); if (... == MPI_SUCCESS && flag == true) { ... }` | Same | ✓ |
+| Rank identification | (existing uses Barrier only; never queries rank) | `GuessParallel::get_rank()` from `parallel.h` | ✓ (canonical accessor) |
+| Communicator | `MPI_COMM_WORLD` | Same | ✓ |
+| Compile-time guards | `#ifdef HAVE_MPI ... #endif` blocks | Same | ✓ |
+
+**Only new MPI primitive C2 introduces is `MPI_Allreduce`** (the existing LPJ-GUESS code only uses `MPI_Barrier`). `MPI_Allreduce` with `MPI_DOUBLE` / `MPI_INT` + `MPI_SUM` is standard MPI-1; universally supported by MPICH (Anaconda3 + KIT IMK-IFU `owl`), OpenMPI, Cray MPICH, Intel MPI, etc.
+
+**Why `MPI_Initialized(&flag)` over `GuessParallel::parallel`**: (1) matches existing convention; (2) more robust (actually queries MPI state rather than trusting a cached bool); (3) `GuessParallel::parallel` isn't exposed via `parallel.h` so using it would require touching the header (larger backport surface).
+
+### 3a.4 Year-boundary semantics — preserves single-process bit-exactness
+
+**Critical correctness property**: in `year_outer` mode, the existing `outannual` year-change-detection at `imogenoutput.cpp:118` (`if (accum_year >= 0 && this_year != accum_year)`) was the auto-flush trigger that produced one flush per year on year+1 cell 0. My new explicit `flush_year_globally_synchronized` call at year boundary changes the TIMING (end of year_idx body vs start of year_idx+1 cell 0) but NOT the VALUES (year-aggregated; same set of cells contribute). After my new call, `accum_year=-1` so outannual's auto-flush at year+1 cell 0 sees `-1 < 0` and SKIPS — avoiding double-write.
+
+**This means**: single-process `year_outer` mode produces:
+- Same flush values per year ✓
+- Same number of flushes per year (one) ✓
+- Different timing (slightly earlier in execution order) ✓
+- → Same `.out` file content ✓ → bit-exact xval preserved
+
+Final-year handling: in year_outer mode, framework.cpp explicitly fires `flush_year_globally_synchronized` for EVERY `year_idx` including the last (since it's inside the `for (year_idx=0; ...< total_years; ...)` loop body). So the destructor's catch-all `if (year_pending && accum_year >= 0)` is naturally bypassed in year_outer (accum_year=-1 + year_pending=false after the explicit flush). In gridcell_outer mode the destructor still catches the final year as before.
+
+### 3a.5 Verification this commit
+
+| Check | Method | Result |
+|---|---|---|
+| Build clean (non-MPI; `build/`) | `cd lpjguess/build && make -j$(nproc)` | ✅ no errors; only pre-existing warnings |
+| Build clean (MPI; `build_mpi/`) | `cd lpjguess/build_mpi && make -j$(nproc)` | ✅ no errors; only pre-existing warnings |
+| 162 unit tests pass (non-MPI) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 162 unit tests pass (MPI) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| imogen 1cell xval against `build_mpi/guess` single-process | harness `scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ 37/37 bit-exact PASS |
+| imogen 4cell xval (regression) | harness `4cell imogen` | ✅ 37/37 bit-exact PASS |
+| imogencfx 1cell xval (regression) | harness `1cell imogencfx` | ✅ 37/37 bit-exact PASS |
+| imogencfx 4cell xval (regression) | harness `4cell imogencfx` | ✅ 37/37 bit-exact PASS |
+| MPI_Init + my code path actually fires under `mpirun -np 1 -parallel` | hand-built `run1/` workdir + `timeout 60 mpirun -np 1 build_mpi/guess -parallel -input imogen main_mpi_smoke.ins` | ✅ "Finished" printed + diagnostic `[ImogenOutput] flushed year=XXXX` visible (confirms `flush_year_globally_synchronized` is invoked + delegates to existing `flush_year` for the write) |
+
+**Side-finding (separate from C2 core)**: the hand-built `mpirun -np 1` smoke produced NaN values in some output fields. Isolation test (same workdir + same .ins WITHOUT `-parallel`) shows the NaN ALSO appears in single-process mode → root cause is the ad-hoc workdir layout (missing some symlinks for default file searches that the standard `cross_validate_year_outer.sh` harness has). **NOT a C2 bug**. Documented for the C2 close-out task: the proper `mpirun -np 4` mimic will use `scripts/run_parallel_mimic.sh` (which delegates to `scripts/cluster/setup_run.sh`) for production-grade per-rank dir population.
+
+### 3a.6 What is NOT yet verified at this commit (deferred to C2 close-out)
+
+- **`mpirun -np 4` workstation MPI mimic with proper per-rank `runNN/` directory population** (requires `scripts/run_parallel_mimic.sh` + `scripts/cluster/setup_run.sh` integration; the setup_run.sh expects `-input imogen` + main.ins which is more straightforward AFTER B4 lands, since B4 expands ImogenInput's Rh/W/Tmin/Tmax consumer wiring needed for full functional loose-mode parallelism)
+- **`MPI_Allreduce` aggregation correctness across multiple ranks** (test: with `coupling_mode "prescribed"` + 4 ranks × 1-cell-per-rank, verify the unified handshake file written by rank 0 has values = sum of per-rank contributions)
+- **Lead-rank-only write race avoidance** (test: confirm only rank 0 opens/writes the unified handshake file; other ranks emit diagnostic dprintf but don't touch the file)
+- **Both deferred to C2 close-out alongside B-bundles (B1+B2+B3+B4+B6+B10)**, with full per-rank workspace setup via `setup_run.sh`.
+
+### 3a.7 CRITICAL FINDING — Substantive-validation NaN gap in the C1 baseline (2026-05-11)
+
+**Discovered during C2 core verification**: while diagnosing apparent NaN values in a `mpirun -np 1 -parallel` smoke test, isolation experiments revealed that **ALL FOUR C1 cross-validation scenarios produce NaN-laden outputs**, both pre- and post-C2-core. The C1 close-out at `v0.17.0-step17a-c1-year-outer-single-process` (commit `8aafe84`) tagged the project on a baseline where `cmp -s` byte-equality between gridcell_outer and year_outer modes was passing **because NaN bytes match NaN bytes**, not because the simulation was producing scientifically correct outputs.
+
+#### 3a.7.1 The forensic chain
+
+| # | Test | Result | Implication |
+|---|---|---|---|
+| 1 | `mpirun -np 1 -parallel` smoke with hand-built `run1/` workdir | NaN at Year 1871 | Initial suspicion: workdir layout |
+| 2 | Same .ins WITHOUT `-parallel` (MPI code path bypassed) | Same NaN at Year 1871 | NOT MPI-caused |
+| 3 | Same .ins from `Common-directory/` cwd (xval-harness-equivalent) | Same NaN | NOT workdir-caused |
+| 4 | Revert `lpjguess/` to C1 close-out state (`git checkout 8aafe84 -- ...`); rebuild; rerun xval | **Same NaN pattern, byte-identical to C2 output** | NaN exists in the C1 tag baseline |
+| 5 | Test imogen + imogencfx, 1cell + 4cell, all 4 variants | All 4 produce identical NaN patterns | NOT input-module-specific; both share the underlying issue |
+| 6 | nyear_spinup ∈ {2, 10, 30}; freenyears ∈ {0, 5, 15} | All produce NaN | NOT short-spinup-caused |
+| 7 | Drop `crop_n.ins` import (use global.ins + wetlandpfts.ins only) | Still NaN | NOT crop-module-caused |
+| 8 | Use soilmap-exact-match cells (-103.75 76.25; 94.25 54.25; -57.75 -33.75) | Still NaN | NOT soilmap-mismatch-caused |
+| 9 | searchradius=50 dist=0 exact climate match | Still NaN | NOT search-radius-caused |
+| 10 | Climate file inspection: T=237-276 K at -78.75/82.50 | Sane Arctic values | NOT climate-input-caused |
+
+NaN first appears at **Year 2 Day 1** (= second simulation year) in `soil.NH4_mass` diagnostic from `lpjguess/modules/somdynam.cpp:574`. The Year=1 simulation completes without diagnostic NaN, then propagates to Year 2's soil-N integration.
+
+#### 3a.7.2 Implications for C1 close-out validation
+
+The C1 close-out (`v0.17.0-step17a-c1-year-outer-single-process` tag at `8aafe84`) claimed "GO/NO-GO gate per session-2 §9.5 PASSED for all 4 scenarios" based on `scripts/cross_validate_year_outer.sh` reporting "37/37 bit-exact matches; 0 mismatches" for each scenario. That claim was:
+
+- **Nominally correct** (byte-equality preserved between gridcell_outer and year_outer)
+- **Substantively misleading** (both modes produced byte-identical NaN-laden outputs; `cmp -s` byte-equality of NaN == byte-equality of NaN)
+
+The cross-validation harness's `cmp -s` byte-equality logic is **necessary but not sufficient** for scientific validation. Both modes producing NaN doesn't validate year_outer's correctness — it just validates that whatever mechanism is producing NaN does so identically in both loop-ordering modes.
+
+**The substantive validation gap means**: we have NEVER actually run a successful, non-NaN, end-to-end LPJG main-loop simulation with `-input imogen` (or `-input imogencfx` + `skip_inprocess_engine_run`) on our smoke gridlists in this rebuild. F-10 deadlock prevented it from running before C1; C1's skip_inprocess_engine_run + year_outer unlocked the LPJG main loop, but the simulation produces NaN immediately and we hadn't noticed.
+
+#### 3a.7.3 What is NOT the cause (definitively ruled out)
+
+- C2 MPI code (NaN identical between C1-only and C1+C2 builds)
+- `MPI_Initialized` vs `GuessParallel::parallel` integration choice (irrelevant; MPI completely bypassed in single-process mode)
+- `-parallel` CLI flag (NaN with and without)
+- Loop-ordering mode (NaN identical in gridcell_outer + year_outer)
+- Short spinup (NaN persists across nyear_spinup ∈ {2, 10, 30})
+- Crop module import
+- Gridcell-specific config (4 cells across diverse latitudes all NaN)
+- Soilmap-mismatch fallback (NaN even with exact soilmap matches)
+- Search-radius interpretation (NaN even with dist=0 exact climate matches)
+
+#### 3a.7.4 Plausible remaining root-cause hypotheses (for B12 investigation)
+
+1. **LPJ-GUESS vegetation/soil initialization** for `-input imogen` with engine ASCII climate has an undiscovered defect that surfaces in single-cell smoke runs; production main.ins's LPJG main loop has never actually been validated to produce non-NaN with this input combination because F-10 deadlock prevented it prior to C1.
+2. **An LPJG-internal bug** in `ImogenInput::get_climate_for_gridcell` or the monthly→daily interpolation path that uninitialised values propagate from.
+3. **A wetlandpfts.ins + global.ins interaction** that mis-initialises soil N pools.
+4. **A LandSyMM_LPJ-GUESS fork-specific issue** (the "integrated LTS" base per Decision #3) that wouldn't appear in `trunk_r13078`. Could be diagnosed by F-11 Backport Sprint preparation work.
+5. **A NaN-aware code path** in soil-N integration (e.g., a divide-by-zero guarded by IFNLIM that the smoke .ins config bypasses).
+
+#### 3a.7.5 Path forward — NEW audit item B12 (CRITICAL PATH)
+
+This commit introduces audit item **B12: Substantive-validation NaN root-cause investigation + fix** as a NEW critical-path item bundled with the C2 era. B12 is NOT optional and is NOT post-v1.0. It must land BEFORE the `v0.17.5-step17b-c2-mpi-sync` tag because the tag should be on a substantively-validated baseline, not on byte-equal-but-NaN-laden output.
+
+Estimated effort: 2-10 days (genuinely unbounded). Could be a quick fix if it's something obvious in LPJG init; could require LPJG-developer-level expertise if it's a deep main-loop issue. Tracking in `notes/FOLLOWUPS.md` "Comprehensive outstanding-work audit (2026-05-11)" §B item B12 + "B-item bundling commitment (2026-05-11)" sub-section.
+
+C2 era combined sprint estimate revised: **~11-23+ days** (was 9-13 d) due to B12 addition.
+
+### 3a.8 xval harness hardening this commit (per B12 finding)
+
+`scripts/cross_validate_year_outer.sh` is updated to add a **substantive-validation NaN gate** that runs AFTER the existing byte-equality check. The gate:
+
+- Scans Run A and Run B `.out` files for `nan` tokens (case-insensitive)
+- Reports the byte-equality and non-NaN check results separately
+- If either run has NaN-laden `.out` files: **FAILS with exit code 3** (was: PASS based on byte-equality alone)
+- Provides actionable diagnostic output pointing at this STEP_17b.md §3a.7 + FOLLOWUPS B12 + session-2 handoff Part 18
+
+Effect on existing validation: until B12 is investigated + fixed, **all 4 cross-validation scenarios will now correctly REPORT FAIL** rather than masking the NaN issue behind byte-equality-of-garbage. This is the desired "stop the line" behavior — forces explicit attention on the science-correctness gap.
+
+The C1 close-out tag at `v0.17.0-step17a-c1-year-outer-single-process` is preserved as-is in the git history (no retroactive de-tagging); it represents the byte-equality validation milestone, which is genuinely a real achievement (year_outer mechanics ARE byte-equivalent to gridcell_outer). The substantive-validation FAIL is a NEW, separate gate added 2026-05-11 to catch a previously-undetected gap.
+
+## 4. C2 core implementation plan (next phase) — SUPERSEDED by §3a above; preserved for design-history reference
 
 Per the plan in session-2 §6.3 + EXECUTION_PLAN.md V.1 row 17b:
 
@@ -290,12 +441,15 @@ Per user direction 2026-05-11 (deferred to agent with the stated condition "be m
 
 ---
 
-## 7. Remaining work within step 17b (after this prep commit)
+## 7. Remaining work within step 17b (after this C2-core commit)
 
-1. **C2 core (~3-5 d)**: `MPI_Barrier(MPI_COMM_WORLD)` at year boundary in framework.cpp + `flush_year_globally_synchronized(int year)` in imogenoutput.cpp/h + workstation MPI mimic test via `scripts/run_parallel_mimic.sh --np 4`.
-2. **B1+B2+B3+B4+B6+B10 bundles (~6-8 d)**: Fortran Rh/Wind physics port (B1; ~70-100 LOC in `imogen/code/imogen_lpjg.f`) + Fortran Tmin/Tmax write (B2; 0.5 d) + C++ Tmin/Tmax REGRID branch (B3; 0.5 d) + ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion (B4; 1 d) + Fortran T_anom 2× investigation (B6; 0.5 d) + symmetric Fortran engine writer fix (B10; 0.5 d).
-3. **C2 close-out + tag**: full 4-xval cross-validation against both `build/guess` and `build_mpi/guess` (single-process AND `mpirun -np 4` mimic); 162 unit tests both builds; tag `v0.17.5-step17b-c2-mpi-sync`; push commit + tag to all 3 remotes.
+1. **~~C2 core (~3-5 d)~~ ✅ DONE 2026-05-11** (this commit): MPI_Barrier + flush_year_globally_synchronized landed; mechanics verified via single-process xval byte-equality + mpirun -np 1 -parallel smoke (LPJG main loop completes; flush_year_globally_synchronized invoked). See §3a.
+2. **B12 (NEW; CRITICAL PATH; 2-10 d unbounded) — NEXT TOP PRIORITY**: Substantive-validation NaN root-cause investigation + fix. The C1 baseline produces NaN-laden outputs that the byte-equality xval masked. Must be diagnosed + fixed BEFORE C2 close-out tag so the v0.17.5-step17b-c2-mpi-sync milestone lands on a substantively-validated baseline. See §3a.7 + §3a.8.
+3. **B1+B2+B3+B4+B6+B10 bundles (~6-8 d) — AFTER B12** (so they land on substantively-validated baseline): Fortran Rh/Wind physics port (B1; ~70-100 LOC in `imogen/code/imogen_lpjg.f`) + Fortran Tmin/Tmax write (B2; 0.5 d) + C++ Tmin/Tmax REGRID branch (B3; 0.5 d) + ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion (B4; 1 d) + Fortran T_anom 2× investigation (B6; 0.5 d) + symmetric Fortran engine writer fix (B10; 0.5 d).
+4. **C2 close-out + tag** (after B12 + B1-B10 bundles): full 4-xval cross-validation against both `build/guess` and `build_mpi/guess` (single-process AND `mpirun -np 4` mimic via `scripts/run_parallel_mimic.sh` + properly populated per-rank `runNN/` dirs via `scripts/cluster/setup_run.sh`) WITH the substantive-validation NaN-gate passing (i.e., bit-exact AND non-NaN); 162 unit tests both builds; tag `v0.17.5-step17b-c2-mpi-sync`; push commit + tag to all 3 remotes.
+
+**Revised C2 era combined sprint estimate**: **~11-23+ days** (was ~9-13 d) — B12 adds 2-10 d unbounded; the upper-range increase reflects the unbounded nature of NaN investigation (could need LPJG-developer-level expertise).
 
 ---
 
-— End of STEP_17b.md prep-phase landing (2026-05-11) —
+— Last updated 2026-05-11 (C2 core landing + substantive-validation NaN finding + xval harness hardening + B12 audit item; un-tagged checkpoint on top of C2 prep `1405ada`) —

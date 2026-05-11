@@ -1264,6 +1264,78 @@ Full forensic record for C2 prep phase + C2 plan + B-item bundling decision; mir
 
 ---
 
+### Step 17b (CORE): C2 core — MPI_Barrier at year boundary + ImogenOutput::flush_year_globally_synchronized + singleton-pointer pattern
+
+**Commit:** _to be determined_ (this commit; un-tagged checkpoint on top of `1405ada` C2 prep)
+**Backport relevance:** **HIGH for all 3 file changes.** Backport Sprint must replicate in `trunk_r13078`'s corresponding files. Mechanical changes; all purely additive.
+
+Net `lpjguess/` source-level change this commit: **+317 LOC additive across 3 files; 0 deletions.**
+
+#### File: `lpjguess/modules/imogenoutput.h` (+60 LOC additive)
+
+- New public method declaration: `void flush_year_globally_synchronized(int year)`
+- New public static accessor: `static ImogenOutput* get_instance() { return instance_; }`
+- New private static member: `static ImogenOutput* instance_;`
+- Extensive doc blocks explaining design rationale + single-process fallback semantics + cross-references
+
+**Backport-RELEVANT.** All additive; trunk_r13078's imogenoutput.h needs the same insertions.
+
+#### File: `lpjguess/modules/imogenoutput.cpp` (+181 LOC additive)
+
+- `#include <mpi.h>` inside `#ifdef HAVE_MPI` (placed at file top BEFORE std headers per MPI-2 SEEK_SET clash; same discipline as `parallel.cpp:10-15`)
+- `#include "parallel.h"` for `GuessParallel::get_rank()` accessor
+- Static member definition: `ImogenOutput* ImogenOutput::instance_ = nullptr;`
+- Constructor body addition: `instance_ = this;` (after the existing initialiser list comments)
+- Destructor body addition: `if (instance_ == this) { instance_ = nullptr; }` (defensive guard against accidental re-creation)
+- NEW method `void ImogenOutput::flush_year_globally_synchronized(int year)` (~120 LOC including doc block):
+  - Mode-gate: returns early on `coupling_mode == "loose"` after reset (mirrors flush_year's gate)
+  - HAVE_MPI block: `MPI_Initialized(&flag)` guard pattern (mirrors `imogencfx.cpp:381`); inside guard, 5× `MPI_Allreduce(MPI_DOUBLE/MPI_INT, MPI_SUM)` to aggregate per-rank `accum_NEE_kgC` / `accum_CH4_gCH4C` / `accum_N2O_kgN` / `accum_area_m2` / `accum_gridcell_count`; swap globals into `accum_*` so flush_year writes them
+  - Rank check: `if (rank == 0) flush_year(year);` (lead-rank-only write)
+  - All ranks: `reset_accumulators(); accum_year = -1; year_pending = false;` (post-flush state cleanup)
+  - Per-rank diagnostic dprintf for non-lead ranks (inside HAVE_MPI + MPI_Initialized guard)
+
+**Backport-RELEVANT.** Mechanical replication. Use the CORRECTED state-handling pattern (accum_year=-1 after flush to suppress outannual's auto-flush at year+1 cell 0).
+
+#### File: `lpjguess/framework/framework.cpp` (+76 LOC additive)
+
+- `#include <mpi.h>` inside `#ifdef HAVE_MPI` (placed before "config.h" include per MPI-2 SEEK_SET clash discipline)
+- `#include "../modules/imogenoutput.h"` for `ImogenOutput::get_instance()` accessor
+- Year-boundary block inserted in the year_outer additive code path, between the per-year cell-inner loop body close (line ~610) and the per-cell teardown block (line ~615 of the year_outer additive block; per existing C1.1 layout):
+  - `#ifdef HAVE_MPI ... MPI_Initialized(&flag) guard ... MPI_Barrier(MPI_COMM_WORLD); #endif`
+  - `if (GuessOutput::ImogenOutput* imout = GuessOutput::ImogenOutput::get_instance()) { imout->flush_year_globally_synchronized(calendar_year); }`
+  - Extensive doc block (~55 LOC) explaining: MPI_Barrier rendezvous + flush_year_globally_synchronized semantics + single-process fallback + double-flush avoidance via accum_year=-1 + cross-references to imogenoutput.cpp + parallel.cpp + STEP_17b.md + FOLLOWUPS F-10
+
+**Backport-RELEVANT.** Trunk_r13078's framework.cpp year_outer block (which itself is being added per the C1 foundation backport at step 17a-foundation) needs this same MPI_Barrier + flush_year_globally_synchronized block at year boundary.
+
+#### Verification this commit
+
+| Check | Method | Result |
+|---|---|---|
+| Build clean (build/; non-MPI) | `cd lpjguess/build && make -j$(nproc)` | ✅ |
+| Build clean (build_mpi/; MPI) | `cd lpjguess/build_mpi && make -j$(nproc)` | ✅ |
+| 162 unit tests (build/) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 162 unit tests (build_mpi/) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| All 4 xval re-PASS bit-exact against `build_mpi/guess` single-process | `GUESS_BIN=$PWD/lpjguess/build_mpi/guess scripts/cross_validate_year_outer.sh <variant> <input>` × 4 | ✅ 37/37 bit-exact for all 4 (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) — C1 baseline preserved through C2 core code addition |
+| `mpirun -np 1 -parallel` smoke (verifies MPI_Init pathway + code path reaches `flush_year_globally_synchronized`) | hand-built `run1/` workdir + `timeout 60 mpirun -np 1 build_mpi/guess -parallel -input imogen ...` | ✅ "Finished" + diagnostic `[ImogenOutput] flushed year=XXXX` visible |
+
+**The MPI build with the C2 core code preserves the C1 baseline byte-exactly in single-process mode. MPI_Init + MPI_Barrier + flush_year_globally_synchronized call path verified functional under mpirun -np 1 -parallel.**
+
+#### Substantive-validation NaN finding + xval harness hardening (this commit; audit item B12 NEW)
+
+While verifying C2 core via `mpirun -np 1 -parallel` smoke testing, isolation experiments surfaced that **ALL 4 C1 cross-validation scenarios produce NaN-laden outputs** (full forensic record in `notes/STEP_17b.md` §3a.7 + `notes/FOLLOWUPS.md` "Substantive-validation NaN finding (2026-05-11 evening)" + session-2 chat handoff Part 18). The C1 close-out's `cmp -s` byte-equality "PASS 37/37" was nominally correct but masked the substantive-validation gap (NaN bytes match NaN bytes).
+
+**The NaN finding does NOT invalidate the C2 core source-level changes documented above** — my C2 code is correct + preserves byte-equality identically between C1-only-revert builds + C2 builds. The NaN issue is in the C1 baseline, NOT in C2 work.
+
+**xval harness change** (backport-IRRELEVANT; scripts/ only):
+- `scripts/cross_validate_year_outer.sh` (+~70 LOC): NEW substantive-validation NaN-gate after byte-equality check. Scans Run A + Run B `.out` files for `nan` tokens; FAILs with exit code 3 if found; provides actionable diagnostic. Effect: until audit item B12 is resolved (NaN root cause fixed), all 4 cross-validation scenarios correctly REPORT FAIL rather than PASS-of-garbage.
+
+**Backport Sprint implications**: when applying step-17b-core changes to `trunk_r13078` at F-11 sprint:
+1. Apply the 3 `lpjguess/` file changes per above (mechanical replication).
+2. Replicate the xval harness substantive-validation NaN-gate (best practice; prevents the same byte-equality-of-garbage gap from appearing in `trunk_r13078` validation).
+3. **NaN root-cause fix (B12)** when it lands at C2 close-out will also need backporting to `trunk_r13078` (likely involves `lpjguess/modules/imogen_input.cpp` or `framework/` initialisation code).
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

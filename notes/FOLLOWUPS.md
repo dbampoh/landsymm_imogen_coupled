@@ -13,7 +13,11 @@ with the closing date. Do not delete; the audit trail is valuable.
 
 ## Status dashboard (at-a-glance; updated at end of every step)
 
-**Last updated:** 2026-05-11 (afternoon; F-12 sub-milestone C2 PREP landed — Anaconda3 `mpicxx` wrapper fix via `conda install -c conda-forge gxx_linux-64` + `scripts/cluster/make_guess.sh --mpi` workstation-NetCDF logic fix + `lpjguess/build_mpi/guess` built clean + 162 unit tests pass + ALL FOUR cross-validation scenarios re-PASS bit-exact 37/37 against `build_mpi/guess` in single-process mode (pre-MPI_Barrier baseline). B1-B11 bundling decision locked in: refined option (i) for B1+B4 with C2 era + opportunistic option (iii) for B2/B3/B5-B11 with definitive per-item home (see "B-item bundling commitment (2026-05-11)" sub-section below). C2 core (`MPI_Barrier` + `flush_year_globally_synchronized`) + B1+B2+B3+B4+B6+B10 bundles + close-out tag `v0.17.5-step17b-c2-mpi-sync` are NEXT. Net `lpjguess/` source-level change this commit: ZERO (scripts/ + docs only).
+**Last updated:** 2026-05-11 (evening; F-12 sub-milestone C2 CORE landed + **CRITICAL substantive-validation NaN finding** surfaced during C2 core verification + xval harness hardened with non-NaN gate + NEW audit item **B12** added as critical-path follow-up). KEY DISCOVERY: the C1 close-out `v0.17.0-step17a-c1-year-outer-single-process` tag (commit `8aafe84`) reported "GO/NO-GO gate PASSED for all 4 cross-validation scenarios" based on the harness's `cmp -s` byte-equality check — but ALL 4 scenarios were producing **byte-identical NaN-laden outputs** (`cmp -s` reports NaN-bytes-match-NaN-bytes as identical → PASS, but the simulation is producing garbage). The substantive-validation gap was masked by the byte-comparison-only harness logic. **My C2 MPI code is NOT the cause** (NaN identical in C1-only revert + C2 builds; NaN identical with and without `-parallel`; NaN identical in gridcell_outer + year_outer). NaN appears at simulation Year 2 Day 1 in `soil.NH4_mass`; persists across nyear_spinup ∈ {2, 10, 30}, freenyears ∈ {0, 5, 15}, with/without crop_n.ins, across 4 cells at diverse latitudes (76°N, 80°N, 54°N, -33°S), with exact soilmap matches + with searchradius dist=0 exact climate matches. Plausible remaining root-cause hypotheses: LPJ-GUESS vegetation/soil initialization for `-input imogen` was never substantively-validated (F-10 deadlock blocked it pre-C1; C1's skip_inprocess_engine_run unlocked it but NaN issue went unnoticed); LPJG-internal bug in ImogenInput::get_climate_for_gridcell; wetlandpfts.ins + global.ins initialisation interaction; LandSyMM_LPJ-GUESS fork-specific issue. Path forward: NEW audit item **B12: Substantive-validation NaN root-cause investigation + fix** (CRITICAL PATH; bundled with C2 era BEFORE B1-B10 bundles + BEFORE C2 close-out tag; estimated 2-10 d unbounded). xval harness updated 2026-05-11 to FAIL on NaN-laden outputs (was: PASS based on byte-equality alone) — forces explicit attention on the science-correctness gap. Net `lpjguess/` source-level change this commit: +317 LOC additive (C2 core; correct + verified by mechanics; preserves byte-equality with C1 baseline). xval harness change: backport-IRRELEVANT (scripts/ only). C2 era combined sprint estimate revised: **~11-23+ days** (was 9-13 d).
+
+**Prior dashboard entry preserved for context (2026-05-11 late afternoon; F-12 sub-milestone C2 CORE landed — `MPI_Barrier(MPI_COMM_WORLD)` at year boundary in `lpjguess/framework/framework.cpp` (HAVE_MPI + `MPI_Initialized` guarded; ~10 LOC additive at line ~611 of year_outer block) + `flush_year_globally_synchronized(int year)` method on `ImogenOutput` (~120 LOC additive in `lpjguess/modules/imogenoutput.cpp/h`) with `MPI_Allreduce(MPI_SUM)` over per-rank NEE/CH4/N2O/area/count contributions + lead-rank-only write delegation to existing `flush_year` + post-flush `accum_year=-1` reset (suppresses outannual auto-flush at year+1 cell 0 → avoids double-write) + singleton-pointer `ImogenOutput::get_instance()` pattern (mirrors existing `output_channel` global at `outputmodule.h:227`; minimises touch surface vs adding a new virtual to OutputModule base). MPI integration discipline VERIFIED to match existing LPJ-GUESS conventions exactly (`mpi.h` include placement + `MPI_Initialized(&flag)` guard pattern from `imogencfx.cpp:381` + `imogen_input.cpp:221` + `GuessParallel::get_rank()` from `parallel.h`). Both builds rebuild clean; 162 unit tests pass on BOTH `build/guess` and `build_mpi/guess`; ALL FOUR cross-validation scenarios re-PASS bit-exact 37/37 against `build_mpi/guess` single-process (C1 baseline preserved through C2 core code addition). `mpirun -np 1 -parallel` smoke test verified: MPI_Init succeeds + my code path is reachable (diagnostic `[ImogenOutput] flushed year=XXXX` visible in stdout) + LPJG main loop completes end-to-end. Full `mpirun -np 4` mimic with proper per-rank `runNN/` setup deferred to C2 close-out (alongside B-bundles, since B4 ImogenInput consumer wiring expansion is needed for full multi-rank loose-mode functionality). B1+B2+B3+B4+B6+B10 bundles are NEXT. Net `lpjguess/` source-level change this commit: +317 LOC additive across 3 files (backport-RELEVANT).
+
+**Prior dashboard entry preserved for context (2026-05-11 afternoon; F-12 sub-milestone C2 PREP at commit `1405ada`):** Anaconda3 `mpicxx` wrapper fix via `conda install -c conda-forge gxx_linux-64` + `scripts/cluster/make_guess.sh --mpi` workstation-NetCDF logic fix + `lpjguess/build_mpi/guess` built clean + 162 unit tests pass + ALL FOUR cross-validation scenarios re-PASS bit-exact 37/37 against `build_mpi/guess` in single-process mode (pre-MPI_Barrier baseline). B1-B11 bundling decision locked in: refined option (i) for B1+B4 with C2 era + opportunistic option (iii) for B2/B3/B5-B11 with definitive per-item home (see "B-item bundling commitment (2026-05-11)" sub-section below).
 
 **Prior dashboard entry preserved for context (2026-05-11 early morning; Comprehensive outstanding-work audit landed at commit `e8fd7fb`):** Triggered by user 2026-05-10 late-evening clarification + question about engine/input-module symmetry. Audit revealed: production path (`-input imogencfx` + C++ in-process engine port) IS fully wired post-C1 close-out at v0.17.0; non-production paths (standalone Fortran engine; `-input imogen` loose mode) have known asymmetries documented since step 9.5 (2026-05-07) that aggregate to ~9-15 days of additional in-v1.0-scope work previously omitted from chat-level "% remaining" estimates. Revised estimate: ~48-50% done; ~50-52% remaining (~33-37 days median); was ~70% / ~30% / ~20-32 days. See "Comprehensive outstanding-work audit" section below the dashboard table for full breakdown across in-v1.0-scope (A + B; ~25-45 days) + post-v1.0 (C; v1.1+/v2.0+/paper-stage). NO SOURCE-LEVEL CHANGE in that commit; docs-only.
 
@@ -32,7 +36,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 | F-9 | OPEN (refined at step 9.5) | Step 9.5c (or merge with F-12 sprint) | No |
 | F-10 | PARTIALLY RESOLVED (workstation single-process tight: ✅ via F-12 C1 close-out; cluster MPI tight: ⏳ via C2+C3) | Resolved at C1+C2+C3 per Path A 2026-05-09 refinement (Option C only; Option B skipped) | C1 done (✅); C2+C3 still required for full v1.0 |
 | F-11 | OPEN | End of Phase 1 (after step 19; scope expanded by F-12 in-v1.0) | No (paper consistency) |
-| F-12 | **PARTIALLY DONE** — C1 ✅ CLOSED (TAGGED `v0.17.0-step17a-c1-year-outer-single-process` 2026-05-10); **C2 prep ✅ done** (2026-05-11; mpicxx fix + build_mpi/guess + 4 xval re-PASS bit-exact); C2 core ⏳ NEXT (MPI_Barrier + flush_year_globally_synchronized); C3 ⏳ after C2 | C1 done; C2 prep done; **C2 core + B1+B4+B2+B3+B6+B10 combined sprint** (~9-13 days; tag target `v0.17.5-step17b-c2-mpi-sync`) → C3 (~1-2 weeks SSH iterative; cluster) | C2 core + C3 still **Yes** (cluster MPI tight gates on C2+C3) |
+| F-12 | **PARTIALLY DONE** — C1 byte-equality ✅ CLOSED (TAGGED `v0.17.0-step17a-c1-year-outer-single-process` 2026-05-10; but **substantive-validation gap surfaced 2026-05-11** — both Run A + Run B produced NaN-laden bit-exact-equal outputs; audit item B12 NEW); **C2 prep ✅ done** (`1405ada`); **C2 core ✅ done** (this commit; MPI mechanics verified); **B12 ⏳ NEXT TOP PRIORITY** (NaN root-cause investigation + fix; CRITICAL PATH; 2-10 d unbounded); B1+B2+B3+B4+B6+B10 bundles ⏳ AFTER B12; full mpirun -np 4 mimic + close-out tag after B12 + bundles; C3 ⏳ after C2 close-out | C1 byte-eq closed; C2 prep done; **C2 core done**; **B12 + B1+B4+B2+B3+B6+B10 + C2 close-out** (~11-23+ days remaining of the revised combined sprint; tag target `v0.17.5-step17b-c2-mpi-sync`) → C3 (~1-2 weeks SSH iterative; cluster) | C2 close-out + C3 still **Yes** (cluster MPI tight gates on C2 close-out + C3; substantive validation gates on B12) |
 | F-13 | OPEN (paper-stage comparative analysis) | Post-v1.0 (post-step-19) | No (paper-stage; not a v1.0-runnable item) |
 
 ### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
@@ -77,10 +81,11 @@ with the closing date. Do not delete; the audit trail is valuable.
 | B9 | **F-8**: CMIP6 wind-magnitude split + precip rain/snow partition refinement (currently `U=V=wind/√2`, `rain=precip/snow=0`). | 0.5-1 day | STEP_5 CAVEAT-B/C + FOLLOWUPS F-8 |
 | B10 | **Symmetric Fortran engine writer fix** (alternating-year bug at `imogen/code/imogen_lpjg.f` lines 954, 1013, 1071, 1088, 1099). Same root cause as the C++ fix landed at C1.3 sub-step 7.3.1 commit `7be595a`. Fortran engine is currently used only for engine-only smoke testing (NOT on prescribed-mode launcher path); fix is for symmetric correctness. | 0.5 day | STEP_17a §5.6 + sub-step 7.3.1 commit doc block |
 | B11 | **Latent OOB fix in existing IMOGENCFXInput::getclimate cache** (`stored_years[i] = imogen_year` when `i >= nyears` due to undersized cache from formula `nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1`). Pre-existing latent bug surfaced at C1.3 sub-step 7.3.1 (worked around via lasthistyear bump in main_xval_loose.ins). Defensive hardening: add explicit bounds check + dynamic resize OR refactor the cache size formula. | 0.5 day | STEP_17a §6.3; surfaced at sub-step 7.3.1 |
+| **B12** | **Substantive-validation NaN root-cause investigation + fix** (NEW 2026-05-11 evening; CRITICAL PATH). The C1 close-out at `v0.17.0-step17a-c1-year-outer-single-process` reported "bit-exact 37/37 PASS" but ALL 4 cross-validation scenarios were producing byte-identical NaN-laden outputs (`cmp -s` byte-equality of NaN == byte-equality of NaN → PASS-of-garbage). The byte-comparison-only harness logic masked the substantive-validation gap. NaN appears at simulation Year 2 Day 1 in `soil.NH4_mass` and propagates. Investigation 2026-05-11 ruled out: MPI code path; -parallel CLI flag; loop-ordering mode; short spinup (2/10/30); crop module; gridcell specificity (4 cells across 76°N → -33°S); soilmap mismatch; searchradius interpretation; climate input (sane Kelvin values). Plausible remaining causes: LPJ-GUESS vegetation/soil initialization for `-input imogen` never substantively-validated (F-10 deadlock blocked it pre-C1); LPJG-internal bug in ImogenInput::get_climate_for_gridcell; wetlandpfts.ins + global.ins initialisation interaction; LandSyMM_LPJ-GUESS fork-specific issue. **MUST land BEFORE C2 close-out tag** so the `v0.17.5-step17b-c2-mpi-sync` milestone is on a substantively-validated baseline. xval harness updated 2026-05-11 to FAIL on NaN-laden outputs (was: PASS based on byte-equality alone) — forces explicit attention until B12 is resolved. | **2-10 days unbounded** | STEP_17b §3a.7 (full forensic record + diagnostic chain); STEP_17b §3a.8 (xval harness hardening this commit); session-2 chat handoff Part 18 (full investigation narrative) |
 
-**Subtotal B**: ~9-15 days (median ~11-12 days)
+**Subtotal B**: ~11-25+ days (median ~13-17 days; B12 unbounded) — was ~9-15 d before B12 addition
 
-**TOTAL in-v1.0 remaining (A + B): ~25-45 days (median ~33-37 days)**
+**TOTAL in-v1.0 remaining (A + B): ~27-55+ days (median ~35-42 days)** — was ~25-45 d before B12 addition
 
 ### C. Post-v1.0 (v1.1+ / v2.0+ / paper-stage; not blocking v1.0 release tag)
 
@@ -102,33 +107,69 @@ with the closing date. Do not delete; the audit trail is valuable.
 | 4-combination weighted (3 of 4 combinations done) | ~75% | ~25% | n/a |
 | Risk-weighted (F-10 architectural mountain done; only mechanical work remains) | ~80% | ~20% | n/a |
 | LOC-weighted (most lpjguess source changes are landed) | ~90% | ~10% | n/a |
-| **REVISED: full v1.0 with engine + input-module symmetry (per tonight's audit)** | **~48-50%** | **~50-52%** | **~33-37 (median)** |
+| REVISED: full v1.0 with engine + input-module symmetry (per 2026-05-11 audit) | ~48-50% | ~50-52% | ~33-37 (median) |
+| **FURTHER REVISED: full v1.0 with substantive-validation gap from B12 finding (2026-05-11 evening)** | **~40-45%** | **~55-60%** | **~35-42 (median; range 27-55+)** |
 
-**Adopted estimate going forward**: ~48-50% done; ~50-52% remaining (~33-37 days median; range 25-45). The audit-revised number is the most honest reflection of total v1.0 scope per user's stated requirements (full engine + input-module symmetry; not just production critical path).
+**Adopted estimate going forward (2026-05-11 evening revision)**: **~40-45% done; ~55-60% remaining (~35-42 days median; range 27-55+)**. The further-revised number reflects the substantive-validation NaN finding (B12) — a CRITICAL PATH item that was previously masked by the byte-comparison-only xval harness. The 2026-05-11 morning estimate (~48-50% done) was based on byte-equality-validated C1; the evening revision factors in that C1's LPJG main loop has never actually produced non-NaN scientific output in our rebuild.
 
-### B-item bundling commitment (2026-05-11; locked in at C2 prep)
+### B-item bundling commitment (2026-05-11; locked in at C2 prep; REVISED 2026-05-11 evening to add B12 per substantive-validation NaN finding)
 
-To honour the user's stated condition "tackle ALL items; leave NONE undone", every B-item has a **definitive home** before C2 implementation begins. Refined option (i) for B1+B4 with C2 era + opportunistic option (iii) for the smaller items B2/B3/B5-B11 with explicit per-item per-step assignment:
+To honour the user's stated condition "tackle ALL items; leave NONE undone", every B-item has a **definitive home** before C2 implementation begins. Refined option (i) for B1+B4 with C2 era + opportunistic option (iii) for the smaller items B2/B3/B5-B11 with explicit per-item per-step assignment. **B12 added 2026-05-11 evening as NEW critical-path item per the substantive-validation NaN finding** (see "Substantive-validation NaN finding (2026-05-11)" sub-section below + STEP_17b.md §3a.7).
 
 | # | Item | Effort | Bundling home | Status |
 |---|---|---|---|---|
-| B1 | Fortran Rh + Wind COMPUTATION port | 3-5 d | **C2 era (step 17b)** | ⏳ pending C2 core |
-| B2 | Fortran Tmin/Tmax write block | 0.5 d | **C2 era (step 17b)** | ⏳ pending C2 core |
-| B3 | C++ Tmin/Tmax in REGRID branch | 0.5 d | **C2 era (step 17b)** | ⏳ pending C2 core |
-| B4 | ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion | 1 d | **C2 era (step 17b)** | ⏳ pending C2 core |
+| **B12** | **Substantive-validation NaN root-cause investigation + fix** (NEW 2026-05-11) | **2-10 d unbounded** | **C2 era (step 17b); CRITICAL PATH; BEFORE B1-B10 + BEFORE C2 close-out tag** | ⏳ **TOP PRIORITY** post-C2-core commit |
+| B1 | Fortran Rh + Wind COMPUTATION port | 3-5 d | **C2 era (step 17b); AFTER B12** | ⏳ pending B12 fix |
+| B2 | Fortran Tmin/Tmax write block | 0.5 d | **C2 era (step 17b); AFTER B12** | ⏳ pending B12 fix |
+| B3 | C++ Tmin/Tmax in REGRID branch | 0.5 d | **C2 era (step 17b); AFTER B12** | ⏳ pending B12 fix |
+| B4 | ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion | 1 d | **C2 era (step 17b); AFTER B12** | ⏳ pending B12 fix |
 | B5 | F-9 / step 9.5c miscoutput diagnostic outputs | 1-2 d | **Step 18** (docs/reproducibility era) | ⏳ pending step 18 |
-| B6 | F-2 Fortran T_anom 2× line count | 0.5 d | **C2 era (step 17b)** (with B1's Fortran work) | ⏳ pending C2 core |
+| B6 | F-2 Fortran T_anom 2× line count | 0.5 d | **C2 era (step 17b); AFTER B12** (with B1's Fortran work) | ⏳ pending B12 fix |
 | B7 | F-6 CMIP6 `ql1_patt` unit | 0.5 d | **Step 18** (batched with B8/B9) | ⏳ pending step 18 |
 | B8 | F-7 CMIP6 `pstar_patt` units | 0.5 d | **Step 18** (batched with B7/B9) | ⏳ pending step 18 |
 | B9 | F-8 CMIP6 wind-mag + precip rain/snow | 0.5-1 d | **Step 18** (batched with B7/B8) | ⏳ pending step 18 |
-| B10 | Symmetric Fortran engine writer fix | 0.5 d | **C2 era (step 17b)** (with B1's Fortran work) | ⏳ pending C2 core |
+| B10 | Symmetric Fortran engine writer fix | 0.5 d | **C2 era (step 17b); AFTER B12** (with B1's Fortran work) | ⏳ pending B12 fix |
 | B11 | Latent OOB fix in IMOGENCFXInput::getclimate cache | 0.5 d | **Step 17d** (end-to-end-validation era; defensive hardening) | ⏳ pending step 17d |
 
-**C2 era combined sprint** (step 17b): C2 core (3-5 d) + B1 (3-5 d) + B2 (0.5 d) + B3 (0.5 d) + B4 (1 d) + B6 (0.5 d) + B10 (0.5 d) = **~9-13 days**.
+**C2 era combined sprint** (step 17b) — REVISED 2026-05-11 evening: C2 core (3-5 d done) + B12 (2-10 d unbounded; CRITICAL PATH) + B1 (3-5 d) + B2 (0.5 d) + B3 (0.5 d) + B4 (1 d) + B6 (0.5 d) + B10 (0.5 d) = **~11-23+ days** (was 9-13 d).
 **Step 18 bundle**: B5 + B7 + B8 + B9 = **~3-4.5 days**.
 **Step 17d bundle**: B11 = **0.5 day**.
 
-Per `notes/STEP_17b.md` §5 for the full bundling rationale.
+Per `notes/STEP_17b.md` §5 + §3a.7 for the full bundling rationale + B12 forensic record.
+
+### Substantive-validation NaN finding (2026-05-11 evening; CRITICAL; audit item B12)
+
+**Discovered during C2 core verification 2026-05-11**: while diagnosing apparent NaN values in a `mpirun -np 1 -parallel` smoke test, isolation experiments revealed that **ALL FOUR C1 cross-validation scenarios produce NaN-laden outputs** at the C1 tag baseline (`v0.17.0-step17a-c1-year-outer-single-process` at commit `8aafe84`). The "GO/NO-GO gate PASSED for all 4 scenarios" claim at C1 close-out was nominally true (byte-equality preserved between gridcell_outer and year_outer) but substantively misleading: both modes produced byte-identical NaN-laden outputs.
+
+**Forensic chain (full record in `notes/STEP_17b.md` §3a.7)**:
+
+| Test ruled out | Method | Result |
+|---|---|---|
+| C2 MPI code | Revert to C1 (8aafe84) + rebuild + rerun xval | Identical NaN |
+| `MPI_Initialized` vs `GuessParallel::parallel` | Test without `-parallel` flag | Identical NaN |
+| Loop-ordering mode | Both gridcell_outer + year_outer | Identical NaN bytes |
+| Short spinup | nyear_spinup ∈ {2, 10, 30}; freenyears ∈ {0, 5, 15} | All NaN |
+| Crop module | Drop `crop_n.ins` import | Still NaN |
+| Gridcell specificity | 4 cells across 76°N, 80°N, 54°N, -33°S | All NaN |
+| Soilmap match | Cells WITH exact soilmap matches | Still NaN |
+| Search-radius interpretation | dist=0 exact climate matches | Still NaN |
+| Climate input quality | Inspected T_anom Kelvin values: 237-276 K (realistic Arctic) | Sane |
+
+**What's confirmed**: NaN first appears at simulation Year 2 Day 1 in `soil.NH4_mass` diagnostic at `lpjguess/modules/somdynam.cpp:574`. Then propagates to vegetation establishment + C/N flux outputs.
+
+**Plausible remaining root cause hypotheses (for B12 investigation)**:
+
+1. LPJ-GUESS vegetation/soil initialization for `-input imogen` has an undiscovered defect that surfaces in smoke runs; production main.ins's LPJG main loop with engine ASCII climate has never been validated to produce non-NaN (F-10 deadlock blocked it pre-C1; C1's skip_inprocess_engine_run unlocked it but NaN issue went unnoticed)
+2. LPJG-internal bug in `ImogenInput::get_climate_for_gridcell` or the monthly→daily interpolation path
+3. `wetlandpfts.ins` + `global.ins` interaction that mis-initialises soil N pools
+4. LandSyMM_LPJ-GUESS fork-specific issue (could be diagnosed by F-11 Backport Sprint preparation comparing against `trunk_r13078`)
+5. A NaN-aware code path in soil-N integration (e.g., divide-by-zero guarded by IFNLIM that the smoke .ins config bypasses)
+
+**Path forward**: NEW audit item **B12** added (above) as CRITICAL PATH bundled with C2 era. Must land BEFORE C2 close-out tag so `v0.17.5-step17b-c2-mpi-sync` is on substantively-validated baseline.
+
+**xval harness hardening (this same commit)**: `scripts/cross_validate_year_outer.sh` updated to add substantive-validation NaN-check gate (FAILs with exit code 3 if NaN detected; was previously PASS based on byte-equality alone). All 4 cross-validation scenarios will now correctly REPORT FAIL until B12 is resolved — forces explicit attention. Documented in `notes/STEP_17b.md` §3a.8.
+
+**The C1 close-out tag `v0.17.0-step17a-c1-year-outer-single-process` is preserved in git history** — it represents the byte-equality validation milestone which IS a real achievement (year_outer mechanics ARE byte-equivalent to gridcell_outer). The substantive-validation FAIL is a NEW, separate gate added 2026-05-11 to catch a previously-undetected gap.
 
 ### Tracking discipline (committed 2026-05-07)
 

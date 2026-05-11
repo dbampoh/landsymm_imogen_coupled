@@ -7,11 +7,22 @@
 ///
 ///////////////////////////////////////////////////////////////////////////////////////
 
+// [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — MPI integration]
+// mpi.h must be included BEFORE stdio.h (and transitively before any
+// standard headers that #define SEEK_SET / SEEK_CUR / SEEK_END) per the
+// MPI-2 standard pre-processor clash. Same discipline as parallel.cpp
+// lines 10-15. Outside #ifdef HAVE_MPI guard, mpi.h is not pulled in and
+// the MPI_Barrier call in the year_outer block below is stubbed out.
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
+
 #include "config.h"
 #include "framework.h"
 #include "commandlinearguments.h"
 #include "guessserializer.h"
 #include "parallel.h"
+#include "../modules/imogenoutput.h"  // [Step 17b C2] ImogenOutput::get_instance() singleton accessor for the year-boundary globally-synchronized flush call below
 
 #include "inputmodule.h"
 #include "driver.h"
@@ -607,6 +618,71 @@ int framework(const CommandLineArguments& args) {
 					// Advance timer to next simulation day
 					date.next();
 				}
+			}
+
+			// =================================================================
+			// [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — year-
+			//  boundary MPI rendezvous + globally-synchronized IMOGEN handshake
+			//  flush]
+			//
+			// All gridcells (across all rank-local subsets) have completed
+			// year_idx. Before advancing to year_idx+1:
+			//   (1) MPI_Barrier: rank-wide synchronization (HAVE_MPI guarded;
+			//       gated on GuessParallel::parallel so single-process
+			//       build_mpi/guess WITHOUT -parallel CLI flag doesn't call
+			//       MPI_Barrier without MPI_Init).
+			//   (2) ImogenOutput::flush_year_globally_synchronized: collects
+			//       per-rank flux contributions via MPI_Allreduce(MPI_SUM) +
+			//       lead rank (rank 0) writes the unified handshake file. In
+			//       single-process or non-MPI build, falls back to local
+			//       flush_year() semantics — same result as outannual's
+			//       implicit year-change-driven flush_year(), just called
+			//       explicitly here so the semantics are visible.
+			//
+			// After flush_year_globally_synchronized: accum_year=-1 + accum_*=0
+			// across all ranks. outannual's year-change-detection at year+1
+			// cell 0 sees accum_year=-1 and skips its own flush_year() auto-
+			// trigger (avoids double-flush; existing logic at
+			// imogenoutput.cpp:118).
+			//
+			// In gridcell_outer mode this block is NEVER reached; the existing
+			// outannual/dtor auto-flush mechanism remains the sole flush
+			// driver. This block is purely additive within the year_outer
+			// code path.
+			//
+			// Cross-references:
+			//   - lpjguess/modules/imogenoutput.cpp::flush_year_globally_
+			//     synchronized (the implementation)
+			//   - lpjguess/framework/parallel.cpp (MPI infrastructure)
+			//   - notes/STEP_17b.md §4 (C2 core implementation plan)
+			//   - notes/FOLLOWUPS.md F-10 (architectural caveat resolved by
+			//     this method for multi-rank MPI year_outer mode)
+			// - DKB 2026-05-11
+			// =================================================================
+#ifdef HAVE_MPI
+			{
+				// MPI_Initialized() guard pattern mirrors imogencfx.cpp:381 +
+				// imogen_input.cpp:221: queries MPI directly rather than
+				// relying on the `GuessParallel::parallel` flag (which isn't
+				// exposed via parallel.h). Safe in single-process build_mpi/
+				// guess WITHOUT -parallel CLI flag (MPI_Init never called ->
+				// MPI_Initialized returns flag=0 -> MPI_Barrier skipped).
+				int mpi_initialized_flag = 0;
+				if (MPI_Initialized(&mpi_initialized_flag) == MPI_SUCCESS &&
+				    mpi_initialized_flag == 1) {
+					MPI_Barrier(MPI_COMM_WORLD);
+				}
+			}
+#endif
+			// Explicit year-boundary handshake flush. Calls into ImogenOutput
+			// singleton; returns silently (no-op) if the module isn't
+			// registered (e.g., a non-IMOGEN -input mode somehow ended up
+			// in year_outer; should not happen in v1.0 but the null-check
+			// makes it safe). The flush itself respects coupling_mode (loose
+			// mode is a no-op).
+			if (GuessOutput::ImogenOutput* imout =
+			    GuessOutput::ImogenOutput::get_instance()) {
+				imout->flush_year_globally_synchronized(calendar_year);
 			}
 		}
 

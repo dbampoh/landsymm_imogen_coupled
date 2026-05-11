@@ -100,6 +100,51 @@ public:
 	/// control. Idempotent: a no-op if no pending year is buffered.
 	void flush_pending_year();
 
+	// =========================================================================
+	// Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — globally-
+	// synchronized year-boundary flush for year_outer + MPI mode
+	// =========================================================================
+	//
+	// Sibling to flush_year() but designed for the year_outer code path
+	// (framework.cpp; gated on IMOGENConfig::framework_loop_mode == "year_outer")
+	// + multi-rank MPI scenarios. Performs MPI_Allreduce(MPI_SUM) over per-rank
+	// flux contributions (accum_NEE_kgC, accum_CH4_gCH4C, accum_N2O_kgN,
+	// accum_area_m2, accum_gridcell_count) so the lead rank (rank 0) writes a
+	// GLOBALLY-AGGREGATED handshake file rather than the per-rank-local values
+	// that flush_year() would produce.
+	//
+	// IN SINGLE-PROCESS MODE (non-MPI build OR no -parallel CLI flag): falls
+	// back to local flush semantics — the per-rank accumulators ARE the
+	// global values when there's only one rank, so the MPI_Allreduce reduces
+	// to a no-op and only rank 0 (= self) writes. Functionally identical to
+	// the existing flush_year() in single-process; just called explicitly by
+	// framework.cpp at the year boundary instead of implicitly by outannual's
+	// year-change-detection. Sets accum_year=-1 after flush, which naturally
+	// suppresses outannual's subsequent auto-flush on year+1 cell 0.
+	//
+	// CALLED BY: framework.cpp year_outer block, after the per-year cell inner
+	// loop completes, gated on IMOGENConfig::framework_loop_mode == "year_outer".
+	// In gridcell_outer mode this method is NEVER called; the existing
+	// outannual/dtor auto-flush mechanism remains active.
+	//
+	// RESOLVES the F-10 architectural caveat for multi-rank MPI year_outer
+	// mode: globally-aggregated values rather than per-gridcell-rolling.
+	void flush_year_globally_synchronized(int year);
+
+	/// Singleton-pointer accessor for framework.cpp year_outer's explicit
+	/// flush call. Returns nullptr if ImogenOutput hasn't been instantiated
+	/// (e.g., the output module wasn't registered for this run, or the
+	/// destructor has already fired during program teardown). Pattern mirrors
+	/// the existing `output_channel` global at outputmodule.h:227.
+	///
+	/// Set in ImogenOutput::ImogenOutput() constructor.
+	/// Cleared in ImogenOutput::~ImogenOutput() destructor.
+	///
+	/// In the (current) v1.0 design only ONE ImogenOutput instance exists per
+	/// process (the registry creates exactly one at startup); the static
+	/// pointer simply caches that instance for fast lookup from framework.cpp.
+	static ImogenOutput* get_instance() { return instance_; }
+
 private:
 
 	/// Write the 4 handshake files for the given year using the current
@@ -155,6 +200,21 @@ private:
 	/// Bookkeeping: count of gridcells contributing to accum_year. Useful for
 	/// diagnostic banner at flush time and for F-10 documentation.
 	int accum_gridcell_count;
+
+	// =========================================================================
+	// Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — singleton-pointer
+	// for framework.cpp year_outer to look up the live ImogenOutput instance
+	// =========================================================================
+	//
+	// Mirrors the existing `output_channel` global at outputmodule.h:227. Set
+	// to `this` in ImogenOutput::ImogenOutput() constructor; cleared (set to
+	// nullptr) in ImogenOutput::~ImogenOutput() destructor. Accessed via the
+	// public get_instance() static accessor above.
+	//
+	// In the (current) v1.0 design only ONE ImogenOutput instance exists per
+	// process (the OutputModuleRegistry creates exactly one at startup); the
+	// pointer caches that one instance for fast lookup from framework.cpp.
+	static ImogenOutput* instance_;
 };
 
 }

@@ -12,10 +12,24 @@
 /// \author Daniel Bampoh, 2026-05-06
 ///////////////////////////////////////////////////////////////////////////////////////
 
+// =============================================================================
+// [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — MPI integration]
+//
+// mpi.h must be included BEFORE stdio.h (and transitively before <fstream>
+// via guess.h / shell.h) per the MPI-2 standard SEEK_SET / SEEK_CUR /
+// SEEK_END pre-processor clash. Same discipline as parallel.cpp lines
+// 10-15. Outside #ifdef HAVE_MPI guard, mpi.h is not pulled in and the
+// MPI_Barrier / MPI_Allreduce calls below are stubbed out.
+// =============================================================================
+#ifdef HAVE_MPI
+#include <mpi.h>
+#endif
+
 #include "config.h"
 #include "imogenoutput.h"
 #include "guess.h"
 #include "parameters.h"
+#include "parallel.h"      // GuessParallel::get_rank()
 #include "shell.h"
 
 #include <fstream>
@@ -25,6 +39,16 @@
 #include <sys/types.h>
 
 namespace GuessOutput {
+
+// =============================================================================
+// Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — singleton-pointer
+// static-member definition. Set to `this` in ctor; cleared in dtor. See
+// imogenoutput.h for full design rationale + the singleton-vs-virtual-method
+// design trade-off (we chose singleton to minimise touch surface on the
+// OutputModule abstract base class which would otherwise need a new virtual
+// method + corresponding stubs in 9+ existing output modules).
+// =============================================================================
+ImogenOutput* ImogenOutput::instance_ = nullptr;
 
 // =============================================================================
 // REGISTRATION
@@ -71,16 +95,37 @@ ImogenOutput::ImogenOutput()
 	// No declare_parameter calls -- coupling_mode is registered by imogencfx
 	// (see imogencfx.cpp around line 333+). All paths for this module are
 	// derived from IMOGENConfig::DIR_COMMON at init() time.
+
+	// [Step 17b C2 core 2026-05-11] Register this instance in the singleton
+	// pointer so framework.cpp year_outer can look it up for the explicit
+	// year-boundary flush_year_globally_synchronized() call. Only ONE
+	// ImogenOutput is ever created (per OutputModuleRegistry::create_all_
+	// modules contract), but we still guard against accidental re-creation.
+	instance_ = this;
 }
 
 ImogenOutput::~ImogenOutput() {
 	// Final-year flush. The framework's per-gridcell-outer loop means there
 	// is no "end of year N+1" trigger after the LAST gridcell finishes year
 	// N (its last year). The destructor catches this case at sim-end teardown.
+	//
+	// In year_outer mode (per step 17b C2 core), framework.cpp already calls
+	// flush_year_globally_synchronized() at the end of EVERY year_idx (including
+	// the last one), which sets year_pending=false + accum_year=-1. So this
+	// destructor's flush_year guard is a no-op in that case. The guard is
+	// kept in place for gridcell_outer mode (where it's still the only
+	// final-year flush trigger).
 	if (year_pending && accum_year >= 0) {
 		dprintf("[ImogenOutput] Final-year flush at destructor: year=%d (gridcells_seen=%d)\n",
 		        accum_year, accum_gridcell_count);
 		flush_year(accum_year);
+	}
+
+	// [Step 17b C2 core 2026-05-11] Clear the singleton pointer. After this
+	// returns, get_instance() returns nullptr and any framework.cpp
+	// year_outer flush attempt is silently skipped (defensive null-check).
+	if (instance_ == this) {
+		instance_ = nullptr;
 	}
 }
 
@@ -331,6 +376,142 @@ void ImogenOutput::flush_year(int year) {
 
 	first_flush = false;
 	year_pending = false;
+}
+
+// =============================================================================
+// [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — globally-synchronized
+//  year-boundary flush for year_outer + MPI mode]
+//
+// Sibling to flush_year(). Performs MPI_Allreduce(MPI_SUM) over per-rank flux
+// contributions before delegating the write to flush_year(); only the lead
+// rank (rank 0) actually opens + writes the unified handshake file. All ranks
+// participate in the Allreduce + reset_accumulators afterwards.
+//
+// IN SINGLE-PROCESS MODE (HAVE_MPI undefined OR GuessParallel::parallel false):
+// MPI_Allreduce is skipped; rank-local accumulators ARE the global values when
+// there's only one rank; rank 0 (= self via GuessParallel::get_rank()) writes
+// via the existing flush_year() path. Functionally identical to outannual's
+// implicit year-change-driven flush_year() in single-process — just called
+// explicitly by framework.cpp at year-boundary instead.
+//
+// Sets accum_year=-1 after flush so outannual's subsequent year-change-
+// detection at year+1 cell 0 is suppressed (existing logic at line 118:
+// `if (accum_year >= 0 && this_year != accum_year)` is false when -1 < 0).
+// This avoids double-flush in year_outer mode.
+//
+// Cross-references:
+//   - imogenoutput.h public docstring for flush_year_globally_synchronized
+//     (full design rationale + single-process fallback semantics)
+//   - notes/STEP_17b.md §4.2 (C2 core implementation plan)
+//   - notes/FOLLOWUPS.md F-10 (architectural caveat resolved by this method
+//     in year_outer + MPI mode)
+//   - framework/parallel.cpp (GuessParallel::parallel + get_rank() infrastructure)
+//
+// - DKB 2026-05-11
+// =============================================================================
+void ImogenOutput::flush_year_globally_synchronized(int year) {
+	// =========================================================================
+	// MODE GATE: only "tight" or "prescribed" modes write the handshake files.
+	// Mirror the gate in flush_year (line 213-218) so we exit early in "loose"
+	// mode WITHOUT calling MPI_Allreduce (which would otherwise block other
+	// ranks if any of them have non-loose mode -- but coupling_mode is set
+	// once at .ins-file parse time + shared across ranks, so all ranks agree).
+	// =========================================================================
+	const std::string mode = std::string((char*)IMOGENConfig::coupling_mode);
+	if (mode == "loose") {
+		dprintf("[ImogenOutput] flush_year_globally_synchronized(%d) skipped: coupling_mode='loose'\n", year);
+		// Still need to reset state so outannual doesn't double-fire on year+1 cell 0
+		reset_accumulators();
+		year_pending = false;
+		accum_year   = -1;
+		return;
+	}
+
+	// =========================================================================
+	// MPI Allreduce: aggregate per-rank contributions into per-rank-identical
+	// global values. After this block, every rank has the same accum_* values
+	// (the sum across all ranks). Only rank 0 will then write the file.
+	//
+	// MPI_Initialized() guard pattern mirrors imogencfx.cpp:381 +
+	// imogen_input.cpp:221: queries MPI directly rather than relying on the
+	// `GuessParallel::parallel` flag (which isn't exposed via parallel.h).
+	// =========================================================================
+#ifdef HAVE_MPI
+	{
+		int mpi_initialized_flag = 0;
+		const bool mpi_active =
+		    (MPI_Initialized(&mpi_initialized_flag) == MPI_SUCCESS) &&
+		    (mpi_initialized_flag == 1);
+		if (mpi_active) {
+			// Each rank contributes its local accum_*; MPI_SUM across all
+			// ranks produces the global aggregate. We use MPI_Allreduce so
+			// every rank has the global values (useful for per-rank
+			// diagnostic dprintfs below); the slight extra cost vs MPI_Reduce
+			// is negligible for 4-rank workstation mimic or 16-rank cluster
+			// smoke runs.
+
+			double global_NEE = 0.0, global_CH4 = 0.0, global_N2O = 0.0;
+			double global_area = 0.0;
+			int    global_count = 0;
+
+			MPI_Allreduce(&accum_NEE_kgC,        &global_NEE,   1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			MPI_Allreduce(&accum_CH4_gCH4C,      &global_CH4,   1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			MPI_Allreduce(&accum_N2O_kgN,        &global_N2O,   1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			MPI_Allreduce(&accum_area_m2,        &global_area,  1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+			MPI_Allreduce(&accum_gridcell_count, &global_count, 1, MPI_INT,    MPI_SUM, MPI_COMM_WORLD);
+
+			// Swap globals into accum_* so flush_year() below writes the
+			// globally-aggregated values. The accum_* fields will be reset
+			// shortly anyway via reset_accumulators(), so no need to save+restore.
+			accum_NEE_kgC        = global_NEE;
+			accum_CH4_gCH4C      = global_CH4;
+			accum_N2O_kgN        = global_N2O;
+			accum_area_m2        = global_area;
+			accum_gridcell_count = global_count;
+		}
+	}
+#endif
+
+	// =========================================================================
+	// Lead-rank-only write: avoid race conditions on the shared handshake
+	// file. In single-process mode get_rank() returns 0 -> self writes (correct).
+	// In multi-rank MPI mode, only rank 0 opens + writes the file; the other
+	// ranks proceed directly to reset_accumulators below.
+	// =========================================================================
+	const int rank = GuessParallel::get_rank();
+	if (rank == 0) {
+		// flush_year() handles the actual file open + write + diagnostic
+		// dprintf banner. We rely on it for correctness (mode gate already
+		// passed above; flush_year's mode gate is a redundant safety check).
+		flush_year(year);
+	}
+
+	// =========================================================================
+	// All ranks reset state. After this returns, accum_* are zero +
+	// accum_year=-1 + year_pending=false. outannual's subsequent year-change-
+	// detection on year+1 cell 0 sees accum_year < 0 and skips its own
+	// flush_year() auto-trigger (existing logic at imogenoutput.cpp:118).
+	// =========================================================================
+	reset_accumulators();
+	accum_year   = -1;
+	year_pending = false;
+
+	// Per-rank diagnostic banner (useful for forensic debugging of MPI runs):
+	// non-lead ranks log that they participated in the Allreduce + reset.
+#ifdef HAVE_MPI
+	{
+		int mpi_initialized_flag = 0;
+		const bool mpi_active =
+		    (MPI_Initialized(&mpi_initialized_flag) == MPI_SUCCESS) &&
+		    (mpi_initialized_flag == 1);
+		if (mpi_active && rank != 0) {
+			dprintf("[ImogenOutput rank=%d] flush_year_globally_synchronized(%d): "
+			        "participated in MPI_Allreduce; reset_accumulators done; "
+			        "lead rank wrote the unified handshake file\n",
+			        rank, year);
+		}
+	}
+#endif
 }
 
 void ImogenOutput::reset_accumulators() {

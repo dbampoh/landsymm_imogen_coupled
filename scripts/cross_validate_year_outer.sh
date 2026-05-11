@@ -236,13 +236,89 @@ compare_outputs() {
 
   echo
   echo "================================================================================"
-  echo "SUMMARY: $matches/$total bit-exact matches; $mismatches mismatches"
+  echo "BYTE-EQUALITY SUMMARY: $matches/$total bit-exact matches; $mismatches mismatches"
   echo "================================================================================"
 
+  # =============================================================================
+  # [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — SUBSTANTIVE-VALIDATION
+  #  GATE added after a critical audit finding.]
+  #
+  # The byte-equality check above is NECESSARY but NOT SUFFICIENT for
+  # validating that the year_outer code path produces scientifically
+  # correct output. If both Run A and Run B produce NaN-laden outputs
+  # (e.g., from a config-level issue in the smoke .ins or an LPJG-internal
+  # bug exposed by our -input imogen / -input imogencfx + skip_inprocess_
+  # engine_run = 1 path), the byte-by-byte comparison still reports PASS
+  # because NaN bytes match NaN bytes — but the underlying simulation is
+  # producing garbage.
+  #
+  # This was discovered 2026-05-11 during C2 core mpirun smoke testing:
+  # the C1 close-out at v0.17.0-step17a-c1-year-outer-single-process
+  # passed byte-equality but ALL 4 cross-validation scenarios were producing
+  # NaN-equal-to-NaN outputs. The substantive-validation gap was masked by
+  # the byte-comparison-only harness logic.
+  #
+  # This block adds a substantive-validation gate that scans both runs'
+  # .out files for "nan" tokens and FAILS the validation if any are found.
+  # Until the underlying NaN root cause is fixed (audit item B12; full
+  # context in notes/STEP_17b.md §3a.7 + notes/FOLLOWUPS.md
+  # "Substantive-validation NaN finding (2026-05-11)" + session-2 chat
+  # handoff Part 18), this harness will correctly REFUSE TO PASS — forcing
+  # explicit attention on the science-correctness issue rather than masking
+  # it behind byte-equality-of-garbage.
+  #
+  # NOTE: this gate is intentionally strict. After NaN root cause is
+  # diagnosed + fixed in audit item B12, this gate becomes the GO/NO-GO
+  # check for SUBSTANTIVE validation (both bit-exact AND non-NaN).
+  #
+  # - DKB 2026-05-11
+  # =============================================================================
+  local nan_in_a nan_in_b
+  nan_in_a=$(grep -l -i 'nan' "$RUN_A_DIR"/*.out 2>/dev/null | wc -l)
+  nan_in_b=$(grep -l -i 'nan' "$RUN_B_DIR"/*.out 2>/dev/null | wc -l)
+
+  echo
+  echo "================================================================================"
+  echo "SUBSTANTIVE-VALIDATION (NaN-check) — added 2026-05-11 per audit item B12"
+  echo "================================================================================"
+  echo "Run A .out files containing NaN: $nan_in_a / $n_a"
+  echo "Run B .out files containing NaN: $nan_in_b / $n_b"
+
+  local bit_exact_ok=0
   if [ "$mismatches" -eq 0 ] && [ "$total" -gt 0 ]; then
-    echo "PASS: All .out files are bit-exact between Run A and Run B."
+    bit_exact_ok=1
+  fi
+
+  if [ "$nan_in_a" -gt 0 ] || [ "$nan_in_b" -gt 0 ]; then
+    echo
+    echo "FAIL (substantive-validation): NaN values detected in one or both runs."
+    echo "  Byte-equality check: $([ $bit_exact_ok -eq 1 ] && echo PASS || echo FAIL)"
+    echo "  Non-NaN check      : FAIL ($nan_in_a + $nan_in_b NaN-laden .out files)"
+    echo
+    echo "BACKGROUND: bit-exact byte-equality is necessary but NOT sufficient"
+    echo "for scientific validation. If both Run A and Run B produce NaN-laden"
+    echo "outputs from a config-level or LPJG-internal issue, byte-equality"
+    echo "still passes (NaN bytes match NaN bytes) but the simulation is"
+    echo "producing garbage. This gate refuses to PASS under such conditions."
+    echo
+    echo "See:"
+    echo "  - notes/STEP_17b.md §3a.7 (NaN-finding forensic record + path forward)"
+    echo "  - notes/FOLLOWUPS.md \"Substantive-validation NaN finding (2026-05-11)\""
+    echo "  - session-2 chat handoff Part 18 (full investigation narrative)"
+    echo
+    echo "AUDIT ITEM B12: NaN root-cause investigation + fix (in-v1.0-scope;"
+    echo "bundled with C2 era; CRITICAL PATH for substantively-validated"
+    echo "v0.17.5-step17b-c2-mpi-sync close-out)."
+    echo "================================================================================"
+    return 3
+  fi
+
+  if [ "$bit_exact_ok" -eq 1 ]; then
+    echo
+    echo "PASS (substantive): All .out files are bit-exact AND non-NaN between Run A and Run B."
     return 0
   else
+    echo
     echo "FAIL: $mismatches files differ. Investigate divergences."
     return 2
   fi
