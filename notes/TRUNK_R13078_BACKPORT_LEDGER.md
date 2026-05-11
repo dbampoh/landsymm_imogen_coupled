@@ -1416,6 +1416,42 @@ The Fortran engine source `imogen/code/imogen_lpjg.f` lives outside `lpjguess/` 
 
 ---
 
+### Step 17b (B6 RESOLVED): F-2 Fortran T_anom 2× line count investigation — **subsumed by B10**; backport-IRRELEVANT (no source change)
+
+**Audit-item scope:** B6 = audit item bundling F-2's "investigate Fortran T_anom.dat 2× line count" follow-up (originally 0.5 d budgeted). Per the re-ordered Option A bundle sequence (B10 → **B6** → B2 → B3 → B4 → B1; user-confirmed 2026-05-11), B6 was scheduled to be the cohesive next-step after B10 because both items live in the same `imogen_lpjg.f` writer block.
+
+**Root-cause finding (this commit; docs-only):** the originally-reported 2× line count for T_anom.dat (3262 vs version_A's 1631) is **one of three downstream symptoms of the same alternating-year writer bug B10 mechanically fixed at commit `3c00428`**. The full forensic chain (in `notes/STEP_17b.md` §3c):
+
+1. **T/P/SW/DTEMP_anom.dat doubled to 3262 lines**: pre-B10's `IF(IYEAR.EQ.IYEND)`-gated CLOSE caused units 92/93/94/11 to stay open across the 1871→1872 year boundary. Year-1872 climate writes appended 1631 cells to the still-open year-1871 files.
+2. **WET.dat stuck at 1631 lines (asymmetric)**: mid-1871 OCEAN_FEED block re-OPENs unit 95 to `fa_ocean.dat`, auto-closing the WET.dat connection. Year 1872 cannot append to /1871/WET.dat (already closed).
+3. **fa_ocean.dat contaminated by +1631 WET-format integer rows**: year-1872's `WRITE(95,...) F_WET_CLIM_OUT(IGP,IMM)` (climate writer block) lands on the still-open year-1871 fa_ocean.dat unit. Smoking-gun: lines 10001-11631 of pre-fix `imogen/code/IMOGEN/output/1871/fa_ocean.dat` are exact WET-format `LON LAT + 12 ints`.
+4. **dtemp_o.dat doubled to 508 lines**: same alternating-year mechanism on unit 96.
+
+B10's structural fix (unconditional OPEN/CLOSE per IYEAR iteration; 7 conditional removals) eliminates all four symptoms simultaneously by ensuring year 1872 receives fresh `/1872/`-targeted files with `STATUS='REPLACE'` resetting per iteration.
+
+**Cross-validation:** `version_A/.../IMOGEN/output/1871/` reference shows T/P/SW/DTEMP=1631 lines each, WET=1631, fa_ocean=10000 (clean), dtemp_o=254 — matches the predicted post-B10 structural output exactly.
+
+**What this commit lands:**
+- `notes/STEP_17b.md` (NEW §3c — B6 forensic record + 3-symptom-1-root-cause mechanism + B10-subsumes-B6 determination + verification matrix; §5 bundling table marks B6 ✅ DONE 0.0 d; §7 remaining work refresh)
+- `CHANGELOG.md` (B6 entry above B10)
+- `EXECUTION_PLAN.md` (row 17b status refresh)
+- `notes/FOLLOWUPS.md` (F-2 → CLOSED; B-item bundling table B6 ✅ DONE; new "Operational heuristics" rule #6 — asymmetric multi-year writer scaling triage rule)
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry)
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` (Part 22 narrative; gitignored)
+
+**ZERO Fortran/C++ source change in this commit. Docs-only.**
+
+**Backport Sprint instructions for `trunk_r13078`:**
+
+**N/A.** B6 has no source change to backport. The B10 backport entry (above) already covers all 7 conditional removals at `imogen/code/imogen_lpjg.f` whose application collectively fixes the F-2 / B6 symptom in `trunk_r13078` as well. The Backport Sprint should treat B6 as automatically satisfied once B10 is applied; this entry exists for traceability completeness.
+
+**Cross-references:**
+- `notes/STEP_17b.md` §3c — canonical forensic record (3-symptom pattern, single-root-cause mechanism, B10-subsumes-B6 determination)
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17b-B10 entry (above) — the source-level backport directive that fixes B6 too
+- `notes/FOLLOWUPS.md` F-2 (now CLOSED 2026-05-11) + Operational heuristics rule #6 (asymmetric multi-year writer scaling triage rule)
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

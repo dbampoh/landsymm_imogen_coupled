@@ -30,7 +30,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 | ID | Status | Best timing | Blocks step 17 validation? |
 |---|---|---|---|
 | F-1 | OPEN | At v1.0 release time (~step 19) | No |
-| F-2 | OPEN | Step 9.5b or step 17 | No |
+| F-2 | DONE 2026-05-11 (subsumed by B10 — 2× line count was one of three downstream symptoms of the alternating-year writer bug B10 fixed at `imogen/code/imogen_lpjg.f`; ZERO further code change needed for F-2; forensic at STEP_17b.md §3c) | — | — |
 | F-3 | OPEN | F-12 era (when both engines testable) | No |
 | F-4 | DONE 2026-05-06 | — | — |
 | F-5 | DONE 2026-05-06 | — | — |
@@ -40,7 +40,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 | F-9 | OPEN (refined at step 9.5) | Step 9.5c (or merge with F-12 sprint) | No |
 | F-10 | PARTIALLY RESOLVED (workstation single-process tight: ✅ via F-12 C1 close-out; cluster MPI tight: ⏳ via C2+C3) | Resolved at C1+C2+C3 per Path A 2026-05-09 refinement (Option C only; Option B skipped) | C1 done (✅); C2+C3 still required for full v1.0 |
 | F-11 | OPEN | End of Phase 1 (after step 19; scope expanded by F-12 in-v1.0) | No (paper consistency) |
-| F-12 | **PARTIALLY DONE** — C1 byte-equality ✅ CLOSED (TAGGED `v0.17.0-step17a-c1-year-outer-single-process` 2026-05-10); C1 substantive-validation ✅ CLOSED (B12 RESOLVED 2026-05-11 evening session 3; root cause: `ifcalccton 0` in smoke .ins; fix: `ifcalccton 1 + ifcalcsla 1`; ALL 4 xval scenarios PASS substantive validation); **C2 prep ✅ done** (`1405ada`); **C2 core ✅ done** (`f13b302`; MPI mechanics verified + xval harness hardened); **B12 ✅ done** (`488c5a2`; ~2 hours work); **B10 ✅ DONE** (this commit; symmetric Fortran engine writer fix at `imogen/code/imogen_lpjg.f`; 7 conditional removals = 5 C++ analogues + 2 Fortran-specific extras); **B6+B2+B3+B4+B1 bundles ⏳ NEXT** (~5.5-9.5 d remaining per re-ordered Option A: B6→B2→B3→B4→B1, mechanical-first/physics-port-last); full mpirun -np 4 mimic + close-out tag after bundles; C3 ⏳ after C2 close-out | C1 byte-eq + substantive-eq closed; C2 prep + core done; B12 done; B10 done; **B6+B2+B3+B4+B1 + C2 close-out** (~6.5-11.5 days remaining; tag target `v0.17.5-step17b-c2-mpi-sync`) → C3 (~1-2 weeks SSH iterative; cluster) | C2 close-out + C3 still **Yes** (cluster MPI tight gates on C2 close-out + C3) |
+| F-12 | **PARTIALLY DONE** — C1 byte-equality ✅ CLOSED (TAGGED `v0.17.0-step17a-c1-year-outer-single-process` 2026-05-10); C1 substantive-validation ✅ CLOSED (B12 RESOLVED 2026-05-11 evening session 3; root cause: `ifcalccton 0` in smoke .ins; fix: `ifcalccton 1 + ifcalcsla 1`; ALL 4 xval scenarios PASS substantive validation); **C2 prep ✅ done** (`1405ada`); **C2 core ✅ done** (`f13b302`; MPI mechanics verified + xval harness hardened); **B12 ✅ done** (`488c5a2`; ~2 hours work); **B10 ✅ done** (`3c00428`; symmetric Fortran engine writer fix at `imogen/code/imogen_lpjg.f`; 7 conditional removals = 5 C++ analogues + 2 Fortran-specific extras); **B6 ✅ DONE** (this commit; F-2 Fortran T_anom 2× line count subsumed by B10; ZERO source change; docs-only); **B2+B3+B4+B1 bundles ⏳ NEXT** (~5-7.5 d remaining per re-ordered Option A: B2→B3→B4→B1, mechanical-first/physics-port-last); full mpirun -np 4 mimic + close-out tag after bundles; C3 ⏳ after C2 close-out | C1 byte-eq + substantive-eq closed; C2 prep + core done; B12 done; B10 done; B6 done; **B2+B3+B4+B1 + C2 close-out** (~6-9.5 days remaining; tag target `v0.17.5-step17b-c2-mpi-sync`) → C3 (~1-2 weeks SSH iterative; cluster) | C2 close-out + C3 still **Yes** (cluster MPI tight gates on C2 close-out + C3) |
 | F-13 | OPEN (paper-stage comparative analysis) | Post-v1.0 (post-step-19) | No (paper-stage; not a v1.0-runnable item) |
 
 ### Step-row deferrals (in `EXECUTION_PLAN.md` rows; not in this file)
@@ -79,7 +79,7 @@ with the closing date. Do not delete; the audit trail is valuable.
 | B3 | **Step 9.5b (c)**: C++ engine Tmin/Tmax write in REGRID branch (currently only non-REGRID branch; "TODO at step 9.5b" comment in code). | 0.5 day | STEP_9.5 §3.3 |
 | B4 | **ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion** — 4 file_* declarations + read pipeline + climate.{relhum, u10, tmin, tmax} assignments + extension to the C1.1 year_outer override. Closes the loose-mode-vs-tight-mode 6-vs-10-fields gap discussed 2026-05-10 late evening. | 1 day | User clarification 2026-05-10 late evening; tonight's audit |
 | B5 | **F-9 / step 9.5c**: miscoutput diagnostic outputs (12 file_*_anom params already declared; needs Option A per FOLLOWUPS F-9 refinement: per-month Climate accumulator infrastructure ~50 LOC + create_output_table + outannual outlimit calls). | 1-2 days | STEP_8 §3.5 + STEP_9.5 §3.4 + FOLLOWUPS F-9 |
-| B6 | **F-2**: Fortran T_anom.dat 2× line count investigation + minor fix. Output is structurally sane; format/footprint discrepancy needs explanation + alignment. | 0.5 day | STEP_4 §6 + FOLLOWUPS F-2 |
+| ~~B6~~ ✅ DONE | ~~**F-2**: Fortran T_anom.dat 2× line count investigation + minor fix.~~ ✅ **CLOSED 2026-05-11 night (session 3 continuation)** — subsumed by B10. The 2× line count was one of three downstream symptoms of the alternating-year writer bug B10 mechanically fixed at `imogen/code/imogen_lpjg.f` (commit `3c00428`). ZERO source change for B6. Forensic record at STEP_17b.md §3c. | 0.0 d (subsumed) | STEP_17b.md §3c |
 | B7 | **F-6**: CMIP6 `ql1_patt` unit alignment with IMOGEN's `DRH15M_PAT`. Magnitude differs 1500× at sample cell. Contact upstream (PRIME/Mathison 2025) author + possibly add unit-conversion factor. | 0.5 day | STEP_5 CAVEAT-A + FOLLOWUPS F-6 |
 | B8 | **F-7**: CMIP6 `pstar_patt` units vs CMIP5 `DPSTAR_C_PAT`. 150× magnitude diff + opposite sign at sample cell; likely Pa-vs-hPa unit mismatch (one-line fix). | 0.5 day | STEP_5 CAVEAT-B + FOLLOWUPS F-7 |
 | B9 | **F-8**: CMIP6 wind-magnitude split + precip rain/snow partition refinement (currently `U=V=wind/√2`, `rain=precip/snow=0`). | 0.5-1 day | STEP_5 CAVEAT-B/C + FOLLOWUPS F-8 |
@@ -114,9 +114,10 @@ with the closing date. Do not delete; the audit trail is valuable.
 | REVISED: full v1.0 with engine + input-module symmetry (per 2026-05-11 audit) | ~48-50% | ~50-52% | ~33-37 (median) |
 | FURTHER REVISED (2026-05-11 evening, pre-B12 resolution) | ~40-45% | ~55-60% | ~35-42 (range 27-55+) |
 | REVISED: full v1.0 post-B12 resolution (2026-05-11 evening session 3) | ~52-55% | ~45-48% | ~28-37 (median; range 22-43) |
-| **REVISED: full v1.0 post-B10 closure (2026-05-11 night session 3 continuation)** | **~53-56%** | **~44-47%** | **~27-36 (median; range 21-42)** |
+| REVISED: full v1.0 post-B10 closure (2026-05-11 night session 3 continuation) | ~53-56% | ~44-47% | ~27-36 (median; range 21-42) |
+| **REVISED: full v1.0 post-B6 closure (2026-05-11 night session 3 continuation)** | **~54-57%** | **~43-46%** | **~26.5-35.5 (median; range 21-42)** — B6 saved 0.5 d by collapsing into B10 |
 
-**Adopted estimate going forward (2026-05-11 night session 3 continuation, post-B10 closure)**: **~53-56% done; ~44-47% remaining (~27-36 days median; range 21-42)**. B10 closed in ~0.5 d (the originally-budgeted estimate; matches expectation). The B-item ordering has been refined to **B6 → B2 → B3 → B4 → B1** (mechanical-first, physics-port-last) per user-confirmed Option A 2026-05-11 night. The C1 baseline produces non-NaN scientific output; both engines (in-process C++ port at `climatemodel.cpp` from `7be595a` + standalone Fortran at `imogen_lpjg.f` from this commit) now have the alternating-year writer fix applied symmetrically.
+**Adopted estimate going forward (2026-05-11 night session 3 continuation, post-B6 closure)**: **~54-57% done; ~43-46% remaining (~26.5-35.5 days median; range 21-42)**. B6 closed in 0.0 d (forensically subsumed by B10's structural fix; docs-only commit). The B-item ordering for the remaining items is **B2 → B3 → B4 → B1** (mechanical-first, physics-port-last) per user-confirmed Option A 2026-05-11 night. The C1 baseline produces non-NaN scientific output; both engines (in-process C++ port at `climatemodel.cpp` from `7be595a` + standalone Fortran at `imogen_lpjg.f` from `3c00428`) now have the alternating-year writer fix applied symmetrically; F-2's 2× line count symptom is mechanically eliminated by that same fix.
 
 ### B-item bundling commitment (2026-05-11; locked in at C2 prep; REVISED 2026-05-11 evening to add B12 per substantive-validation NaN finding)
 
@@ -130,7 +131,7 @@ To honour the user's stated condition "tackle ALL items; leave NONE undone", eve
 | B3 | C++ Tmin/Tmax in REGRID branch | 0.5 d | **C2 era (step 17b); B12+B10 ✅ done** | ⏳ pending (after B2) |
 | B4 | ImogenInput Rh/W/Tmin/Tmax consumer wiring expansion | 1 d | **C2 era (step 17b); B12+B10 ✅ done** | ⏳ pending (after B3) |
 | B5 | F-9 / step 9.5c miscoutput diagnostic outputs | 1-2 d | **Step 18** (docs/reproducibility era) | ⏳ pending step 18 |
-| B6 | F-2 Fortran T_anom 2× line count | 0.5 d | **C2 era (step 17b); B12+B10 ✅ done** (sits in same `imogen_lpjg.f` writer block we just touched) | ⏳ **NEXT** (per re-ordered Option A sequence: B10→B6→B2→B3→B4→B1) |
+| **B6** ✅ DONE | ~~F-2 Fortran T_anom 2× line count~~ | 0.0 d (subsumed by B10) | **C2 era (step 17b)** | ✅ **DONE 2026-05-11 night (session 3 continuation; this commit; docs-only)** — forensic determination: the 2× line count is one of three downstream symptoms of the same alternating-year writer bug B10 fixed at `3c00428` (T/P/SW/DTEMP doubled to 3262 lines; WET stuck at 1631 lines due to mid-1871 unit-95 reuse for fa_ocean.dat that auto-closed WET; fa_ocean.dat contaminated by +1631 WET-format integer rows; dtemp_o.dat doubled to 508). Smoking-gun: lines 10001-11631 of pre-fix `fa_ocean.dat` are exact WET-format `LON LAT + 12 ints`. Cross-validation against `version_A/.../IMOGEN/output/1871/` reference (T/P/SW/DTEMP=1631 each, WET=1631, fa_ocean=10000 clean, dtemp_o=254) confirms the predicted post-B10 structural output. ZERO Fortran source change for B6. Backport-IRRELEVANT (no source change; B10 backport entry already covers all 7 gates). See STEP_17b.md §3c. |
 | B7 | F-6 CMIP6 `ql1_patt` unit | 0.5 d | **Step 18** (batched with B8/B9) | ⏳ pending step 18 |
 | B8 | F-7 CMIP6 `pstar_patt` units | 0.5 d | **Step 18** (batched with B7/B9) | ⏳ pending step 18 |
 | B9 | F-8 CMIP6 wind-mag + precip rain/snow | 0.5-1 d | **Step 18** (batched with B7/B8) | ⏳ pending step 18 |
@@ -139,7 +140,7 @@ To honour the user's stated condition "tackle ALL items; leave NONE undone", eve
 | **B13** | **Defensive hardening: fail-fast at `init_cton_limits()` if `cton_leaf_min == 0` (so the trap that caused B12 cannot recur silently)** | **0.5 d** (NEW 2026-05-11 session 3) | **Step 18** (docs/reproducibility era) | ⏳ pending step 18 |
 | **B14** | **One-time `.ins` parity audit vs original codebase(s).** Diff `runs/SSP1-2.6/main_xval_*.ins` (and the imported `global.ins` / `crop_n.ins` / `wetlandpfts.ins` / `imogen_intermediary.ins` chain) against Version A's `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` (and Version B's `landsymm_imogen/SSP1_RCP26/`) `.ins` set. For each parameter that differs: classify as (a) **intentional** (smoke-scale / xval-specific) and document rationale at the parameter site, or (b) **unintentional** (open follow-up). Driven by the B12 lesson: a single `ifcalccton 0` divergence from the inherited `global.ins` baseline produced silent NaNs. Low priority — fix arrived without a full audit — but the audit reduces residual unknown-unknown risk and is cheap to do once. | **0.5-1 d** (NEW 2026-05-11 session 3) | **Step 18** (docs/reproducibility era) — opportunistically usable earlier if any future output anomaly is suspected | ⏳ pending step 18 |
 
-**C2 era combined sprint** (step 17b) — REVISED 2026-05-11 night session 3 continuation (B10 LANDED): C2 core (3-5 d ✅ done) + B12 (~2 hours ✅ done) + **B10 (~0.5 d ✅ done; this commit)** + B6 (0.5 d) + B2 (0.5 d) + B3 (0.5 d) + B4 (1 d) + B1 (3-5 d) = **~5.5-9.5 days remaining** for B-bundles (was 9-13 before B10 closure). Plus C2 close-out (full 4-xval + mpirun -np 4 + tag): ~1-2 d. **Total step 17b remaining: ~6.5-11.5 days.**
+**C2 era combined sprint** (step 17b) — REVISED 2026-05-11 night session 3 continuation (B6 SUBSUMED BY B10 ✅ DONE this commit): C2 core (3-5 d ✅ done) + B12 (~2 hours ✅ done) + B10 (~0.5 d ✅ done at `3c00428`) + **B6 (0.0 d ✅ done; this commit; subsumed by B10)** + B2 (0.5 d) + B3 (0.5 d) + B4 (1 d) + B1 (3-5 d) = **~5-7.5 days remaining** for B-bundles (was 5.5-9.5 before B6 closure; B6 saved 0.5 d). Plus C2 close-out (full 4-xval + mpirun -np 4 + tag): ~1-2 d. **Total step 17b remaining: ~6-9.5 days.**
 **Step 18 bundle**: B5 + B7 + B8 + B9 + B13 + B14 = **~4-6 days**.
 **Step 17d bundle**: B11 = **0.5 day**.
 
@@ -209,6 +210,8 @@ Standing rules of thumb extracted from forensic episodes in this rebuild. Inheri
 
 5. **When in doubt, ask the original codebase what it would have done.** _Origin: B12 closure._ The Version A `.ins` set is the closest-to-canonical reference for the LPJG–IMOGEN coupled run; diff against it before hypothesising LPJ-GUESS internal bugs.
 
+6. **Asymmetric file-size scaling across files written from the SAME loop ⇒ check single-OPEN/CLOSE-gating root cause across a unit-reuse chain.** _Origin: B6 (2026-05-11 session 3 continuation)._ The pre-B10 forensic on `imogen/code/IMOGEN/output/1871/` showed three apparently-unrelated symptoms — T/P/SW/DTEMP doubled to 3262 lines; WET stuck at 1631; fa_ocean contaminated by +1631 WET-format integer rows — that ALL traced to one bug: the alternating-year `IF(IYEAR.EQ.YEAR1)` OPEN gate plus mid-loop unit-95 reuse for `fa_ocean.dat`. Rule of thumb: when a multi-year writer block emits files with **different** scaling factors (some 1×, some 2×, some +δ), suspect a single OPEN/CLOSE gating bug + unit-reuse interleaving rather than chasing each file's discrepancy independently. Check whether `STATUS='REPLACE'` resets each file fresh per year-iteration, and whether mid-loop OPEN of one file on the same unit silently auto-closes the previous file. Before crafting separate fixes for each symptom, **verify whether one structural fix (unconditional per-iteration OPEN/CLOSE) cures all of them**.
+
 ---
 
 ## OPEN
@@ -245,29 +248,17 @@ Standing rules of thumb extracted from forensic episodes in this rebuild. Inheri
 - **Timing**: before the project becomes externally visible (paper
   submission, code release announcement). Not blocking step 5+.
 
-### F-2 — Investigate Fortran writer 2× line count for `T_anom.dat`
+### ~~F-2~~ — _CLOSED 2026-05-11 night session 3 by audit item B6 (subsumed by B10)_
 
-- **Trigger**: step 4 (`notes/STEP_4.md` §6 "Comparison with version_A's
-  1871 output"). Our Fortran's `T_anom.dat` has 3262 lines vs
+- **Original trigger**: step 4 (`notes/STEP_4.md` §6 "Comparison with version_A's
+  1871 output"). Our Fortran's `T_anom.dat` had 3262 lines vs
   `version_A`'s 1631 lines — exactly 2× — at otherwise-similar formatting.
-- **Hypotheses to check**:
-  1. The Fortran writer iterates the cells twice (once for the 1631-cell
-     native grid + once for the 3698-cell extended grid even though
-     `REGRID=.FALSE.`); but 1631 × 2 = 3262, NOT 1631 + 3698 = 5329, so
-     this is unlikely.
-  2. A `NSDMAX`-related sub-day-step write that doubles the row count.
-  3. A genuinely doubled write loop (e.g. write each cell once for
-     the daily-mean and once for some other aggregate).
-  4. version_A's reference was generated with a different (possibly
-     CMIP3 native) grid that genuinely had 1631 cells, while ours is
-     scaling to a different grid.
-- **Where to look**: the per-year writer block in `imogen_lpjg.f` (search
-  for `T_anom.dat` and `OPEN(...)` near the year-end output). Compare
-  line counts against C++ `climatemodel.cpp`'s writer block.
-- **Timing**: low priority. The output is structurally and numerically
-  sane; this is a format/footprint discrepancy, not a physics bug.
-  Schedule against step 9.5 (the parity work where Fortran ↔ C++
-  output formats are reconciled).
+- **Forensic determination (2026-05-11)**: the 2× line count is **one of three downstream symptoms of the same alternating-year writer bug B10 fixed at commit `3c00428`** (not a separate bug). The other two co-symptoms in the same `imogen/code/IMOGEN/output/1871/` directory:
+  1. `WET.dat` stuck at 1631 lines (asymmetric vs T/P/SW/DTEMP) — explained by mid-1871 unit-95 reuse for `fa_ocean.dat` that auto-closes the WET.dat connection at line ~1088 (pre-fix).
+  2. `fa_ocean.dat` at 11631 lines instead of 10000 (extra 1631 lines) — explained by year-1872 `WRITE(95,...) F_WET_CLIM_OUT(IGP,IMM)` appending WET-format integer rows to the still-open year-1871 fa_ocean.dat unit. Smoking-gun: `sed -n '9998,10003p' fa_ocean.dat` shows the float-to-WET-format transition exactly at line 10001.
+- **Cross-validation**: `version_A/.../IMOGEN/output/1871/` reference shows T/P/SW/DTEMP=1631 lines each, WET=1631, fa_ocean=10000 (clean), dtemp_o=254 — matches the predicted post-B10 structural output exactly.
+- **Mechanism**: pre-B10's `IF(IYEAR.EQ.YEAR1)`-gated OPEN + `IF(IYEAR.EQ.IYEND)`-gated CLOSE caused year 1872 of a 2-year engine call to reuse year-1871's still-open units rather than getting fresh `/1872/`-targeted files. B10's unconditional-OPEN-per-IYEAR semantics structurally fix all three symptoms simultaneously.
+- **Resolution**: ZERO Fortran source change for B6. Forensic record at `notes/STEP_17b.md` §3c. Backport-IRRELEVANT (B10's backport entry already covers all 7 gates whose removal collectively fixes the B6 symptom).
 
 ### F-3 — Numerical parity: Fortran ↔ C++ IMOGEN
 

@@ -17,6 +17,94 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-11 (night; session 3) — Step 17b (F-12 sub-milestone C2; **B6 LANDED — subsumed by B10**): F-2 Fortran T_anom 2× line count fully traced to the same alternating-year writer bug B10 fixed (3 symptoms, one root cause); ZERO Fortran source change for B6; un-tagged docs-only checkpoint
+
+This commit closes **audit item B6** (F-2 Fortran T_anom 2× line count investigation) per the re-ordered Option A bundle sequence (B10 → **B6** → B2 → B3 → B4 → B1; user-confirmed 2026-05-11). The forensic determination is that B6 is **fully subsumed by B10** (commit `3c00428`): the originally-reported 2× line count (T_anom.dat = 3262 lines vs version_A's 1631 lines) is **one of three downstream symptoms of the same alternating-year writer bug B10 fixed**.
+
+#### Forensic finding — three symptoms, one root cause
+
+Inspection of the on-disk pre-fix outputs at `imogen/code/IMOGEN/output/1871/` (preserved as a documentation artefact per B10's verification §3b.5) reveals the asymmetric file-count pattern:
+
+| File | Our pre-fix lines | version_A reference | Pattern |
+|---|---:|---:|---|
+| `T_anom.dat` | 3262 | 1631 | **2× — doubled** |
+| `P_anom.dat` | 3262 | 1631 | **2× — doubled** |
+| `SW_anom.dat` | 3262 | 1631 | **2× — doubled** |
+| `DTEMP_anom.dat` | 3262 | 1631 | **2× — doubled** |
+| `WET.dat` | 1631 | 1631 | match (asymmetric vs T) |
+| `fa_ocean.dat` | 11631 | 10000 | **+1631 — contaminated** |
+| `dtemp_o.dat` | 508 | 254 | **2× — doubled** |
+
+**Smoking-gun signature**: tail of pre-fix `fa_ocean.dat` (lines 10001-11631, 1631 rows) shows **WET-format `LON LAT + 12 ints`** content, e.g. ` 281.250  82.500         0         1         1 ...`. Version_A's reference is clean (10000 lines of `0` only).
+
+#### Mechanism — alternating-year unit-95 reuse
+
+In a 2-year engine call (`YEAR1=1871, IYEND=1872`) with the **pre-B10** OPEN/CLOSE gating:
+
+1. **Year 1871**: climate writer OPENs unit 95 → `/1871/WET.dat` with `STATUS='REPLACE'`. Writes 1631 rows. Then OCEAN_FEED block re-OPENs unit 95 → `/1871/fa_ocean.dat` (Fortran auto-closes the existing WET.dat connection); writes 10000 rows. Climate-writer CLOSE statements at year-end were **gated** `IF(IYEAR.EQ.IYEND)` → did NOT fire. Units 92/93/94/95/11 stay open across year boundary. WET.dat is sealed at 1631 (because of the auto-close on unit-95 re-OPEN, not because of the CLOSE gate).
+2. **Year 1872**: every `IF(IYEAR.EQ.YEAR1)`-gated OPEN is **skipped**. Units 92/93/94/11 still connect to `/1871/T_anom.dat` etc.; unit 95 still connects to `/1871/fa_ocean.dat` (NOT to `/1871/WET.dat` — that was auto-closed in step 1). Year-1872 climate writer:
+   - `WRITE(92,...)` → appends 1631 cells to `/1871/T_anom.dat` → **3262 total**
+   - `WRITE(93,...)` → appends 1631 cells to `/1871/P_anom.dat` → **3262 total**
+   - `WRITE(94,...)` → appends 1631 cells to `/1871/SW_anom.dat` → **3262 total**
+   - `WRITE(11,...)` → appends 1631 cells to `/1871/DTEMP_anom.dat` → **3262 total**
+   - `WRITE(95,...) F_WET_CLIM_OUT(IGP,IMM)` → **appends 1631 WET-format integer rows to the still-open `/1871/fa_ocean.dat`** → **11631 total** (the smoking-gun contamination)
+   - DTEMP_O writer on unit 96 → `/1871/dtemp_o.dat` → **508 total**
+   - Climate-writer CLOSE statements fire (`IYEAR.EQ.IYEND=TRUE`) sealing all files.
+3. **`/1872/` directory** receives only the **unconditional** `done` marker (everything else was redirected back to `/1871/`).
+
+So **three symptoms = one bug**: pre-B10's alternating-year OPEN/CLOSE gating prevented year 1872 from receiving fresh per-year file targets; year-1872 writes silently appended to year-1871's still-open units; and the unit-95 mid-1871 reuse for fa_ocean.dat created the WET-vs-fa_ocean asymmetry.
+
+#### Determination — B6 fully fixed by B10's structural change
+
+**B10's structural fix** (`3c00428`, 7 conditional removals) replaces every gated OPEN/CLOSE with unconditional per-IYEAR semantics. Post-B10, year 1872's `STATUS='REPLACE'` OPENs target `/1872/`-paths cleanly; every unit closes at end-of-year. Predicted post-fix output:
+- T/P/SW/DTEMP_anom.dat = 1631 lines per year per file (in BOTH `/1871/` and `/1872/`). 2× doubling **eliminated**.
+- WET.dat = 1631 lines per year per file. Asymmetric-vs-T eliminated.
+- fa_ocean.dat = 10000 lines per year per file. Contamination eliminated.
+- dtemp_o.dat = 254 lines per year per file. Doubling eliminated.
+
+Predicted post-fix structure matches `version_A/.../IMOGEN/output/1871/` reference **exactly** (same file count, same line count per file).
+
+**Therefore B6 requires no additional code change.** It is **subsumed by B10**.
+
+#### Verification
+
+| Check | Method | Result |
+|---|---|---|
+| Empirical pre-fix on-disk pattern | `wc -l imogen/code/IMOGEN/output/1871/*.dat` | ✅ T/P/SW/DTEMP=3262, WET=1631, fa_ocean=11631, dtemp_o=508 — confirms the 3-symptom pattern |
+| version_A reference parity | `wc -l version_A/.../IMOGEN/output/1871/*.dat` | ✅ T/P/SW/DTEMP=1631, WET=1631, fa_ocean=10000, dtemp_o=254 — matches predicted post-B10 structural output |
+| Contamination tail signature | `sed -n '9998,10003p' imogen/code/IMOGEN/output/1871/fa_ocean.dat` | ✅ Lines 10001+ are WET-format `LON LAT + 12 ints` |
+| Static writer-block analysis | `rg 'WRITE\(\s*(11\|92\|93\|94\|95)\s*[,\)]' imogen/code/imogen_lpjg.f` | ✅ Single writer block (lines 1019-1071 REGRID; 1083-1135 non-REGRID); no other doubled-write paths |
+| Loop-structure analysis | Inspect IYEAR loop (lines 485-1189) | ✅ Climate writer fires once per IYEAR via the `(STEP_DAY.EQ.1).AND.(MM.EQ.12).AND.(MD.EQ.30)` gate (MM, MD = PARAMETERs always true; STEP_DAY=1 from settings); no nested loops doubling firings |
+
+**Empirical post-B10 engine smoke deferred** — same reason as B10 (Fortran engine inputs `CEN_IPSL_MOD_IPSL-CM5A-MR/` patterns + `DKB_dataset_totals/` emissions are not currently shipped in the active rebuild). The post-B10 engine smoke that will be staged when B1 (Fortran Rh + Wind COMPUTATION port) lands will simultaneously verify both B10 and B6's predicted post-fix structure.
+
+#### Files changed this commit
+
+| File | Change | Backport-relevance |
+|---|---|---|
+| `notes/STEP_17b.md` | NEW §3c (B6 forensic record: pre-investigation framing, empirical 3-symptom pattern, single-root-cause mechanism, B10-subsumes-B6 determination, verification, code-change=ZERO, lesson-for-future-triage); §5 bundling table marks B6 ✅ DONE (0.0 d, subsumed); §7 remaining work refresh (B2 NEXT); revised C2-era estimate; new dated footer | IRRELEVANT (docs) |
+| `CHANGELOG.md` | This entry (above B10 entry) | IRRELEVANT (docs) |
+| `EXECUTION_PLAN.md` | Row 17b status refresh (B6 ✅) | IRRELEVANT (docs) |
+| `notes/FOLLOWUPS.md` | F-2 entry → CLOSED 2026-05-11 by §3c (B6 subsumed by B10); B-item bundling table (B6 ✅ DONE); status dashboard refresh; "Operational heuristics — lessons learned" rule #6 (asymmetric multi-year writer scaling → check for single OPEN/CLOSE-gating root cause) | IRRELEVANT (docs) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | NEW step-17b-B6 entry: 0 source files; **backport-IRRELEVANT** (no source change; B10 backport entry already covers all 7 gates whose removal collectively fixes the B6 symptom) | IRRELEVANT (docs; the ledger row IS the backport directive) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` | Part 22 narrative (gitignored) | IRRELEVANT (gitignored chat artifact) |
+
+**Net `lpjguess/` source-level change in this commit: ZERO. Net `imogen/` source-level change in this commit: ZERO. Docs-only commit.**
+
+#### Remaining within step 17b after this commit
+
+Per §7 of `notes/STEP_17b.md` (refreshed this commit):
+
+- **B2 ⏳ NEXT** (~0.5 d): Fortran Tmin/Tmax write block (algebraic `Tmin = T - DTEMP/2`).
+- **B3** (~0.5 d): C++ Tmin/Tmax in REGRID branch of `climatemodel.cpp`; closes `// TODO at step 9.5b`.
+- **B4** (~1 d): `ImogenInput` Rh/W/Tmin/Tmax consumer wiring expansion (mirrors C1.1 pattern).
+- **B1** (~3-5 d; heaviest): Fortran Rh + Wind COMPUTATION port from in-process C++ engine to standalone Fortran (~70-100 LOC of Fortran physics).
+- **C2 close-out + tag** `v0.17.5-step17b-c2-mpi-sync`.
+
+**Revised C2-era estimate**: ~6.5-9.5 d remaining (was ~9-13 d at start of session 3; B6 saves 0.5 d by collapsing into B10).
+
+---
+
 ### 2026-05-11 (night; session 3) — Step 17b (F-12 sub-milestone C2; **B10 LANDED**): symmetric Fortran engine writer fix in `imogen/code/imogen_lpjg.f`; 7 conditional removals (empirically refined from originally-documented 5); engines stay in lock-step for engine-mode parity; un-tagged checkpoint
 
 This commit lands **audit item B10** (Symmetric Fortran engine writer fix) on top of the B12-resolution baseline. The standalone Fortran IMOGEN engine (`imogen/code/imogen_lpjg.f`) — canonical for v1.0's `imogen` mode per `EXECUTION_PLAN.md` Decision #2 — carried the same alternating-year writer bug that was fixed in the in-process C++ port (`lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()`) at commit `7be595a`. This commit applies the symmetric mechanical fix to the Fortran engine.
