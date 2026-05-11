@@ -851,10 +851,19 @@ C IMOGEN operated interactively.
         PRINT *,'C_EMISSIONS ',C_EMISSIONS
         IF(SPINUP.EQV..FALSE.) THEN
         !If in the spin-up period then writing to CO2.dat is carried out earlier on in the program
-          IF(IYEAR.EQ.YEAR1) THEN
-            OPEN(91,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'CO2.dat') !Send to DIR_COMMON - TP 13.07.15
-            OPEN(98,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/'//'CO2_all.dat',ACCESS='APPEND')
-          ENDIF
+C [Step 17b (F-N B10 - symmetric Fortran engine writer fix) of
+C  unified-codebase rebuild (2026-05-11): UNCONDITIONAL OPEN per IYEAR
+C  iteration for the CO2.dat + CO2_all.dat writers (units 91, 98).
+C  Symmetric with the C++ in-process port fix at commit 7be595a
+C  (lpjguess/modules/climatemodel.cpp ~line 787). Same root cause +
+C  same fix as the climate-anomalies block at line ~954 below
+C  (canonical doc). Without this fix, the IYEND iteration of each
+C  engine call silently dropped its CO2.dat write because units 91/98
+C  were never opened on that iteration. unit 98 (CO2_all.dat
+C  aggregator; ACCESS='APPEND') similarly: each iteration appends
+C  iyear's entry exactly once. - DKB 2026-05-11]
+          OPEN(91,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'CO2.dat') !Send to DIR_COMMON - TP 13.07.15
+          OPEN(98,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/'//'CO2_all.dat',ACCESS='APPEND')
 
           IF(INCLUDE_CO2.AND.C_EMISSIONS.AND.ANLG.AND.ANOM.AND.
      &     OCEAN_FEED.AND.LAND_FEED) THEN
@@ -880,10 +889,16 @@ C IMOGEN operated interactively.
           ENDIF
         ENDIF
 
-        IF(IYEAR.EQ.IYEND) THEN
-          CLOSE(91)
-          CLOSE(98)
-        ENDIF
+C [Step 17b (F-N B10 - symmetric Fortran engine writer fix) of
+C  unified-codebase rebuild (2026-05-11): UNCONDITIONAL CLOSE per IYEAR
+C  iteration for the CO2.dat + CO2_all.dat units 91, 98. Symmetric with
+C  OPEN block at line ~854 above; closes the per-iteration writes
+C  cleanly so the units are reusable on the next IYEAR iteration.
+C  Symmetric with the C++ in-process port (which uses std::ofstream
+C  RAII so an explicit close is implicit; Fortran requires explicit
+C  CLOSE statements). - DKB 2026-05-11]
+        CLOSE(91)
+        CLOSE(98)
 
 C Write out the climate anomalies here - TP 13.07.15
 
@@ -951,13 +966,61 @@ C             Also want the number of wet days per month as an output
      &       ,LON_OUT,LAT_OUT,DIR_COMMON,THISYEAR,FILE_GRIDLIST)
 
             PRINT *,'Writing regridded anomalies for year: ',IYEAR
-            IF(IYEAR.EQ.YEAR1) THEN
-              OPEN(92,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'T_anom.dat',STATUS='REPLACE')
-              OPEN(93,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'P_anom.dat',STATUS='REPLACE')
-              OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
-              OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
-              OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
-            ENDIF
+C [Step 17b (F-N B10 - symmetric Fortran engine writer fix) of
+C  unified-codebase rebuild (2026-05-11): UNCONDITIONAL OPEN per IYEAR
+C  iteration for the regridded climate-anomaly writers (T/P/SW/WET/DTEMP).
+C  CANONICAL DOC FOR ALL 7 B10 REMOVALS IN THIS FILE.
+C
+C  ROOT-CAUSE FIX: the previous IF(IYEAR.EQ.YEAR1) gate caused IYEND
+C  iterations (year > YEAR1 in 2-year-window engine calls) to silently
+C  skip the file open + writes. Combined with the persistent YEAR1++/
+C  IYEND++ global increment per IYEAR iteration (advancing each call
+C  by one year), each engine call effectively wrote climate data for
+C  ONE year only (the call's YEAR1) while leaving the IYEND year as
+C  an empty placeholder (just a 'done' marker, no climate). Net effect
+C  across calls: ALTERNATING-YEAR staged climate (only ODD years 1871,
+C  1873, ... fully populated; EVEN years 1872, 1874, ... empty).
+C
+C  This bug exists SYMMETRICALLY in two engines:
+C    - lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE() (in-process
+C      C++ port; FIXED at commit 7be595a, 2026-05-10, 5 conditional
+C      removals at lines ~787, ~884, ~963, ~988, ~998); used by
+C      imogencfx mode in v1.0.
+C    - imogen/code/imogen_lpjg.f (standalone Fortran engine; THIS FIX,
+C      7 conditional removals = 5 C++ analogues + 2 Fortran-specific
+C      extras: explicit CO2.dat CLOSE at line ~883 (C++ uses RAII), and
+C      a non-REGRID climate-anomaly OPEN/CLOSE pair at lines ~1013/
+C      ~1071 absent in the C++ port which lacks the REGRID/native-grid
+C      branch); used by imogen mode in v1.0 (canonical IMOGEN engine
+C      for v1.0 per EXECUTION_PLAN.md Decision #2).
+C
+C  FIX: open ALL output files unconditionally per IYEAR iteration.
+C  THISYEAR is already updated per iteration (WRITE(THISYEAR,...) at
+C  line ~833), so each iteration's open targets that iteration's
+C  correct year-folder. Symmetric removals applied at:
+C    - line ~854 (CO2 writer OPEN; was gated IYEAR.EQ.YEAR1)
+C    - line ~883 (CO2 writer CLOSE; was gated IYEAR.EQ.IYEND)
+C    - line ~1013 (non-REGRID climate-anomaly OPEN; was gated YEAR1)
+C    - line ~1071 (climate-anomaly CLOSE for both REGRID branches;
+C                  was gated IYEAR.EQ.IYEND)
+C    - line ~1088 (FA_OCEAN/DTEMP_O OPEN; was gated IYEAR.EQ.YEAR1)
+C    - line ~1099 (FA_OCEAN/DTEMP_O CLOSE; was gated IYEAR.EQ.IYEND)
+C
+C  PRIMARY USE OF FORTRAN ENGINE: engine-only smoke testing + imogen
+C  mode (canonical engine for v1.0). C1.2/C1.3 PASSes verified at
+C  commit 7be595a were on the C++ port; this Fortran fix is for
+C  symmetric correctness so the engines stay in lock-step (per F-3
+C  Fortran<->C++ IMOGEN parity in notes/FOLLOWUPS.md).
+C
+C  Backport-relevant per F-11 + BACKPORT_LEDGER (Fortran source change
+C  in imogen/code/; if trunk_r13078 has this engine file, apply the
+C  same 7 removals mechanically).
+C  - DKB 2026-05-11]
+            OPEN(92,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'T_anom.dat',STATUS='REPLACE')
+            OPEN(93,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'P_anom.dat',STATUS='REPLACE')
+            OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
+            OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
+            OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,NGPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !Advance one line in the output file
@@ -1010,13 +1073,18 @@ C             Also want the number of wet days per month as an output
           ELSE
             !Output in the native IMOGEN grid - TP 06.08.15
             PRINT *,'Writing native-grid anomalies for year: ',IYEAR
-            IF(IYEAR.EQ.YEAR1) THEN
-              OPEN(92,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'T_anom.dat',STATUS='REPLACE')
-              OPEN(93,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'P_anom.dat',STATUS='REPLACE')
-              OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
-              OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
-              OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
-            ENDIF
+C [Step 17b (F-N B10): UNCONDITIONAL OPEN per IYEAR iteration for the
+C  native-grid (non-REGRID) climate-anomaly writers. Same root cause +
+C  same fix as the REGRID OPEN block at line ~954 (canonical doc).
+C  This branch (non-REGRID) has NO C++ analogue: the C++ in-process
+C  port (climatemodel.cpp) writes on a single grid throughout, so this
+C  is one of the 2 Fortran-specific extras vs the C++ fix's 5
+C  removals. - DKB 2026-05-11]
+            OPEN(92,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'T_anom.dat',STATUS='REPLACE')
+            OPEN(93,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'P_anom.dat',STATUS='REPLACE')
+            OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
+            OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
+            OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,GPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LONG(IGP) !Advance one line in the output file
@@ -1068,13 +1136,20 @@ C             Also want the number of wet days per month as an output
             ENDDO
           ENDIF !End of REGRID conditional
 
-          IF(IYEAR.EQ.IYEND) THEN
-            CLOSE(92)
-            CLOSE(93)
-            CLOSE(94)
-            CLOSE(95)
-            CLOSE(11)
-          ENDIF
+C [Step 17b (F-N B10): UNCONDITIONAL CLOSE per IYEAR iteration for
+C  T/P/SW/WET/DTEMP units (11, 92, 93, 94, 95). Symmetric with OPEN
+C  blocks at lines ~954 (REGRID branch) + ~1013 (non-REGRID branch);
+C  closes the per-iteration writes cleanly so units are reusable on
+C  the next IYEAR iteration. Symmetric with the C++ in-process port
+C  CLOSE fix at commit 7be595a (climatemodel.cpp ~line 963; C++ uses
+C  std::ofstream RAII so its close is implicit, but the Fortran units
+C  require explicit CLOSE to avoid carrying stale file-position state
+C  forward). - DKB 2026-05-11]
+          CLOSE(92)
+          CLOSE(93)
+          CLOSE(94)
+          CLOSE(95)
+          CLOSE(11)
 
           !Write a temporary file to tell LPJ-GUESS that IMOGEN has completed writing the climate files - TP 29.07.15
           OPEN(97,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'done',STATUS='REPLACE')
@@ -1085,10 +1160,17 @@ C             Also want the number of wet days per month as an output
 C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
 
         IF(OCEAN_FEED) THEN
-          IF(IYEAR.EQ.YEAR1) THEN
-            OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'fa_ocean.dat')
-            OPEN(96,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'dtemp_o.dat')
-          ENDIF
+C [Step 17b (F-N B10): UNCONDITIONAL OPEN per IYEAR iteration for the
+C  FA_OCEAN/DTEMP_O restart files (units 95, 96). Same root cause +
+C  same fix as the climate-anomalies block at line ~954 (canonical
+C  doc). Per-year writes ensure restart from any year is possible
+C  (vs only-YEAR1 with the previous gate). Symmetric with the C++
+C  in-process port fix at commit 7be595a (climatemodel.cpp ~line 988).
+C  NOTE: this block reuses unit 95 already CLOSE'd at line ~1071
+C  above; reopening here for the ocean feedback writer is intentional
+C  (different file path: fa_ocean.dat vs WET.dat above). - DKB 2026-05-11]
+          OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'fa_ocean.dat')
+          OPEN(96,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'dtemp_o.dat')
           DO IGP=1,NFARRAY
             WRITE(95,*) FA_OCEAN(IGP)
           ENDDO
@@ -1096,10 +1178,12 @@ C Write out FA_OCEAN and DTEMP_O here, to allow restart - TP 13.07.15
             WRITE(96,*) DTEMP_O(IGP)
           ENDDO
         ENDIF
-        IF(IYEAR.EQ.IYEND) THEN
-          CLOSE(95)
-          CLOSE(96)
-        ENDIF
+C [Step 17b (F-N B10): UNCONDITIONAL CLOSE per IYEAR iteration for
+C  units 95 (fa_ocean.dat) + 96 (dtemp_o.dat). Symmetric with OPEN
+C  block at line ~1088 above; symmetric with C++ fix at commit
+C  7be595a (climatemodel.cpp ~line 998). - DKB 2026-05-11]
+        CLOSE(95)
+        CLOSE(96)
 
         CALL FLUSH(6)
       ENDDO !End of IYEAR loop

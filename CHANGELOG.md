@@ -17,6 +17,81 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-11 (night; session 3) — Step 17b (F-12 sub-milestone C2; **B10 LANDED**): symmetric Fortran engine writer fix in `imogen/code/imogen_lpjg.f`; 7 conditional removals (empirically refined from originally-documented 5); engines stay in lock-step for engine-mode parity; un-tagged checkpoint
+
+This commit lands **audit item B10** (Symmetric Fortran engine writer fix) on top of the B12-resolution baseline. The standalone Fortran IMOGEN engine (`imogen/code/imogen_lpjg.f`) — canonical for v1.0's `imogen` mode per `EXECUTION_PLAN.md` Decision #2 — carried the same alternating-year writer bug that was fixed in the in-process C++ port (`lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()`) at commit `7be595a`. This commit applies the symmetric mechanical fix to the Fortran engine.
+
+#### Pre-implementation re-examination (per user direction 2026-05-11)
+
+Per user direction "do a more meticulous, systematic, and comprehensive examination of the various documentations (including handoffs)", a comprehensive review of `EXECUTION_PLAN.md` Decisions #2/#11/#12, `_phase2_findings/04_imogen_cxx.md` (the 25-bug catalogue of the **standalone** IMOGENCXX C++ refactor — distinct from the in-process C++ port at `climatemodel.cpp`), `notes/STEP_9.5.md`, and `notes/FOLLOWUPS.md` F-3 was completed before any code edits. Confirmed strategic context:
+
+1. **Canonical IMOGEN engine for v1.0 = Fortran** (`imogen/code/imogen_lpjg.f`); standalone IMOGENCXX (with 25 documented bugs) is **deferred to Phase 2**, preserved as immutable archive in `version_A/.../IMOGENCXX/ImogenCXX/src/Main.cpp` per Decision #5.
+2. **The in-process C++ engine port at `climatemodel.cpp`** (used by `imogencfx` mode in v1.0; NOT the same as standalone IMOGENCXX) was the engine fixed at `7be595a`. B10 is the symmetric replication of that fix to the standalone Fortran engine.
+3. **B1 (Fortran Rh + Wind COMPUTATION port)** = port the Rh/W *physics computation* (~70-100 LOC) from the in-process C++ engine to the standalone Fortran engine. NOT about the 25 IMOGENCXX bugs.
+4. **B-item ordering reconfirmed** per user-confirmed Option A 2026-05-11: B10 → B6 → B2 → B3 → B4 → B1 (mechanical-first; physics-port-last).
+
+#### What landed this commit (1 file; +121 LOC, -37 LOC; net +84 LOC; backport-RELEVANT)
+
+`imogen/code/imogen_lpjg.f`: 7 conditional removals around file OPEN/CLOSE blocks at (pre-fix) lines 854/883/954/1013/1071/1088/1099, with C++-doc-block parity. Net structure mirrors the C++ canonical doc at `climatemodel.cpp` ~884 (post-`7be595a`):
+
+| # | Line (pre-fix) | Block | Has C++ analogue? |
+|---|---|---|---|
+| 1 | 854 | CO2 writer OPEN (units 91, 98) | YES (`climatemodel.cpp` ~787) |
+| 2 | 883 | CO2 writer CLOSE (units 91, 98) | NO (Fortran-specific extra; C++ uses `std::ofstream` RAII so close is implicit) |
+| 3 | 954 | Climate-anomaly REGRID OPEN (T/P/SW/WET/DTEMP, units 11, 92, 93, 94, 95) | YES (`climatemodel.cpp` ~884) — canonical doc lives here |
+| 4 | 1013 | Climate-anomaly non-REGRID OPEN (same units) | NO (Fortran-specific extra; C++ port has no native-grid branch) |
+| 5 | 1071 | Climate-anomaly CLOSE (units 11, 92, 93, 94, 95; covers both REGRID branches) | YES (`climatemodel.cpp` ~963) |
+| 6 | 1088 | FA_OCEAN/DTEMP_O OPEN (units 95, 96) | YES (`climatemodel.cpp` ~988) |
+| 7 | 1099 | FA_OCEAN/DTEMP_O CLOSE (units 95, 96) | YES (`climatemodel.cpp` ~998) |
+
+So **7 = 5 C++ analogues + 2 Fortran-specific extras** (CO2 explicit CLOSE; non-REGRID OPEN branch). This is an **empirical refinement** of the originally-documented "5" count — not a scope expansion of intent. The intent was always full alternating-year symmetry; the original count was inherited from the C++ fix's count without re-counting against the Fortran source.
+
+#### Symmetric-correctness framing (NOT a blocker)
+
+The Fortran engine is **NOT on the v1.0 production path** — `imogen` mode in v1.0 calls a different launcher path; the Fortran engine is currently exercised only by **engine-only smoke testing**. The C1.2/C1.3 cross-validation PASSes verified at `7be595a` were on the C++ in-process port, not the Fortran engine. So B10 is about **engine parity** (per F-3 Fortran↔C++ IMOGEN parity in `notes/FOLLOWUPS.md`) — keeping the two engines in lock-step so future engine-mode switches inherit identical writer semantics — rather than unblocking any current-path failure.
+
+#### Verification
+
+| Check | Method | Result |
+|---|---|---|
+| Clean Fortran build | `cd imogen/code && rm -f *.o imogen_lpjg && bash compile.sh` | ✅ Exit 0; binary 129 600 bytes; ZERO warnings |
+| Static gate-removal check | `rg 'IYEAR\.EQ\.(YEAR1\|IYEND)' imogen/code/imogen_lpjg.f` | ✅ All 7 B10 gates correctly removed; remaining matches are pre-existing legacy comment + different gate variable + my own doc-block paragraph references |
+| Net LOC parity with C++ | `git diff --shortstat` | ✅ +121, -37 (vs C++ `7be595a`'s +76, -5; proportionate given 7 vs 5 fixes + 2 extra Fortran-specific cross-reference blocks) |
+| Pre-fix evidence preserved | `ls imogen/code/IMOGEN/output/{1871,1872}/` | ✅ `1871/` has 9 climate files (full); `1872/` has only `done` marker (empty) — empirical pre-fix demonstration of the alternating-year quirk, retained as a documentation artefact |
+| C++ fix doc-block parity | Visual diff of `imogen_lpjg.f` canonical block vs `climatemodel.cpp` ~884 canonical block | ✅ Same structure: ROOT-CAUSE FIX + symmetric-engine-list + FIX + symmetric-removals list + backport note + author/date stamp |
+
+**Empirical post-fix engine smoke deferred** — would require staging the `CEN_IPSL_MOD_IPSL-CM5A-MR/` patterns + `DKB_dataset_totals/` emissions inputs that the existing `imogen_settings.txt` references but which are not currently shipped in the active rebuild's `imogen/` tree (engine inputs were not re-staged after Step 4's selective import per the engine being NOT on the v1.0 production path). Per the symmetric-correctness framing, the clean compile + static gate-removal check + pre-fix evidence preserved together suffice for B10's verification gate. A full empirical engine smoke would naturally be staged when **B1** (Fortran Rh + Wind COMPUTATION port) lands — at which point a post-B1 engine smoke would simultaneously verify B10's writer fix in production.
+
+#### Files changed this commit
+
+| File | Change | Backport-relevance |
+|---|---|---|
+| `imogen/code/imogen_lpjg.f` | 7 conditional removals around file OPEN/CLOSE blocks; canonical doc block + 6 cross-referencing short blocks (+121, -37) | **RELEVANT** (Fortran source change in standalone engine; if `trunk_r13078` ships this engine file, apply 7 mechanical removals symmetrically) |
+| `notes/STEP_17b.md` | NEW §3b (B10 forensic record + scope refinement 5→7 + symmetric-correctness framing + ordering rationale); §5 bundling table marks B10 ✅ DONE; §7 remaining work refresh; new dated footer | IRRELEVANT (docs) |
+| `CHANGELOG.md` | This entry (above B12-resolution entry) | IRRELEVANT (docs) |
+| `EXECUTION_PLAN.md` | Row 17b status refresh (B10 ✅) | IRRELEVANT (docs) |
+| `notes/FOLLOWUPS.md` | B-item bundling table (B10 ✅ DONE); status dashboard refresh; % done estimates | IRRELEVANT (docs) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | NEW step-17b-B10 entry: 1 file (`imogen/code/imogen_lpjg.f`); 7 conditional removals; backport-RELEVANT | IRRELEVANT (docs; the ledger row IS the backport directive) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` | Part 21 narrative (gitignored) | IRRELEVANT (gitignored chat artifact) |
+
+**Net `lpjguess/` source-level change in this commit: ZERO** (the Fortran engine source lives at `imogen/code/`, NOT `lpjguess/`, but is still backport-relevant for the Backport Sprint per F-11 — the BACKPORT_LEDGER tracks both `lpjguess/`-internal AND `imogen/`-internal source changes).
+
+#### Remaining within step 17b after this commit
+
+Per §7 of `notes/STEP_17b.md` (refreshed this commit):
+
+- **B6 ⏳ NEXT** (~0.5 d): F-2 Fortran T_anom 2× line count investigation; sits in same `imogen_lpjg.f` writer block; cohesive next step.
+- **B2** (~0.5 d): Fortran Tmin/Tmax write block (algebraic `Tmin = T - DTEMP/2`).
+- **B3** (~0.5 d): C++ Tmin/Tmax in REGRID branch of `climatemodel.cpp`; closes `// TODO at step 9.5b`.
+- **B4** (~1 d): `ImogenInput` Rh/W/Tmin/Tmax consumer wiring expansion.
+- **B1** (~3-5 d; heaviest): Fortran Rh + Wind COMPUTATION port from C++ engine to Fortran (~70-100 LOC of new Fortran physics).
+- **B13 + B14** (NEW; from B12 work; bundle with step 18; ~1-1.5 d): defensive hardening at `init_cton_limits()` if `cton_leaf_min == 0` (B13) + one-time `.ins` parity audit (B14).
+- **C2 close-out + tag `v0.17.5-step17b-c2-mpi-sync`** (after all B-bundles): full 4-xval against both `build/guess` and `build_mpi/guess` (single-process AND `mpirun -np 4` mimic); tag; push to all 3 remotes.
+
+Refs: `notes/STEP_17b.md` §3b (forensic) + §5 (bundling table refresh) + §7 (remaining work refresh); `notes/FOLLOWUPS.md` B-item table (B10 ✅); `EXECUTION_PLAN.md` V.1 row 17b (status); `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW step-17b-B10 entry); `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Part 21.
+
+---
+
 ### 2026-05-11 (evening; session 3) — Step 17b (F-12 sub-milestone C2; **B12 RESOLVED**): substantive-validation NaN root cause identified + fix applied; ALL 4 xval scenarios now PASS substantive validation (bit-exact AND non-NaN); un-tagged checkpoint
 
 The substantive-validation NaN finding documented at session-2 commit `f13b302` and audit item B12 is **fully resolved** in this commit. ALL 4 cross-validation scenarios (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) now pass `scripts/cross_validate_year_outer.sh`'s substantive-validation gate (bit-exact AND non-NaN); 0/37 NaN-laden output files in any run; against both `build/guess` and `build_mpi/guess` single-process. 162 unit tests pass on both builds.

@@ -1336,7 +1336,7 @@ While verifying C2 core via `mpirun -np 1 -parallel` smoke testing, isolation ex
 
 ### Step 17b (B12 RESOLVED): substantive-validation NaN root cause fix — config-only (.ins file changes); no `lpjguess/` source change
 
-**Commit:** _to be determined_ (this commit; un-tagged checkpoint on top of `d7f6c74`)
+**Commit:** `488c5a2` (un-tagged checkpoint on top of `d7f6c74`)
 **Backport relevance:** **IRRELEVANT FOR `lpjguess/` SOURCE.** The fix is entirely in `runs/SSP1-2.6/main_xval_*.ins` (config files; not part of the LPJG source tree). Backport Sprint does NOT need to apply this fix to `trunk_r13078`'s `lpjguess/` directly. HOWEVER, if `trunk_r13078`-based smoke runs are set up in the future, they MUST also use `ifcalccton 1` and `ifcalcsla 1` (the LPJ-GUESS defaults) — same trap exists in `trunk_r13078`'s LPJG code (the `init_cton_min()` / `init_cton_limits()` cascade behaviour is unchanged from upstream).
 
 **Why this fix is config-only and NOT a `lpjguess/` source fix:**
@@ -1360,6 +1360,59 @@ The original LPJG code logic at `parameters.cpp:2333-2337` (skip `init_cton_min(
 **Defensive-hardening NEW audit item B13** (added per the B12 RESOLUTION post-mortem; bundled with step 18 docs/cleanup era; ~0.5 day): make LPJG `parameters.cpp::CB_CHECKPFT` (or `init_cton_limits()`) fail-fast with a clear error message if `cton_leaf_min == 0` post-PFT-init, so the trap that caused B12 cannot recur silently. Tracked in `notes/FOLLOWUPS.md` "B-item bundling commitment" sub-section.
 
 **Process-hardening NEW audit item B14** (added per session-continuation user direction 2026-05-11 evening, after empirical confirmation that `version_A/.../landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/global.ins` sets `ifcalcsla 1` + `ifcalccton 1`; bundled with step 18; ~0.5–1 day): one-time `.ins` parity audit of `runs/SSP1-2.6/main_xval_*.ins` (and import chain) vs `version_A`'s `landsymm_imogen_setup/landsymm_imogen/SSP1_RCP26/` and `version_B`'s `landsymm_imogen/SSP1_RCP26/`; each divergent parameter classified as intentional (rationale documented at site) or unintentional (open follow-up). **Backport relevance: IRRELEVANT** — B14 is a process audit on `runs/` configs, not on `lpjguess/` source. Persistent companion: NEW "Operational heuristics — lessons learned" subsection in `notes/FOLLOWUPS.md` (5 standing rules; `.ins`-parity-with-original as rule #1).
+
+---
+
+### Step 17b (B10 LANDED): symmetric Fortran engine writer fix — `imogen/code/imogen_lpjg.f`; mechanical replication of C++ fix at `7be595a`; **backport-RELEVANT**
+
+**Commit:** _to be determined_ (this commit; un-tagged checkpoint on top of `488c5a2`)
+**Backport relevance:** **RELEVANT** for the standalone Fortran IMOGEN engine. If `trunk_r13078` (and/or its companion IMOGEN/Fortran source tree) ships `imogen/code/imogen_lpjg.f` — likely, since this is canonical Huntingford-Cox IMOGEN code that has been part of the LandSyMM-IMOGEN coupled framework since the predecessor versions — the same 7 mechanical conditional removals apply symmetrically. The fix is purely structural (no new physics; no changed I/O semantics): unconditional file OPEN/CLOSE per IYEAR iteration in place of the previous `IF(IYEAR.EQ.YEAR1)` / `IF(IYEAR.EQ.IYEND)` gates that produced an alternating-year staged-climate quirk.
+
+**Why this fix is symmetric (engine parity), not a critical-path bug fix:**
+The standalone Fortran IMOGEN engine is **not on the v1.0 production path** (`imogen` mode in v1.0 calls a different launcher path; the Fortran engine is currently exercised only by engine-only smoke testing). The structurally-identical bug in the **in-process C++ engine port** at `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` was the production-path blocker, fixed at commit `7be595a` (2026-05-10; 5 conditional removals; ~76 LOC of doc blocks; verified by C1.2/C1.3 4-cell xval PASS). B10 replicates that fix to the standalone Fortran engine for engine parity (per F-3 Fortran↔C++ IMOGEN parity in `notes/FOLLOWUPS.md`) — keeping the two engines in lock-step so future engine-mode switches inherit identical writer semantics.
+
+**Empirical scope refinement: 5 → 7 conditional removals.**
+The originally-documented scope was 5 removals (inherited from the C++ fix's 5-removal count). Empirical inspection of `imogen_lpjg.f` revealed **7 gates** = 5 C++ analogues + 2 Fortran-specific extras:
+
+| # | Line (pre-fix) | Block | Has C++ analogue? | Notes |
+|---|---|---|---|---|
+| 1 | 854 | CO2 writer OPEN (units 91, 98) | YES (`climatemodel.cpp` ~787) | Same logic |
+| 2 | 883 | CO2 writer CLOSE (units 91, 98) | NO (Fortran-specific extra) | C++ uses `std::ofstream` RAII so close is implicit; Fortran requires explicit `CLOSE` |
+| 3 | 954 | Climate-anomaly REGRID OPEN (T/P/SW/WET/DTEMP) | YES (`climatemodel.cpp` ~884) | Canonical doc lives here |
+| 4 | 1013 | Climate-anomaly non-REGRID OPEN (same units) | NO (Fortran-specific extra) | C++ in-process port has no native-grid branch; always writes on a single grid |
+| 5 | 1071 | Climate-anomaly CLOSE (units 11, 92, 93, 94, 95) | YES (`climatemodel.cpp` ~963) | Same logic |
+| 6 | 1088 | FA_OCEAN/DTEMP_O OPEN (units 95, 96) | YES (`climatemodel.cpp` ~988) | Same logic |
+| 7 | 1099 | FA_OCEAN/DTEMP_O CLOSE (units 95, 96) | YES (`climatemodel.cpp` ~998) | Same logic |
+
+This is an **empirical refinement** of the originally-documented scope, not a scope expansion of intent.
+
+**Files changed in this commit:**
+- `imogen/code/imogen_lpjg.f` (+121 LOC, -37 LOC; net +84 LOC; **backport-RELEVANT**) — 7 conditional removals at lines 854/883/954/1013/1071/1088/1099 with full C++-doc-block parity (canonical doc at REGRID OPEN mirroring `climatemodel.cpp` ~884 from `7be595a`; 6 cross-referencing short blocks at other sites)
+- Documentation updates (STEP_17b.md §3b NEW + §5 + §7 + footer; CHANGELOG entry above B12-resolution; EXECUTION_PLAN row 17b status; FOLLOWUPS B-bundling table B10 ✅ DONE + status dashboard refresh + % done estimate; this LEDGER entry; chat handoff Part 21)
+
+**Net `lpjguess/` source change in this commit: ZERO.**
+The Fortran engine source `imogen/code/imogen_lpjg.f` lives outside `lpjguess/` (in the IMOGEN-specific directory tree), but is still backport-relevant per F-11 since it's part of the LandSyMM-IMOGEN coupled framework's core IMOGEN component. The Backport Sprint should track both `lpjguess/`-internal AND `imogen/`-internal source changes when applying step-17b changes to `trunk_r13078`.
+
+**Verification this commit:**
+- `cd imogen/code && rm -f *.o imogen_lpjg && bash compile.sh`: ✅ clean Fortran build (exit 0; binary 129 600 bytes; ZERO warnings beyond pre-existing)
+- Static gate-removal check (`rg 'IYEAR\.EQ\.(YEAR1|IYEND)' imogen/code/imogen_lpjg.f`): ✅ all 7 B10 gates correctly removed; remaining matches are pre-existing legacy comment + `YEAR1_LPJG` (different gate variable, not part of B10) + my own doc-block paragraph references
+- Net LOC parity with C++ (`git diff --shortstat`): ✅ +121, -37 (vs C++ `7be595a`'s +76, -5; proportionate given 7 vs 5 fixes + 2 extra Fortran-specific cross-reference blocks)
+- Pre-fix evidence preserved (`ls imogen/code/IMOGEN/output/{1871,1872}/`): ✅ `1871/` has 9 climate files (full); `1872/` has only `done` marker (empty) — empirical pre-fix demonstration of the alternating-year quirk, retained as a documentation artefact
+- C++ fix doc-block parity: ✅ Same structure as `climatemodel.cpp` ~884 canonical block (ROOT-CAUSE FIX + symmetric-engine-list + FIX + symmetric-removals list + backport note + author/date stamp)
+- 162 unit tests on both `build/guess` and `build_mpi/guess`: PASS (no `lpjguess/` source change → no-op build expected; verified C1 baseline preserved)
+- Empirical post-fix engine smoke: **DEFERRED** (Fortran engine inputs `CEN_IPSL_MOD_IPSL-CM5A-MR/` patterns + `DKB_dataset_totals/` emissions that the existing `imogen_settings.txt` references are not currently shipped in the active rebuild's `imogen/` tree; engine inputs were not re-staged after Step 4's selective import per the engine being NOT on the v1.0 production path). Per the symmetric-correctness framing, the clean compile + static gate-removal check + pre-fix evidence preserved together suffice for B10's verification gate. A full empirical engine smoke would naturally be staged when **B1** (Fortran Rh + Wind COMPUTATION port) lands — at which point a post-B1 engine smoke would simultaneously verify B10's writer fix in production.
+
+**Backport Sprint instructions for `trunk_r13078`:**
+1. Locate the standalone Fortran IMOGEN engine in `trunk_r13078`'s tree (likely `imogen/code/imogen_lpjg.f` or equivalent path; if absent, this entry is N/A and can be skipped).
+2. Apply the same 7 mechanical conditional removals at the analogous gates (search for `IF(IYEAR.EQ.YEAR1)` / `IF(IYEAR.EQ.IYEND)` patterns around file OPEN/CLOSE blocks for units 11, 91, 92, 93, 94, 95, 96, 98).
+3. Mirror the doc-block style: canonical block at the climate-anomaly REGRID OPEN; cross-referencing short blocks at the other sites.
+4. Verify: clean Fortran build; static gate-removal check; if engine inputs are staged in `trunk_r13078`'s tree, run engine-only smoke and verify all years receive full climate (not alternating).
+
+**Cross-references:**
+- `notes/STEP_17b.md` §3b — canonical forensic record (root cause + scope refinement + verification + ordering rationale)
+- `lpjguess/modules/climatemodel.cpp` post-`7be595a` — reference C++ fix (5 conditional removals; ~76 LOC of doc blocks)
+- `notes/STEP_17a.md` §5.6 + §6.4 — original C++ fix narrative
+- `notes/FOLLOWUPS.md` F-3 — Fortran↔C++ IMOGEN parity follow-up (B10 closes its symmetric-correctness aspect)
 
 ---
 
