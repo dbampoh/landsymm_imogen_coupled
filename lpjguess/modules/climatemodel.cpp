@@ -239,6 +239,25 @@ int RUN_IMOGEN_ENGINE() {
     bool nonco2Emissions = IMOGENConfig::NONCO2_EMISSIONS;
     bool nonco2EmissionsLpjg = IMOGENConfig::NONCO2_EMISSIONS_LPJG;
     bool co2RfFair = IMOGENConfig::CO2_RF_FAIR;
+    // [Step 17b (F-12 sub-milestone C2; B3 LANDED) ù close-by-architectural-
+    //  reframing: this `regrid` local is currently DEAD CODE ù declared but
+    //  never read inside RUN_IMOGEN_ENGINE(). The C++ in-process engine port
+    //  has only ONE climate-anomaly writer block (the native-IMOGEN-grid
+    //  branch at line ~890 below); there is no `if (regrid) { ... } else
+    //  { ... }` switch. The Fortran standalone engine (imogen/code/
+    //  imogen_lpjg.f lines ~962-1117) is what has the genuine
+    //  `IF (REGRID) THEN ... ELSE ... ENDIF` branch built around CALL
+    //  REGRID_CLIM; that REGRID_CLIM helper was never ported to C++. If a
+    //  future change adds a REGRID branch to this C++ port (e.g., during
+    //  F-11 Backport Sprint, Phase-2 IMOGENCXX parity work, or any other
+    //  future REGRID feature add), `regrid` will become live and Tmin/Tmax
+    //  writers MUST be added there per B2 pattern (see canonical B3 doc
+    //  block at line ~890 below + notes/STEP_17b.md ù3e). Until that
+    //  happens, IMOGENConfig::REGRID is silently a no-op in this port (the
+    //  imogencfx mode that uses this engine always writes on the native
+    //  IMOGEN grid). A defensive runtime warning when REGRID==true is
+    //  recommended as a follow-up (B13-style defensive hardening; not
+    //  bundled with B3 to keep B3 docs-only). - DKB 2026-05-12]
     bool regrid = IMOGENConfig::REGRID;
     bool lImpacts = false; // Not used, set to false
     bool firstCall = IMOGENConfig::FIRSTCALL;
@@ -887,12 +906,90 @@ int RUN_IMOGEN_ENGINE() {
                     }
                 }
 
-                // Output in native IMOGEN grid
+                // Output in native IMOGEN grid (the ONLY climate-anomaly writer
+                // branch in this C++ in-process port ó see B3 canonical doc
+                // block below for the architectural rationale).
                 std::cout << "Writing native-grid anomalies for year: " << iyear << "\n";
                 // [Step 9.5: file100/file101 added for Tmin_anom.dat / Tmax_anom.dat
-                //  (computed as T -/+ DTEMP/2 per cell x month x sub-day step).
-                //  TODO at step 9.5b: replicate this in the REGRID branch.
+                //  (computed as T -/+ DTEMP/2 per cell x month x sub-day step;
+                //  Decision #11 algebra ó same Kelvin units as T_anom).
                 //  - DKB 2026-05-07]
+                //
+                // [Step 17b (F-12 sub-milestone C2; B3 LANDED 2026-05-12) ó CANONICAL
+                //  B3 DOC BLOCK; close-by-architectural-reframing.
+                //
+                //  HISTORY OF THE PRIOR `// TODO at step 9.5b: replicate this in
+                //  the REGRID branch.` comment (now removed): when step 9.5
+                //  introduced file100/file101 above (Tmin/Tmax derived per
+                //  Decision #11), the author left a forward-reference TODO
+                //  anticipating that a C++ REGRID branch ó analogous to the
+                //  Fortran engine's IF (REGRID) THEN ... ELSE ... ENDIF block
+                //  at imogen/code/imogen_lpjg.f lines ~962-1117 ó would later
+                //  be added here, and that when it was, Tmin/Tmax writers
+                //  would need replicating in the new branch.
+                //
+                //  FORENSIC FINDING (2026-05-12; full forensic in notes/STEP_17b.md
+                //  ß3e + this B3 commit): the anticipated C++ REGRID branch was
+                //  never built. This C++ in-process port has only ONE
+                //  climate-anomaly writer branch: the native-IMOGEN-grid block
+                //  immediately below. Evidence: (a) `bool regrid` declared at
+                //  line ~242 above is dead code (declared, never read); (b)
+                //  there are no `*_REGRID` array declarations or usages in
+                //  this file (only the native `tOutM/pOutM/swOutM/windOutM/
+                //  rhOutM/dtempOutM` arrays at lines ~284-289); (c) there is
+                //  no `if (regrid) { ... } else { ... }` switch anywhere in
+                //  RUN_IMOGEN_ENGINE(); (d) the Fortran REGRID branch is
+                //  built around `CALL REGRID_CLIM(...)` (Fortran line ~964)
+                //  which has no C++ counterpart function.
+                //
+                //  CROSS-ENGINE PARITY MATRIX (post-B3):
+                //    - Fortran standalone (imogen_lpjg.f):
+                //        Tmin/Tmax in BOTH branches (B2 added them; lines
+                //        ~1041-1042 REGRID OPEN + ~1136-1137 non-REGRID OPEN).
+                //    - C++ in-process port (this file):
+                //        Tmin/Tmax in the ONLY branch that exists (native
+                //        grid; lines ~952-953 OPEN + ~990-991 daily WRITEs +
+                //        ~1005-1006 monthly WRITEs + ~1016-1017 newlines +
+                //        ~1035-1036 CLOSE). Since the Fortran-style REGRID
+                //        branch does not exist in C++, Tmin/Tmax are in fact
+                //        present at every writer site that currently exists
+                //        in this engine.
+                //    - Rh/W (wind): C++ has them in this only branch (which
+                //        is everything we have); Fortran has only the writer
+                //        slots (the Rh/W COMPUTATION port is B1's scope).
+                //
+                //  FORWARD-LOOKING MAINTENANCE DIRECTIVE: IF a future change
+                //  adds a REGRID branch to this C++ port (e.g., during the
+                //  F-11 Backport Sprint, Phase-2 IMOGENCXX numerical-parity
+                //  work per Decision #2, or any other REGRID feature add),
+                //  Tmin/Tmax writers MUST be replicated in the new branch
+                //  using the same algebraic derivation per Decision #11:
+                //    file100 << ... << (tOutMRegrid[igp][imm][imd][ind]
+                //                      - dtempOutMRegrid[igp][imm][imd] / 2.0);
+                //    file101 << ... << (tOutMRegrid[igp][imm][imd][ind]
+                //                      + dtempOutMRegrid[igp][imm][imd] / 2.0);
+                //  matching the existing file100/file101 writes immediately
+                //  below (~lines 990-991 and ~1005-1006), with the same
+                //  setw(10) setprecision(3) formatting. The Fortran symmetric
+                //  counterpart at imogen/code/imogen_lpjg.f lines ~1041-1042
+                //  + ~1076-1083 (REGRID DAILYOUT=TRUE) + ~1098-1105 (REGRID
+                //  DAILYOUT=FALSE) + ~1115-1116 (newlines) is the canonical
+                //  reference template (per B2 commit 76b3b04).
+                //
+                //  DEFENSIVE FOLLOW-UP (B13-style; NOT bundled with B3): add
+                //  a runtime warning in the engine prologue when
+                //  IMOGENConfig::REGRID == true (currently silently no-op in
+                //  this port), so users who pass `REGRID 1` get an explicit
+                //  hint that the option is honoured only by the Fortran
+                //  engine, not by this in-process C++ port. Deferred to keep
+                //  B3 docs-only.
+                //
+                //  Cross-references: notes/STEP_17b.md ß3e (full B3 forensic
+                //  record + cross-engine parity matrix correction + dead-code
+                //  analysis of `bool regrid` declaration); imogen/code/
+                //  imogen_lpjg.f ~lines 1019-1160 (B2 Fortran symmetric
+                //  Tmin/Tmax block; commit 76b3b04); notes/TRUNK_R13078_
+                //  BACKPORT_LEDGER.md step-17b-B3 entry. - DKB 2026-05-12]
                 std::ofstream file92, file93, file94, file95, file11, file96, file97, file100, file101;
 
                 // [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of unified-codebase

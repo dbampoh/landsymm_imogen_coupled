@@ -17,6 +17,104 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-12 (night; session 3 continuation) — Step 17b (F-12 sub-milestone C2; **B3 LANDED — closed by architectural reframing**): the C++ in-process port has NO REGRID branch; the stale `// TODO at step 9.5b` was an aspirational forward-reference; ~30 LOC additive docs-only in `lpjguess/modules/climatemodel.cpp`; ZERO functional code change; un-tagged checkpoint
+
+This commit closes **audit item B3** (C++ Tmin/Tmax in REGRID branch of `climatemodel.cpp`) per the re-ordered Option A bundle sequence (B10 → B6 → B2 → **B3** → B4 → B1; user-confirmed 2026-05-11). The forensic determination is that B3 is **closed by architectural reframing** (not by the originally-anticipated mechanical Tmin/Tmax insertion): the C++ in-process port has **no REGRID branch in which to insert**. The `// TODO at step 9.5b: replicate this in the REGRID branch.` comment at `climatemodel.cpp` ~line 894 was an aspirational forward-reference left by the step-9.5 author anticipating a future C++ REGRID branch that was never built.
+
+#### Forensic finding — no C++ REGRID branch exists
+
+Pre-implementation investigation (per the four checks in the B3 onboarding prompt):
+
+| Check | Method | Finding |
+|---|---|---|
+| Search for `REGRID`/`regrid` in `climatemodel.cpp` | `rg "REGRID\|regrid" lpjguess/modules/climatemodel.cpp` | **Only 3 hits**: line 242 `bool regrid = IMOGENConfig::REGRID;` (dead-code declaration); line 894 the stale `// TODO at step 9.5b` comment; line 1353 an unrelated comment in a different function. **No `if (regrid)` switch anywhere in the file.** |
+| `*Regrid` array variants (analogue of Fortran's `T_OUT_M_REGRID` etc.) | `rg "tOutMRegrid\|dtempOutMRegrid\|*Regrid" lpjguess/modules/climatemodel.cpp` | **Zero hits**. Only native-grid arrays exist: `tOutM/pOutM/swOutM/windOutM/rhOutM/dtempOutM` at lines 284-289, sized over `GPOINTS` (not `NGPOINTS`). |
+| `REGRID_CLIM` function (C++ analogue of Fortran `CALL REGRID_CLIM`) | `rg "REGRID_CLIM\|regridClim" lpjguess/` | Zero hits anywhere in `lpjguess/`. The Fortran helper `REGRID_CLIM` (`imogen/code/imogen_lpjg.f` ~line 964) was never ported to C++. |
+| `bool regrid` usage | Manual full-function inspection of `RUN_IMOGEN_ENGINE()` | Declared at line 242, never read. Dead code. |
+
+The Fortran standalone engine (`imogen/code/imogen_lpjg.f` lines 962-1117) has a genuine `IF (REGRID) THEN ... ELSE ... ENDIF` block built around `CALL REGRID_CLIM(T_OUT_M, ..., T_OUT_M_REGRID, ...)` that populates `*_REGRID` arrays via nearest-neighbour interpolation. The C++ port has nothing analogous; it always writes climate anomalies on the single native IMOGEN grid (which is what `imogencfx` mode requires; that mode is the v1.0 production path).
+
+#### Interpretation — close-by-architectural-reframing
+
+The pre-B3 cross-engine parity matrix (e.g., `notes/STEP_17b.md` §3d.6 as written in the B2 commit `76b3b04`, plus FOLLOWUPS audit-table row B3) implicitly assumed the C++ port had both REGRID and non-REGRID branches, mirroring the Fortran. It does not. The matrix has been **corrected** this commit to reflect actual architectural state.
+
+B3 is thus the second "close-without-the-originally-expected-mechanical-action" outcome in step 17b (after B6's close-by-subsumption via B10):
+
+| Audit item | Close-out pattern | Mechanism |
+|---|---|---|
+| B6 | close-by-subsumption | One symptom (T_anom doubled) is fully covered by another bug's structural fix (B10's unconditional OPEN/CLOSE) |
+| **B3** | **close-by-architectural-reframing** | The originally-anticipated insertion site (C++ REGRID branch) does not exist; the deliverable becomes documentation of the architectural finding + forward-looking maintenance directive |
+
+#### What landed this commit (1 file; ~30 LOC additive docs only; backport-RELEVANT)
+
+`lpjguess/modules/climatemodel.cpp`: three surgical documentation edits — **ZERO functional code change**:
+
+| # | Site | Action |
+|---|---|---|
+| 1 | Before `bool regrid = IMOGENConfig::REGRID;` at line ~242 | Insert ~18-line doc block annotating the dead-code status of the `regrid` local: explains it's declared-but-never-read; cross-references the canonical B3 doc block at line ~890; documents the architectural finding; flags a defensive runtime warning as recommended B13-style follow-up |
+| 2 | After `// Output in native IMOGEN grid` at line ~890 | Extend the inline comment to make it explicit that this is the **ONLY** climate-anomaly writer branch (not merely the non-REGRID counterpart of some hypothetical REGRID branch) |
+| 3 | Replace the 4-line stale `// TODO at step 9.5b: replicate this in the REGRID branch.` block at line ~894 | Insert the canonical B3 doc block (~50 lines): forensic finding statement; cross-engine parity matrix snapshot; forward-looking maintenance directive (with the exact C++ algebraic pattern for any future REGRID-branch Tmin/Tmax addition: `file100 << ... << (tOutMRegrid - dtempOutMRegrid/2.0)`); cross-references to STEP_17b.md §3e, B2 Fortran symmetric block at `imogen/code/imogen_lpjg.f` lines ~1019-1160 (commit `76b3b04`), and the BACKPORT_LEDGER step-17b-B3 entry |
+
+#### Cross-engine parity matrix (post-B3; CORRECTED)
+
+| Field | C++ in-process (climatemodel.cpp) | Fortran standalone (imogen_lpjg.f) |
+|---|---|---|
+| T/P/SW/DTEMP/WET | ✅ native-grid (the only branch) | ✅ both branches |
+| **Tmin/Tmax** | ✅ native-grid (the only branch) — N/A (no C++ REGRID branch) | ✅ both branches (B2) |
+| Rh/W (wind) | ✅ native-grid (the only branch) | ⏳ B1 (Fortran physics port; ~3-5 d) |
+
+**Post-B3 status**: every climate-anomaly writer site that actually exists in either engine has Tmin/Tmax wired. The "C++ REGRID gap" recorded in earlier docs was a documentation drift; B3 corrects it. Rh + Wind remain Fortran-side-only physics gaps (B1 closes them via the heaviest physics port).
+
+#### Verification
+
+| Check | Method | Result |
+|---|---|---|
+| Clean rebuild (non-MPI) | `cd lpjguess/build && rm -f .../climatemodel.cpp.o && make -j$(nproc)` (forced rebuild of touched file) | ✅ Exit 0; binary 2 966 056 B; **zero new warnings** (`grep -E "warning\|error"` returns nothing) |
+| Clean rebuild (MPI) | `cd lpjguess/build_mpi && make -j$(nproc)` | ✅ Exit 0; binary 2 840 824 B; zero new warnings |
+| 162 unit tests (non-MPI) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 162 unit tests (MPI) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ same |
+| imogen 1cell xval substantive PASS | `GUESS_BIN=...build_mpi/guess scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ 37/37 bit-exact + 0/37 NaN |
+| imogen 4cell xval substantive PASS | (same harness, 4cell imogen) | ✅ same |
+| imogencfx 1cell xval substantive PASS | (same harness, 1cell imogencfx) | ✅ same |
+| imogencfx 4cell xval substantive PASS | (same harness, 4cell imogencfx) | ✅ same |
+
+**No regression**: B3 is docs-only; zero functional change; byte-equality with pre-B3 build preserved across all 4 xval scenarios.
+
+#### New operational heuristic (rule #7 in `notes/FOLLOWUPS.md`)
+
+The B3 forensic episode generalises cleanly into a new persistent heuristic for future audit-item triage:
+
+> **Stale forward-reference TODOs are architectural-finding triggers — investigate the actual code structure before mechanically replicating from a sibling implementation.** When a TODO comment says "replicate this in branch X" or "add this to function Y", verify that branch X / function Y actually exists in the same form as in the sibling implementation. Differences between sibling implementations (e.g., Fortran has REGRID branch; C++ port does not) can invalidate the mechanical-replication assumption, in which case the audit item's deliverable becomes architectural reframing (close-by-finding) rather than insertion work.
+
+This rule lives at `notes/FOLLOWUPS.md` §"Operational heuristics — lessons learned" rule #7 (companion to rules #1-6 from the B12 + B6 episodes).
+
+#### Files changed this commit
+
+| File | Change | Backport-relevance |
+|---|---|---|
+| `lpjguess/modules/climatemodel.cpp` | ~30 LOC additive docs only (3 edits: dead-code annotation at line ~242; native-grid-is-only-branch clarification at line ~890; canonical B3 doc block replacing stale TODO at line ~894) | **RELEVANT** (C++ source change in `lpjguess/modules/`; if `trunk_r13078`'s `climatemodel.cpp` has the same step-9.5 `file100`/`file101` block + stale TODO, apply the same 3 doc-only edits verbatim) |
+| `notes/STEP_17b.md` | NEW §3e (B3 forensic record + 4-check pre-implementation investigation + interpretation + 3-edit table + verification + new rule #7 statement); corrected §3d.6 cross-engine parity matrix; §5 bundling table marks B3 ✅ DONE; §7 remaining work refresh (B4 NEXT); revised C2-era estimate ~5-8 d remaining; new dated footer entry | IRRELEVANT (docs) |
+| `CHANGELOG.md` | This entry (above B2 entry) | IRRELEVANT (docs) |
+| `EXECUTION_PLAN.md` | Row 17b status refresh (B3 ✅) | IRRELEVANT (docs) |
+| `notes/FOLLOWUPS.md` | B-item bundling table (B3 ✅ DONE); status dashboard refresh ("B3 LANDED" header); NEW Operational heuristics rule #7; revised % done estimate | IRRELEVANT (docs) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | NEW step-17b-B3 entry: 1 file (`lpjguess/modules/climatemodel.cpp`); 3 mechanical doc-only insertions; backport-RELEVANT | IRRELEVANT (docs; the ledger row IS the backport directive) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` | Part 24 narrative (gitignored; not in commit) | IRRELEVANT (gitignored chat artifact) |
+
+**Net `lpjguess/` source-level change in this commit: +30 LOC additive docs only (zero functional code).** Backport-RELEVANT.
+
+#### Remaining within step 17b after this commit
+
+Per §7 of `notes/STEP_17b.md` (refreshed this commit):
+
+- **B4 ⏳ NEXT** (~1 d): `ImogenInput` Rh/W/Tmin/Tmax consumer wiring expansion (mirrors C1.1 pattern).
+- **B1** (~3-5 d; heaviest): Fortran Rh + Wind COMPUTATION port from C++ in-process engine to standalone Fortran (~70-100 LOC of new Fortran physics).
+- **C2 close-out + tag** `v0.17.5-step17b-c2-mpi-sync` (after B4 + B1): full 4-xval substantive PASS + mpirun -np 4 mimic + 162 unit tests on both builds + tag + push to all 3 remotes.
+
+**Revised C2-era estimate**: ~5-8 d remaining (was 5.5-8.5; B3 saved 0.2 d by landing in 0.3 d via the close-by-architectural-reframing outcome).
+**Revised v1.0 % done estimate**: ~56-59% done; ~41-44% remaining.
+
+---
+
 ### 2026-05-12 (session 3 continuation) — Step 17b (F-12 sub-milestone C2; **B2 LANDED**): Fortran Tmin/Tmax write block in `imogen/code/imogen_lpjg.f`; algebraic `Tmin = T - DTEMP/2`, `Tmax = T + DTEMP/2` in BOTH REGRID + non-REGRID branches; +59 LOC additive; un-tagged checkpoint
 
 This commit lands **audit item B2** (Fortran Tmin/Tmax write block) on top of the B6 docs-only commit (`24250b2`). Per the re-ordered Option A bundle sequence (B10 → B6 → **B2** → B3 → B4 → B1; user-confirmed 2026-05-11), B2 was scheduled as the next mechanical win after B6 because both items live in the same `imogen_lpjg.f` writer block.
