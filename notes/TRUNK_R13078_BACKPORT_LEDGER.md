@@ -1452,6 +1452,54 @@ B10's structural fix (unconditional OPEN/CLOSE per IYEAR iteration; 7 conditiona
 
 ---
 
+### Step 17b (B2 LANDED): Fortran Tmin/Tmax write block — `imogen/code/imogen_lpjg.f`; algebraic Tmin = T - DTEMP/2; **backport-RELEVANT**
+
+**Audit-item scope:** B2 = audit item bundling step-9.5b's "Fortran Tmin/Tmax write block" follow-up (originally 0.5 d budgeted; matched actual). Per the re-ordered Option A bundle sequence (B10 → B6 → **B2** → B3 → B4 → B1; user-confirmed 2026-05-11), B2 was scheduled as the next mechanical win after B6 because both items live in the same `imogen_lpjg.f` writer block.
+
+**Symmetric-with-C++ framing (per Step 17b §3d.2):** the C++ in-process port at `lpjguess/modules/climatemodel.cpp` ~lines 952-953 already has `file100`/`file101` ofstream Tmin/Tmax writers in the **non-REGRID branch only** (added at step 9.5; an explicit `// TODO at step 9.5b` comment at `climatemodel.cpp` ~line 894 documents the pending REGRID-side addition — that's **B3's** scope on the C++ side). B2 mirrors this in the Fortran engine but for **BOTH** branches (REGRID + non-REGRID) because the Fortran writer block has both branches and there's no reason to leave them asymmetric. Per Decision #11: Tmin/Tmax are derived (not directly modelled) as `T ± DTEMP/2` (same units = Kelvin; same dynamic range as `T_anom`).
+
+**Backport Sprint instructions for `trunk_r13078`:**
+
+**One source file affected: `imogen/code/imogen_lpjg.f`.** If `trunk_r13078` ships this engine file (it likely does; the standalone Fortran IMOGEN engine is part of LandSyMM-IMOGEN's core), apply the same 9 surgical insertions. Total +59 LOC additive (no removals).
+
+**Insertion sites** (line numbers approximate; pre-B2 reference in `notes/STEP_17b.md` §3d.4):
+
+| # | Site | Branch | Code to insert |
+|---|---|---|---|
+| 1 | After `OPEN(11, .../DTEMP_anom.dat, STATUS='REPLACE')` (REGRID OPEN block) | REGRID | Canonical doc block + `OPEN(100, .../Tmin_anom.dat, STATUS='REPLACE')` + `OPEN(101, .../Tmax_anom.dat, STATUS='REPLACE')` |
+| 2 | After REGRID `WRITE(11, '(f8.3)', ADVANCE='NO') LAT_OUT(IGP)` | REGRID | `WRITE(100/101, '(f8.3)', ADVANCE='NO') LON_OUT(IGP)` and same for LAT_OUT (4 lines + short doc) |
+| 3 | After REGRID DAILYOUT=TRUE `WRITE(95, '(i10)', ADVANCE='NO') F_WET_CLIM_REGRID(IGP,IMM)` (just before ENDIF for `IMD.LE.MTHDAY(IMM)`) | REGRID | `WRITE(100, '(f10.3)', ADVANCE='NO') T_OUT_M_REGRID(IGP,IMM,IMD,IND) - DTEMP_OUT_M_REGRID(IGP,IMM,IMD)/2.0` and same for unit 101 with `+` |
+| 4 | After REGRID DAILYOUT=FALSE `WRITE(95, '(i10)', ADVANCE='NO') F_WET_CLIM_REGRID(IGP,IMM)` (just before ENDIF for DAILYOUT) | REGRID | Tmin/Tmax monthly writes using `T_OUT_M_REGRID(IGP,IMM,1,1) ± DTEMP_OUT_M_REGRID(IGP,IMM,1)/2.0` |
+| 5 | After REGRID per-cell `WRITE(11, '()')` | REGRID | `WRITE(100, '()')` + `WRITE(101, '()')` |
+| 6 | After `OPEN(11, .../DTEMP_anom.dat)` in non-REGRID branch | non-REGRID | Short cross-ref doc + `OPEN(100, .../Tmin_anom.dat)` + `OPEN(101, .../Tmax_anom.dat)` |
+| 7 | After non-REGRID `WRITE(11) LAT(IGP)` | non-REGRID | LON/LAT headers using `LONG/LAT` (NOT `LON_OUT/LAT_OUT`) for units 100/101 |
+| 8 | After non-REGRID DAILYOUT=TRUE `WRITE(95) F_WET_CLIM_OUT` | non-REGRID | Tmin/Tmax daily writes using `T_OUT_M(IGP,IMM,IMD,IND) ± DTEMP_OUT_M(IGP,IMM,IMD)/2.0` (NO `_REGRID` suffix) |
+| 9 | After non-REGRID DAILYOUT=FALSE `WRITE(95) F_WET_CLIM_OUT` + after `WRITE(11, '()')` | non-REGRID | Tmin/Tmax monthly writes + per-cell newlines for units 100/101 |
+| 10 | After post-B10 `CLOSE(11)` (after `ENDIF !End of REGRID conditional`) | shared | `CLOSE(100)` + `CLOSE(101)` |
+
+**Critical safety details to preserve at backport:**
+
+1. **Real-division literal**: ALL 8 algebraic expressions MUST use `/2.0` (REAL literal), NOT `/2` (INTEGER). Integer division would truncate and corrupt Tmin/Tmax outputs.
+2. **Variable name suffix discipline**: REGRID branch uses `T_OUT_M_REGRID/DTEMP_OUT_M_REGRID/LON_OUT/LAT_OUT`; non-REGRID branch uses `T_OUT_M/DTEMP_OUT_M/LONG/LAT` — do NOT mix; the wrong suffix in the wrong branch produces compile errors (good) or worse, silent corruption if the same name happens to compile in both contexts.
+3. **Format `(f10.3)`**: must match `T_anom.dat` writes for byte-level parity (10-char width, 3 decimals). Same width/precision as the C++ port's `std::setw(10) << std::setprecision(3)`.
+4. **Unit 100 + 101 free-ness**: verify in `trunk_r13078`'s `imogen_lpjg.f` that units 100 and 101 are unused before applying. If `trunk_r13078` has additional unit usage at 100/101 (unlikely but possible), pick alternative free units (e.g., 102/103).
+5. **Place AFTER B10's unconditional OPEN/CLOSE fix is applied** — B10 is a pre-requisite (B2's writes to units 100/101 inherit the same per-IYEAR-iteration unconditional-open semantics).
+
+**Verification gate at backport:**
+- Clean Fortran build (zero warnings) — same `compile.sh` driver
+- Static check: `rg "OPEN\\\|CLOSE\\\|WRITE\(\s*(100\|101)\s*[,\)]" imogen_lpjg.f` should return 26 occurrences (4 OPENs + 2 CLOSEs + 8 LON/LAT writes + 8 data writes + 4 per-cell newlines)
+- Both `Tmin_anom.dat` + `Tmax_anom.dat` paths should appear at REGRID branch + non-REGRID branch (4 matches total in `rg "Tmin_anom\.dat\|Tmax_anom\.dat" imogen_lpjg.f`)
+- Empirical engine smoke (when engine inputs ship): each `IMOGEN/output/YEAR/` should have 9 files (was 7); `Tmin_anom.dat` + `Tmax_anom.dat` should each have 1631 lines (1631 cells × 1 line of `LON LAT + 12 monthly Tmin/Tmax values` per cell, in non-REGRID branch DAILYOUT=FALSE; or 1631 lines × N daily values in DAILYOUT=TRUE)
+
+**Cross-references:**
+- `notes/STEP_17b.md` §3d — canonical forensic record (scope decision, unit-number selection, 9-insertion table, cross-engine parity matrix)
+- `lpjguess/modules/climatemodel.cpp` ~lines 952-953 (file100/file101) + ~lines 990-991 (DAILYOUT=TRUE algebra) + ~lines 1005-1006 (DAILYOUT=FALSE algebra) — C++ analogue
+- `notes/STEP_4.md` step 9.5b — original Tmin/Tmax write block deferral
+- `notes/FOLLOWUPS.md` audit-table B2 row (now ✅ DONE 2026-05-12)
+- `_phase2_findings/decisions.md` Decision #11 — Tmin/Tmax algebraic derivation rationale
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

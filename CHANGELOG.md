@@ -17,6 +17,83 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-12 (session 3 continuation) — Step 17b (F-12 sub-milestone C2; **B2 LANDED**): Fortran Tmin/Tmax write block in `imogen/code/imogen_lpjg.f`; algebraic `Tmin = T - DTEMP/2`, `Tmax = T + DTEMP/2` in BOTH REGRID + non-REGRID branches; +59 LOC additive; un-tagged checkpoint
+
+This commit lands **audit item B2** (Fortran Tmin/Tmax write block) on top of the B6 docs-only commit (`24250b2`). Per the re-ordered Option A bundle sequence (B10 → B6 → **B2** → B3 → B4 → B1; user-confirmed 2026-05-11), B2 was scheduled as the next mechanical win after B6 because both items live in the same `imogen_lpjg.f` writer block.
+
+#### What landed this commit (1 file; +59 LOC additive; backport-RELEVANT)
+
+`imogen/code/imogen_lpjg.f`: 9 surgical insertions across the post-B10 climate-anomaly writer block, adding `Tmin_anom.dat` (unit 100) + `Tmax_anom.dat` (unit 101) writers symmetrically to BOTH REGRID + non-REGRID branches:
+
+| # | Site | Branch | Action |
+|---|---|---|---|
+| 1 | After `OPEN(11, .../DTEMP_anom.dat)` (REGRID) | REGRID | Canonical doc block + `OPEN(100, .../Tmin_anom.dat)` + `OPEN(101, .../Tmax_anom.dat)` |
+| 2 | After REGRID `WRITE(11) LAT_OUT(IGP)` | REGRID | LON/LAT headers for units 100/101 (4 lines + short doc) |
+| 3 | After REGRID DAILYOUT=TRUE `WRITE(95) F_WET_CLIM_REGRID` | REGRID | Tmin/Tmax daily writes using `T_OUT_M_REGRID(IGP,IMM,IMD,IND) ± DTEMP_OUT_M_REGRID(IGP,IMM,IMD)/2.0` |
+| 4 | After REGRID DAILYOUT=FALSE `WRITE(95) F_WET_CLIM_REGRID` | REGRID | Tmin/Tmax monthly writes using `T_OUT_M_REGRID(IGP,IMM,1,1) ± DTEMP_OUT_M_REGRID(IGP,IMM,1)/2.0` |
+| 5 | After REGRID per-cell `WRITE(11,'()')` | REGRID | `WRITE(100,'()')` + `WRITE(101,'()')` |
+| 6 | After `OPEN(11, .../DTEMP_anom.dat)` (non-REGRID) | non-REGRID | Short doc + `OPEN(100, .../Tmin_anom.dat)` + `OPEN(101, .../Tmax_anom.dat)` |
+| 7 | After non-REGRID `WRITE(11) LAT(IGP)` | non-REGRID | LON/LAT headers using `LONG/LAT` (no `_OUT` suffix) for units 100/101 |
+| 8 | After non-REGRID DAILYOUT=TRUE `WRITE(95) F_WET_CLIM_OUT` | non-REGRID | Tmin/Tmax daily writes using `T_OUT_M(IGP,IMM,IMD,IND) ± DTEMP_OUT_M(IGP,IMM,IMD)/2.0` (no `_REGRID` suffix) |
+| 9 | After non-REGRID DAILYOUT=FALSE `WRITE(95) F_WET_CLIM_OUT` + after `WRITE(11,'()')` | non-REGRID | Tmin/Tmax monthly writes + per-cell newlines for units 100/101 |
+| 10 | After post-B10 `CLOSE(11)` | shared (post-REGRID conditional) | `CLOSE(100)` + `CLOSE(101)` |
+
+#### Symmetric-with-C++ framing
+
+The C++ in-process port at `lpjguess/modules/climatemodel.cpp` ~lines 952-953 already has `file100`/`file101` ofstream Tmin/Tmax writers in the **non-REGRID branch only** (added at step 9.5; an explicit `// TODO at step 9.5b` comment at `climatemodel.cpp` ~line 894 documents the pending REGRID-side addition — that's **B3's** scope on the C++ side). B2 mirrors this in Fortran but for BOTH branches because the Fortran writer block has both REGRID and non-REGRID branches and there's no reason to leave them asymmetric. Per Decision #11: Tmin/Tmax are derived (not directly modelled) as `T ± DTEMP/2` (same units = Kelvin; same dynamic range as `T_anom`).
+
+**Unit number selection**: `100`/`101` chosen to mirror the C++ ofstream variable names (`file100`, `file101`) for ergonomic cross-engine code-reading. Verified unused in `imogen_lpjg.f` pre-B2 (existing units: 1, 2, 3, 4, 6, 11, 21, 49, 51, 60, 62, 63, 64, 65, 66, 72, 81, 82, 91-99; unit 99 is `RF_all.dat` at line 715).
+
+#### Verification
+
+| Check | Method | Result |
+|---|---|---|
+| Clean Fortran build | `cd imogen/code && rm -f *.o imogen_lpjg && bash compile.sh` | ✅ Exit 0; binary 133 696 bytes (+4096 vs pre-B2's 129 600 B); ZERO warnings |
+| Static unit reference count | `rg "OPEN\\\|CLOSE\\\|WRITE\(\s*(100\|101)\s*[,\)]" imogen_lpjg.f` | ✅ 26 occurrences = 4 OPENs + 2 CLOSEs + 8 LON/LAT writes + 8 data writes + 4 per-cell newlines (matches expected) |
+| Both file paths in source | `rg "Tmin_anom\.dat\|Tmax_anom\.dat" imogen_lpjg.f -n` | ✅ 4 matches: REGRID lines 1041-1042 + non-REGRID lines 1136-1137 |
+| Variable name consistency | manual diff vs existing T_anom writes at same sites | ✅ REGRID uses `T_OUT_M_REGRID/DTEMP_OUT_M_REGRID/LON_OUT/LAT_OUT`; non-REGRID uses `T_OUT_M/DTEMP_OUT_M/LONG/LAT` |
+| Algebra parity with C++ | Visual diff vs `climatemodel.cpp` ~lines 990-991, 1005-1006 | ✅ Same expressions (`T - DTEMP/2.0`, `T + DTEMP/2.0`); same `(f10.3)` format; same Kelvin units |
+| Real-division safety | inspect `/2.0` usage | ✅ All 8 algebraic expressions use `/2.0` (REAL literal) — no integer-division truncation |
+
+**Empirical post-B2 engine smoke deferred** (same reason as B10/B6: Fortran engine inputs `CEN_IPSL_MOD_IPSL-CM5A-MR/` patterns + `DKB_dataset_totals/` emissions are not currently shipped in the active rebuild; will be staged when B1 lands and a post-B1 engine smoke will simultaneously verify B10 + B6 + B2's predicted output structure: each `/YEAR/` directory will contain 9 files with line counts matching `version_A` reference + 12 monthly Tmin/Tmax values per cell-row in `Tmin_anom.dat`/`Tmax_anom.dat`).
+
+#### Cross-engine parity matrix (post-B2)
+
+| Field | C++ in-process (climatemodel.cpp) | Fortran standalone (imogen_lpjg.f) |
+|---|---|---|
+| T/P/SW/DTEMP/WET | ✅ both branches | ✅ both branches |
+| **Tmin/Tmax** | ✅ non-REGRID; ⏳ REGRID (B3) | ✅ both branches (THIS COMMIT) |
+| Rh/W (wind) | ✅ both branches | ⏳ B1 (Fortran physics port; ~3-5 d) |
+
+**Post-B2 status**: Fortran engine has caught up to AND surpassed C++ on Tmin/Tmax (Fortran has it in both branches; C++ has it only in non-REGRID; B3 closes the C++ REGRID gap). Rh + Wind remain Fortran-side-only gaps (B1 closes them).
+
+#### Files changed this commit
+
+| File | Change | Backport-relevance |
+|---|---|---|
+| `imogen/code/imogen_lpjg.f` | +59 LOC additive (9 surgical insertions: 4 OPENs + 2 CLOSEs + 8 LON/LAT writes + 8 data writes + 4 per-cell newlines + canonical doc block + 8 short cross-reference comments) | **RELEVANT** (Fortran source change in standalone engine; if `trunk_r13078` ships this engine file, apply the same 9 mechanical insertions) |
+| `notes/STEP_17b.md` | NEW §3d (B2 forensic record + scope decision + unit-number selection + cross-engine parity matrix); §5 bundling table marks B2 ✅ DONE; §7 remaining work refresh (B3 NEXT); revised C2-era estimate ~5.5-8.5 d remaining; new dated footer entry | IRRELEVANT (docs) |
+| `CHANGELOG.md` | This entry (above B6 entry) | IRRELEVANT (docs) |
+| `EXECUTION_PLAN.md` | Row 17b status refresh (B2 ✅) | IRRELEVANT (docs) |
+| `notes/FOLLOWUPS.md` | B-item bundling table (B2 ✅ DONE); status dashboard refresh; % done estimate updated | IRRELEVANT (docs) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | NEW step-17b-B2 entry: 1 file (`imogen/code/imogen_lpjg.f`); 9 mechanical insertions; backport-RELEVANT | IRRELEVANT (docs; the ledger row IS the backport directive) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` | Part 23 narrative (gitignored; not in commit) | IRRELEVANT (gitignored chat artifact) |
+
+**Net `lpjguess/` source-level change in this commit: ZERO** (Fortran engine source lives at `imogen/code/`, NOT `lpjguess/`, but is still backport-relevant per F-11).
+
+#### Remaining within step 17b after this commit
+
+Per §7 of `notes/STEP_17b.md` (refreshed this commit):
+
+- **B3 ⏳ NEXT** (~0.5 d): C++ Tmin/Tmax in REGRID branch of `climatemodel.cpp`; closes `// TODO at step 9.5b` inline comment.
+- **B4** (~1 d): `ImogenInput` Rh/W/Tmin/Tmax consumer wiring expansion.
+- **B1** (~3-5 d; heaviest): Fortran Rh + Wind COMPUTATION port from C++ in-process engine to standalone Fortran.
+- **C2 close-out + tag** `v0.17.5-step17b-c2-mpi-sync`.
+
+**Revised C2-era estimate**: ~5.5-8.5 d remaining.
+
+---
+
 ### 2026-05-11 (night; session 3) — Step 17b (F-12 sub-milestone C2; **B6 LANDED — subsumed by B10**): F-2 Fortran T_anom 2× line count fully traced to the same alternating-year writer bug B10 fixed (3 symptoms, one root cause); ZERO Fortran source change for B6; un-tagged docs-only checkpoint
 
 This commit closes **audit item B6** (F-2 Fortran T_anom 2× line count investigation) per the re-ordered Option A bundle sequence (B10 → **B6** → B2 → B3 → B4 → B1; user-confirmed 2026-05-11). The forensic determination is that B6 is **fully subsumed by B10** (commit `3c00428`): the originally-reported 2× line count (T_anom.dat = 3262 lines vs version_A's 1631 lines) is **one of three downstream symptoms of the same alternating-year writer bug B10 fixed**.

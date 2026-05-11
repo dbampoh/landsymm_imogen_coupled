@@ -1021,6 +1021,25 @@ C  - DKB 2026-05-11]
             OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
             OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
             OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
+C [Step 17b (F-N B2): NEW Tmin_anom.dat + Tmax_anom.dat writers in
+C  Fortran engine, added symmetrically to BOTH REGRID + non-REGRID
+C  branches. Algebraic derivation: Tmin = T - DTEMP/2; Tmax = T +
+C  DTEMP/2 (same units as T = Kelvin; same dynamic range as T_anom);
+C  per Decision #11 (steps 8-9.5 era; Tmin/Tmax derived rather than
+C  directly modelled). Symmetric with C++ in-process port at
+C  lpjguess/modules/climatemodel.cpp ~lines 952-953 (file100/file101
+C  ofstream; non-REGRID branch only; REGRID-branch C++ addition is
+C  B3's scope per the `// TODO at step 9.5b` comment in C++ source
+C  ~line 894). Units 100/101 chosen to mirror the C++ ofstream
+C  variable names (file100, file101); verified unused elsewhere in
+C  this file (only units 1-99 + standard streams in use; unit 99 is
+C  RF_all.dat at line 715). Format `(f10.3)` matches T_anom for
+C  byte-level dimensional parity with the C++ port. Forensic +
+C  design rationale: notes/STEP_17b.md §3d. Backport-RELEVANT
+C  (Fortran source change in standalone engine; symmetric with the
+C  in-process C++ port). - DKB 2026-05-12]
+            OPEN(100,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmin_anom.dat',STATUS='REPLACE')
+            OPEN(101,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmax_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,NGPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !Advance one line in the output file
@@ -1033,6 +1052,12 @@ C  - DKB 2026-05-11]
               WRITE(95,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !Advance one line in the output file
               WRITE(11,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !Advance one line in the output file
               WRITE(11,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !Advance one line in the output file
+C [B2: Tmin_anom (unit 100) + Tmax_anom (unit 101) per-cell LON/LAT
+C  headers; same format as T_anom. - DKB 2026-05-12]
+              WRITE(100,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !B2 Tmin
+              WRITE(100,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B2 Tmin
+              WRITE(101,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !B2 Tmax
+              WRITE(101,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B2 Tmax
               DO IMM=1,MM
                 IF(DAILYOUT) THEN
                   DO IMD=1,31
@@ -1048,6 +1073,14 @@ C  - DKB 2026-05-11]
      &                   DTEMP_OUT_M_REGRID(IGP,IMM,IMD)
                         WRITE(95,'(i10)',ADVANCE='NO')
      &                   F_WET_CLIM_REGRID(IGP,IMM)
+C [B2: Tmin = T - DTEMP/2; Tmax = T + DTEMP/2; same units as T (K).
+C  REGRID DAILYOUT=TRUE branch. - DKB 2026-05-12]
+                        WRITE(100,'(f10.3)',ADVANCE='NO')
+     &                   T_OUT_M_REGRID(IGP,IMM,IMD,IND)
+     &                  -DTEMP_OUT_M_REGRID(IGP,IMM,IMD)/2.0
+                        WRITE(101,'(f10.3)',ADVANCE='NO')
+     &                   T_OUT_M_REGRID(IGP,IMM,IMD,IND)
+     &                  +DTEMP_OUT_M_REGRID(IGP,IMM,IMD)/2.0
                       ENDIF
                     ENDDO
                   ENDDO
@@ -1062,6 +1095,14 @@ C  - DKB 2026-05-11]
      &              DTEMP_OUT_M_REGRID(IGP,IMM,1)
                   WRITE(95,'(i10)',ADVANCE='NO')
      &              F_WET_CLIM_REGRID(IGP,IMM)
+C [B2: Tmin = T - DTEMP/2; Tmax = T + DTEMP/2; same units as T (K).
+C  REGRID DAILYOUT=FALSE branch (monthly mean). - DKB 2026-05-12]
+                  WRITE(100,'(f10.3)',ADVANCE='NO')
+     &              T_OUT_M_REGRID(IGP,IMM,1,1)
+     &             -DTEMP_OUT_M_REGRID(IGP,IMM,1)/2.0
+                  WRITE(101,'(f10.3)',ADVANCE='NO')
+     &              T_OUT_M_REGRID(IGP,IMM,1,1)
+     &             +DTEMP_OUT_M_REGRID(IGP,IMM,1)/2.0
                 ENDIF
               ENDDO
               WRITE(92,'()') !Advance one line in the output file
@@ -1069,6 +1110,10 @@ C  - DKB 2026-05-11]
               WRITE(94,'()') !Advance one line in the output file
               WRITE(95,'()') !Advance one line in the output file
               WRITE(11,'()') !Advance one line in the output file
+C [B2: per-cell newlines for Tmin_anom (unit 100) + Tmax_anom (unit
+C  101). REGRID branch. - DKB 2026-05-12]
+              WRITE(100,'()') !B2 Tmin
+              WRITE(101,'()') !B2 Tmax
             ENDDO
           ELSE
             !Output in the native IMOGEN grid - TP 06.08.15
@@ -1085,6 +1130,11 @@ C  removals. - DKB 2026-05-11]
             OPEN(94,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'SW_anom.dat',STATUS='REPLACE')
             OPEN(95,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'WET.dat',STATUS='REPLACE')
             OPEN(11,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'DTEMP_anom.dat',STATUS='REPLACE')
+C [B2: NEW Tmin_anom + Tmax_anom OPENs in non-REGRID branch.
+C  Symmetric with REGRID OPEN block at line ~1023 (canonical doc).
+C  - DKB 2026-05-12]
+            OPEN(100,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmin_anom.dat',STATUS='REPLACE')
+            OPEN(101,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmax_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,GPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LONG(IGP) !Advance one line in the output file
@@ -1097,6 +1147,12 @@ C  removals. - DKB 2026-05-11]
               WRITE(95,'(f8.3)',ADVANCE='NO') LAT(IGP) !Advance one line in the output file
               WRITE(11,'(f8.3)',ADVANCE='NO') LONG(IGP) !Advance one line in the output file
               WRITE(11,'(f8.3)',ADVANCE='NO') LAT(IGP) !Advance one line in the output file
+C [B2: Tmin/Tmax LON/LAT headers; non-REGRID branch (uses LONG, LAT
+C  vs REGRID's LON_OUT, LAT_OUT). - DKB 2026-05-12]
+              WRITE(100,'(f8.3)',ADVANCE='NO') LONG(IGP) !B2 Tmin
+              WRITE(100,'(f8.3)',ADVANCE='NO') LAT(IGP) !B2 Tmin
+              WRITE(101,'(f8.3)',ADVANCE='NO') LONG(IGP) !B2 Tmax
+              WRITE(101,'(f8.3)',ADVANCE='NO') LAT(IGP) !B2 Tmax
               DO IMM=1,MM
                 IF(DAILYOUT) THEN
                   DO IMD=1,31
@@ -1112,6 +1168,15 @@ C  removals. - DKB 2026-05-11]
      &                   DTEMP_OUT_M(IGP,IMM,IMD)
                         WRITE(95,'(i10)',ADVANCE='NO')
      &                   F_WET_CLIM_OUT(IGP,IMM)
+C [B2: Tmin = T - DTEMP/2; Tmax = T + DTEMP/2; same units as T (K).
+C  non-REGRID DAILYOUT=TRUE branch (uses T_OUT_M, DTEMP_OUT_M; no
+C  _REGRID suffix). - DKB 2026-05-12]
+                        WRITE(100,'(f10.3)',ADVANCE='NO')
+     &                   T_OUT_M(IGP,IMM,IMD,IND)
+     &                  -DTEMP_OUT_M(IGP,IMM,IMD)/2.0
+                        WRITE(101,'(f10.3)',ADVANCE='NO')
+     &                   T_OUT_M(IGP,IMM,IMD,IND)
+     &                  +DTEMP_OUT_M(IGP,IMM,IMD)/2.0
                       ENDIF
                     ENDDO
                   ENDDO
@@ -1126,6 +1191,14 @@ C  removals. - DKB 2026-05-11]
      &             DTEMP_OUT_M(IGP,IMM,1)
                   WRITE(95,'(i10)',ADVANCE='NO')
      &             F_WET_CLIM_OUT(IGP,IMM)
+C [B2: Tmin = T - DTEMP/2; Tmax = T + DTEMP/2; same units as T (K).
+C  non-REGRID DAILYOUT=FALSE branch (monthly mean). - DKB 2026-05-12]
+                  WRITE(100,'(f10.3)',ADVANCE='NO')
+     &             T_OUT_M(IGP,IMM,1,1)
+     &            -DTEMP_OUT_M(IGP,IMM,1)/2.0
+                  WRITE(101,'(f10.3)',ADVANCE='NO')
+     &             T_OUT_M(IGP,IMM,1,1)
+     &            +DTEMP_OUT_M(IGP,IMM,1)/2.0
                 ENDIF
               ENDDO
               WRITE(92,'()') !Advance one line in the output file
@@ -1133,6 +1206,10 @@ C  removals. - DKB 2026-05-11]
               WRITE(94,'()') !Advance one line in the output file
               WRITE(95,'()') !Advance one line in the output file
               WRITE(11,'()') !Advance one line in the output file
+C [B2: per-cell newlines for Tmin_anom (unit 100) + Tmax_anom (unit
+C  101). non-REGRID branch. - DKB 2026-05-12]
+              WRITE(100,'()') !B2 Tmin
+              WRITE(101,'()') !B2 Tmax
             ENDDO
           ENDIF !End of REGRID conditional
 
@@ -1150,6 +1227,11 @@ C  forward). - DKB 2026-05-11]
           CLOSE(94)
           CLOSE(95)
           CLOSE(11)
+C [B2: CLOSE Tmin_anom (unit 100) + Tmax_anom (unit 101); symmetric
+C  with B10's unconditional-CLOSE-per-IYEAR-iteration semantics for
+C  units 92/93/94/95/11 above. - DKB 2026-05-12]
+          CLOSE(100)
+          CLOSE(101)
 
           !Write a temporary file to tell LPJ-GUESS that IMOGEN has completed writing the climate files - TP 29.07.15
           OPEN(97,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'done',STATUS='REPLACE')
