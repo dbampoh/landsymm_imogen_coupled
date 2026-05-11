@@ -80,7 +80,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_DIR="$ROOT/runs/SSP1-2.6"
 COMMON_DIR="$RUN_DIR/Common-directory"
-GUESS_BIN="$ROOT/lpjguess/build/guess"
+# GUESS_BIN env var overrides the default build/guess path. Useful for
+# running xval against build_mpi/guess (step 17b C2 verification: confirm
+# the MPI build still passes the 4 xval scenarios in single-process mode
+# before MPI_Barrier + flush_year_globally_synchronized code lands).
+# Default (unset): build/guess (the C1-baseline build). - DKB 2026-05-11
+GUESS_BIN="${GUESS_BIN:-$ROOT/lpjguess/build/guess}"
 GRIDLIST="$ROOT/data/gridlist/$GRIDLIST_NAME"
 BASE_INS="$RUN_DIR/$INS_BASENAME"
 

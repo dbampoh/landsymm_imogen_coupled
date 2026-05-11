@@ -17,6 +17,77 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-11 (afternoon) — Step 17b (F-12 sub-milestone C2 PREP): Anaconda3 `mpicxx` wrapper fix + `make_guess.sh` `--mpi` NetCDF logic fix + `lpjguess/build_mpi/guess` built clean + all 4 cross-validation scenarios re-PASS bit-exact against `build_mpi/guess` (single-process baseline; pre-MPI_Barrier code); B-item bundling decision LOCKED IN (refined option (i) for B1+B4 with C2 era + opportunistic option (iii) for B2/B3/B5-B11 with definitive per-item home); STEP_17b.md NEW (no tag)
+
+C2 prep phase landing for F-12 sub-milestone C2 (workstation MPI year_outer) on top of C1 tag `v0.17.0-step17a-c1-year-outer-single-process` + audit docs commit `e8fd7fb`. This is an intermediate checkpoint commit (no tag); the full step-17b tag `v0.17.5-step17b-c2-mpi-sync` waits for C2 core (MPI_Barrier + flush_year_globally_synchronized) + B1+B2+B3+B4+B6+B10 bundles to land.
+
+**Net `lpjguess/` source-level change this commit: ZERO** (scripts/ + docs only).
+
+#### Anaconda3 `mpicxx` wrapper fix (the C2 pre-requisite)
+
+Anaconda3's mpicxx wrapper (MPICH 4.1.1) is configured to invoke `x86_64-conda-linux-gnu-c++` (the conda-shipped g++ wrapper compiler). That binary is NOT present in the bare Anaconda3 install on this workstation per session-2 §8.1 specs:
+
+```
+$ mpicxx --version
+/home/bampoh-d/anaconda3/bin/mpicxx: line 321:
+  x86_64-conda-linux-gnu-c++: command not found
+```
+
+Two fixes investigated 2026-05-11:
+- (a) `MPICH_CXX=g++` env-var override — uses system g++ instead of conda wrapper. NOT chosen: hits an INDEPENDENT libstdc++ ABI issue (Anaconda3 ships `libstdc++.so.6.0.29` GCC 11.2 era which doesn't export `__cxa_call_terminate`; system `libstdc++.so.6.0.34` GCC 15.2 era does; the mpicxx wrapper command bakes `-L/home/.../anaconda3/lib -Wl,-rpath,...` into the link line → linker finds older libstdc++ first → undefined reference). NOTE: handoff Part 8.1 + the user's C2 prompt suggested `OMPI_CXX=g++`; corrected here — Anaconda3 ships MPICH, not OpenMPI; the variable is `MPICH_CXX`.
+- (b) `conda install -c conda-forge gxx_linux-64` — provides the missing wrapper compiler AT the path mpicxx expects + ships a matching `libstdc++` (typically GCC 11.x+ which exports `__cxa_call_terminate`). CHOSEN (per session-2 §8.1 "preferred"). Empirical: installed `conda-forge gcc 15.2.0-7` (literally the SAME 15.2.0 major-minor as system g++; ABI fully compatible). Anaconda3's `libstdc++.so.6` link target updated 2026-05-11 to `libstdc++.so.6.0.34` (matches system; exports `__cxa_call_terminate`).
+
+#### Independent NetCDF/HDF5 mismatch in `make_guess.sh --mpi` path
+
+Existing `scripts/cluster/make_guess.sh` had a workstation-incorrect `&& ${USE_MPI} -eq 0` clause at lines 92-102 that excluded Anaconda3 NetCDF preference for MPI builds. The rationale was cluster-correct ("cluster + MPI prefers module-loaded NetCDF") but workstation-INCORRECT: on workstation there's no module-loaded NetCDF; Ubuntu native is the broken `libhdf5_serial.so.310` ↔ `libcurl.so.4@CURL_OPENSSL_4` ABI mismatch that Decision #8 specifically AVOIDS via the Anaconda3 NetCDF preference.
+
+Empirical evidence: with `--mpi` skipping Anaconda3 NetCDF, MPI workstation build failed at link time with the canonical Decision #8 errors:
+```
+undefined reference to `curl_global_init@CURL_OPENSSL_4`
+undefined reference to `curl_easy_perform@CURL_OPENSSL_4`
+... (libhdf5_serial.so.310 ↔ libcurl mismatch)
+```
+
+Fix: apply Anaconda3 NetCDF unconditionally when ANACONDA3_PREFIX is set. Cluster builds (which use module-loaded NetCDF) should NOT set ANACONDA3_PREFIX; env_owl.sh module loads will populate cluster-native NETCDF paths and leave ANACONDA3_PREFIX unset.
+
+#### Verification (this commit)
+
+| Check | Result |
+|---|---|
+| `mpicxx --version` works | ✅ "conda-forge gcc 15.2.0-7" |
+| `lpjguess/build_mpi/guess` builds clean | ✅ 2 836 440 bytes |
+| `lpjguess/build_mpi/runtests` builds clean | ✅ 162 tests / 25 cases pass |
+| MPI symbol linkage | ✅ `libmpi.so.12` + `libmpicxx.so.12` from Anaconda3 |
+| NetCDF linkage | ✅ `libnetcdf.so.19` + `libhdf5.so.200` + `libcurl.so.4` from Anaconda3 (Decision #8 honored) |
+| HAVE_MPI defined at compile | ✅ `auto_ptr<FinalizeCaller>` symbol present in `parallel.cpp.o` |
+| All 4 xval scenarios bit-exact PASS against `build_mpi/guess` (single-process; pre-MPI_Barrier baseline) | ✅ 37/37 bit-exact for all 4 (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) |
+
+**The MPI build preserves the C1 baseline byte-exactly in single-process mode.**
+
+#### B-item bundling decision (locked in this commit)
+
+Per user 2026-05-11 deferred-to-agent direction "tackle ALL items; leave NONE undone":
+
+- **C2 era (this step 17b)** ← B1 (Fortran Rh/Wind port; 3-5 d) + B2 (Fortran Tmin/Tmax; 0.5 d) + B3 (C++ Tmin/Tmax REGRID; 0.5 d) + B4 (ImogenInput consumer expansion; 1 d) + B6 (F-2 T_anom 2×; 0.5 d) + B10 (symmetric Fortran writer fix; 0.5 d) = **~6-8 d bundled with C2 core 3-5 d → ~9-13 day combined sprint**
+- **Step 18** ← B5 (F-9 miscoutput diagnostic outputs; 1-2 d) + B7+B8+B9 (CMIP6 unit caveats; 1.5-2.5 d) = ~3-4.5 d
+- **Step 17d** ← B11 (latent OOB defensive hardening; 0.5 d)
+
+Full bundling rationale in `notes/STEP_17b.md` §5 + `notes/FOLLOWUPS.md` "B-item bundling commitment (2026-05-11)" sub-section.
+
+#### Files modified this commit
+
+| File | Change | Backport-relevance |
+|---|---|---|
+| `scripts/cluster/make_guess.sh` | mpicxx-wrapper fix prompt + Anaconda3 NetCDF unconditional | IRRELEVANT (scripts/ only) |
+| `scripts/cross_validate_year_outer.sh` | `GUESS_BIN` env-var overridable (testing alt builds); default unchanged | IRRELEVANT (scripts/ only) |
+| `notes/STEP_17b.md` (NEW) | Full forensic record + C2 plan + B-item bundling | IRRELEVANT (docs) |
+| `CHANGELOG.md` | this entry | IRRELEVANT (docs) |
+| `EXECUTION_PLAN.md` | row 17b status 🔧 with C2 prep landing details | IRRELEVANT (docs) |
+| `notes/FOLLOWUPS.md` | dashboard date refresh + F-12 row update + B-item bundling commitment section | IRRELEVANT (docs) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | NEW step-17b-prep entry (note: backport-IRRELEVANT for this commit since no `lpjguess/` source change) | docs entry |
+
+Refs: `notes/STEP_17b.md` (NEW; full forensic record); `notes/FOLLOWUPS.md` "Comprehensive outstanding-work audit" + "B-item bundling commitment (2026-05-11)" sub-section; `EXECUTION_PLAN.md` V.1 step row 17b (status updated to 🔧 C2 PREP LANDED); `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17b-prep entry; `_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md` Part 16 (NEW; this commit's narrative + decisions adopted).
+
 ---
 
 ## [v0.17.0-step17a-c1-year-outer-single-process] — F-12 sub-milestone C1 CLOSE-OUT (workstation single-process year_outer with cross-validation across all 4 scenarios) — 2026-05-10

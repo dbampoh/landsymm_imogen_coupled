@@ -1225,6 +1225,45 @@ Backport-relevance HIGH for all 4 file changes. The Backport Sprint must replica
 
 ---
 
+### Step 17b (PREP): C2 prep phase — Anaconda3 `mpicxx` wrapper fix + `make_guess.sh` `--mpi` NetCDF logic fix + `build_mpi/guess` baseline verification
+
+**Commit:** _to be determined_ (this commit; un-tagged checkpoint)
+**Backport relevance:** **IRRELEVANT** (scripts/ + docs only; no `lpjguess/` source change)
+
+Net `lpjguess/` source-level change this commit: **ZERO**. All changes are in `scripts/` + `notes/` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + this ledger. Listed here for traceability only — the Backport Sprint can skip this commit (it has no source code to replicate in `trunk_r13078`).
+
+Build-environment prerequisite for the Backport Sprint to note when applying step-17b changes to `trunk_r13078`: the Anaconda3 `mpicxx` wrapper requires either `conda install -c conda-forge gxx_linux-64` (recommended; provides matching wrapper compiler + libstdc++) OR `MPICH_CXX=g++` env-var override (NOTE: handoff Part 8.1 + the C2 prompt incorrectly said `OMPI_CXX`; that's the OpenMPI variable; Anaconda3 ships MPICH; verified live 2026-05-11). Detailed rationale in `notes/STEP_17b.md` §3.
+
+Operational scripts updated this commit (NOT in `lpjguess/`; **NOT backportable to `trunk_r13078`**):
+
+#### File: `scripts/cluster/make_guess.sh`
+
+- Replaced the previous (silent) `mpicxx` invocation with a fail-fast probe + actionable error message documenting both fixes (`conda install gxx_linux-64` preferred + `MPICH_CXX=g++` alternative with libstdc++ ABI caveat).
+- Removed the `&& ${USE_MPI} -eq 0` clause that incorrectly excluded Anaconda3 NetCDF preference for workstation MPI builds. Workstation `--mpi` now uses Anaconda3 NetCDF (same as non-MPI build/guess), avoiding the Decision #8 broken `libhdf5_serial.so.310 ↔ libcurl@CURL_OPENSSL_4` mismatch. Cluster `--mpi` builds (which use module-loaded NetCDF) should NOT set `ANACONDA3_PREFIX`; the script auto-detects and skips.
+
+#### File: `scripts/cross_validate_year_outer.sh`
+
+- `GUESS_BIN` made env-var overridable via `${GUESS_BIN:-$ROOT/lpjguess/build/guess}`. Default unchanged. Enables testing alternative builds (e.g., `GUESS_BIN=$PWD/lpjguess/build_mpi/guess scripts/cross_validate_year_outer.sh 1cell imogen`).
+
+#### File: `notes/STEP_17b.md` (NEW)
+
+Full forensic record for C2 prep phase + C2 plan + B-item bundling decision; mirrors the per-step doc discipline established at step 0 + maintained through step 17a.
+
+#### Empirical baseline verification this commit
+
+| Check | Result |
+|---|---|
+| `lpjguess/build_mpi/guess` builds clean (`make_guess.sh --mpi` after `conda install gxx_linux-64`) | ✅ 2 836 440 bytes |
+| `lpjguess/build_mpi/runtests` builds clean | ✅ 162 tests / 25 cases pass |
+| MPI symbol linkage | ✅ `libmpi.so.12` + `libmpicxx.so.12` from Anaconda3 |
+| NetCDF linkage | ✅ `libnetcdf.so.19` + `libhdf5.so.200` + `libcurl.so.4` from Anaconda3 (Decision #8 honored) |
+| HAVE_MPI defined at compile | ✅ `auto_ptr<FinalizeCaller>` symbol present in `parallel.cpp.o` |
+| All 4 xval scenarios bit-exact PASS against `build_mpi/guess` single-process | ✅ 37/37 bit-exact for all 4 (imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell) |
+
+**The MPI build preserves the C1 baseline byte-exactly in single-process mode.** This provides a verified baseline against which the upcoming C2 core (MPI_Barrier + flush_year_globally_synchronized) can be measured.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):
