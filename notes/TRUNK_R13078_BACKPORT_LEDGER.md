@@ -1637,6 +1637,50 @@ B10's structural fix (unconditional OPEN/CLOSE per IYEAR iteration; 7 conditiona
 
 ---
 
+### Step 17b (B1 LANDED): Fortran-engine Rh + Wind COMPUTATION + write-block port in `imogen/code/imogen_lpjg.f` — closed by architectural reframing; +200 LOC additive (single file); **backport-RELEVANT** (functional Fortran source change)
+
+**Date:** 2026-05-12 (early morning; session 3 continuation). **Commit hash:** (HEAD this commit; un-tagged checkpoint on top of `2bd5222`).
+
+**Forensic context:** The audit-table description "Fortran Rh + Wind COMPUTATION port" was a misread of `climatemodel.cpp:866`'s `// Compute Rh from Qh since Rh is not output directly` comment. Pre-implementation reading revealed: (a) Wind output is a direct passthrough from `windOut` (engine's disaggregated subdaily output) at `climatemodel.cpp:865` — no physics; (b) Rh output is a single 22-LOC inline Tetens-formula computation at `climatemodel.cpp:1228-1249` (`computeRelativeHumidityFromSpeificHumidty`); (c) Fortran-side `WIND_OUT/QHUM_OUT/PSTAR_OUT/T_OUT_M` already exist at `imogen_lpjg.f:229-231,1313-1316` and are populated by the existing `CLIM_DISAG` call at line 773. B1 is mechanical-symmetric-writer work, NOT a physics port. Estimate revised from 3-5 d → ~0.5 d.
+
+**What landed this commit (single Fortran source file; 18 surgical sub-edits + 1 NEW SUBROUTINE; +202 / -2 = +200 LOC additive net):**
+
+| # | Site (~line, post-edit) in `imogen/code/imogen_lpjg.f` | Edit | Backport directive |
+|---|---|---|---|
+| 1 | ~302 | B1 doc block + 3 new `REAL, ALLOCATABLE :: WIND_OUT_M_REGRID/QHUM_OUT_M_REGRID/PSTAR_OUT_M_REGRID(:,:,:,:)` declarations (after existing `T_OUT_M_REGRID` siblings at lines 295-298) | Apply identically; mirror the existing `T_OUT_M_REGRID` declaration pattern |
+| 2 | ~320 | 1 new `REAL RH_TMP` scratch scalar (with 3-line doc block) for inline Rh computation at each writer cell | Apply identically; declare in MAIN scope alongside other WORK scalars |
+| 3 | ~341 | 3 new `ALLOCATE(WIND_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))` etc. (with 3-line doc block) immediately after existing `T_OUT_M_REGRID/P_OUT_M_REGRID/...` ALLOCATEs | Apply identically; same shape as `T_OUT_M_REGRID` allocation |
+| 4 | ~975 | B1 doc block on `CALL REGRID_CLIM(...)` site + 2 continuation lines appending 6 new args (`,WIND_OUT,QHUM_OUT,PSTAR_OUT, WIND_OUT_M_REGRID,QHUM_OUT_M_REGRID,PSTAR_OUT_M_REGRID`) at the END of the existing 19-arg call | Apply identically; preserve trailing-arg ordering for minimal diff |
+| 5 | ~1052 | B1 doc block + 2 new `OPEN(96, 'Rh_anom.dat')` + `OPEN(97, 'W_anom.dat')` in REGRID branch (symmetric with B2's Tmin/Tmax OPENs at lines ~1041-1042) | Apply identically; unit numbers 96/97 mirror C++ ofstream variable names `file96`/`file97` at `climatemodel.cpp:1046-1047` |
+| 6 | ~1063 | 4 new per-cell LON/LAT header WRITEs (units 96/97) in REGRID branch | Apply identically |
+| 7 | ~1086 | B1 doc block + `WRITE(97, ..., WIND_OUT_M_REGRID(IGP,IMM,IMD,IND))` + `CALL RH_FROM_QPT(...)` + `WRITE(96, ..., RH_TMP)` in REGRID DAILYOUT=TRUE inner-loop | Apply identically; use `_REGRID` suffix arrays in REGRID branch |
+| 8 | ~1118 | Analogous WRITE+CALL+WRITE in REGRID DAILYOUT=FALSE branch (monthly mean; `,1,1` sub-index) | Apply identically |
+| 9 | ~1133 | `WRITE(96,'()') / WRITE(97,'()')` per-cell newlines in REGRID branch | Apply identically; format must be `'()'` to advance one line |
+| 10 | ~1140 | B1 doc block + 2 new `OPEN(96/97)` in non-REGRID branch (symmetric with item 5) | Apply identically |
+| 11 | ~1163 | 4 new per-cell LON/LAT header WRITEs in non-REGRID branch (uses `LONG(IGP)`/`LAT(IGP)` vs REGRID's `LON_OUT`/`LAT_OUT`) | Apply identically; non-REGRID branch uses different LON/LAT arrays |
+| 12 | ~1192 | B1 doc block + WRITE+CALL+WRITE in non-REGRID DAILYOUT=TRUE branch (uses `WIND_OUT/QHUM_OUT/PSTAR_OUT/T_OUT_M`; no `_REGRID` suffix) | Apply identically |
+| 13 | ~1218 | Analogous WRITE+CALL+WRITE in non-REGRID DAILYOUT=FALSE branch | Apply identically |
+| 14 | ~1247 | `WRITE(96,'()') / WRITE(97,'()')` per-cell newlines in non-REGRID branch | Apply identically |
+| 15 | ~1276 | B1 doc block + 2 new `CLOSE(96)/(97)` (symmetric with B2's CLOSE(100)/(101) at lines ~1233-1234) — placed BEFORE the pre-existing `OPEN(97, 'done')` at line ~1304 | Apply identically; sequence is critical (CLOSE then OPEN for the unit 97 reuse pattern) |
+| 16 | ~1303 | 3 new `IF (ALLOCATED(...)) DEALLOCATE(...)` for the 3 new REGRID arrays | Apply identically; mirror existing `T_OUT_M_REGRID` DEALLOCATE pattern |
+| 17 | ~1342 (`SUBROUTINE REGRID_CLIM`) | B1 doc block on signature + 2 continuation lines appending 6 new dummy args (3 IN, 3 OUT) at the END | Apply identically |
+| 18 | ~1372 (`REGRID_CLIM` body) | 6 new dimension decls (3 IN block + 3 OUT block) + 3 new nearest-neighbor passthrough assignments inside the `DO IMM, DO IMD, DO IND` triple-loop after the existing `T_OUT_M_REGRID = T_OUT_M` line | Apply identically; use `IND_MIN` (already computed by the existing nearest-neighbor loop) for all 3 new assignments |
+| **19** | **~1432 (NEW SUBROUTINE)** | **NEW `SUBROUTINE RH_FROM_QPT(Q, P_PA, T_K, RH)` with full docstring + IMPLICIT NONE + 4-line Tetens algebra + clamping (~40 LOC; byte-identical to C++ `computeRelativeHumidityFromSpeificHumidty` at `climatemodel.cpp:1228-1249`)** | **Apply identically; insert between existing `REGRID_CLIM END` and `SUBROUTINE SETTIN` at the same anchor as in our tree** |
+
+**Verification post-B1:**
+- Fortran clean build: binary 137832 B (was 133696 B post-B2; +4136 B for B1 additions); zero new warnings with `-Wall -Wno-unused-dummy-argument -Wno-unused-variable` (8 pre-existing warnings at lines 4523/1489/2466/3642/870/688/853 unchanged — all from non-B1 code paths)
+- C++ rebuilds clean (no-op regression check; B1 doesn't touch `lpjguess/`)
+- 162 unit tests on both `build/runtests` + `build_mpi/runtests`: "Passed all 25 test cases with 162 assertions."
+- All 4 xval scenarios PASS substantive (37/37 bit-exact + 0/37 NaN): imogen 1cell, imogen 4cell, imogencfx 1cell, imogencfx 4cell
+
+**Cross-engine parity matrix POST-B1:** Full climate-anomaly output parity between the two engines for the v1.0 production path. Both engines now write T/P/SW/WET/DTEMP/Tmin/Tmax/Rh/W (the Fortran engine writes these to BOTH REGRID + non-REGRID branches; the C++ port has only one branch — the native-IMOGEN-grid branch — per the B3 finding at `lpjguess/modules/climatemodel.cpp` line ~890).
+
+**F-11 backport-sprint classification:** **RELEVANT (functional Fortran source change)**. The 18 sub-edits + 1 NEW SUBROUTINE should be applied to `trunk_r13078`'s `imogen_lpjg.f` if its pre-B1 state matches our pre-B1 state (i.e., no `WIND_OUT_M_REGRID`/`QHUM_OUT_M_REGRID`/`PSTAR_OUT_M_REGRID` REGRID arrays; no `Rh_anom.dat`/`W_anom.dat` writer blocks; no `RH_FROM_QPT` SUBROUTINE). Treat as a ~2-3 hour mechanical replication during the F-11 sprint. Although the Fortran engine source is shared across both forks (no fork-specific Fortran), recording the directive here ensures the backport sprint reviews the change against `trunk_r13078`'s build expectations.
+
+**With B1 landed, the C2-era B-bundle is feature-COMPLETE** (all 6 audit items DONE: B10 → B6 → B2 → B3 → B4 → B1). Only the C2 close-out tag `v0.17.5-step17b-c2-mpi-sync` remains (zero source changes).
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

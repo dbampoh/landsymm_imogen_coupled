@@ -297,6 +297,24 @@ C  Decision #2 of EXECUTION_PLAN.md. - DKB 2026-05-05]
       REAL, ALLOCATABLE :: SW_OUT_M_REGRID(:,:,:,:)   !OUT Regridded calculated shortwave radiation for 365 day year - TP 06.08.15
       REAL, ALLOCATABLE :: DTEMP_OUT_M_REGRID(:,:,:)  !OUT Regridded calculated daily temperature range for 365 day year - TP 03.02.16
       INTEGER, ALLOCATABLE :: F_WET_CLIM_REGRID(:,:)
+C [Step 17b (F-12 sub-milestone C2; audit item B1) of unified-codebase
+C  rebuild (2026-05-12): NEW regridded arrays for Wind / Qhum / Pstar
+C  to enable Rh_anom.dat + W_anom.dat writing in the REGRID branch of
+C  the climate-anomaly writer block (lines ~1019-1117 below). These
+C  mirror the existing T_OUT_M_REGRID / P_OUT_M_REGRID / SW_OUT_M_REGRID
+C  pattern; populated by extended REGRID_CLIM subroutine (line ~1296
+C  below). Symmetric counterpart to C++ in-process port's writer for
+C  Rh / W at climatemodel.cpp:1081-1098 (B1 closes the Fortran-side
+C  gap; cf. cross-engine parity matrix in notes/STEP_17b.md
+C  section 3g post-B1). - DKB 2026-05-12]
+      REAL, ALLOCATABLE :: WIND_OUT_M_REGRID(:,:,:,:) !OUT Regridded calculated wind speed (m/s) for 365 day year - DKB B1
+      REAL, ALLOCATABLE :: QHUM_OUT_M_REGRID(:,:,:,:) !OUT Regridded calculated specific humidity (kg/kg) for 365 day year - DKB B1
+      REAL, ALLOCATABLE :: PSTAR_OUT_M_REGRID(:,:,:,:)!OUT Regridded calculated surface pressure (Pa) for 365 day year - DKB B1
+
+C [B1: Scratch scalar used for inline Tetens-formula Rh computation at
+C  each writer-cell. Computed via subroutine RH_FROM_QPT (defined near
+C  QSAT at the bottom of this file). - DKB 2026-05-12]
+      REAL RH_TMP                                     !WORK relative humidity scratch scalar (%, [0,100]) - DKB B1
 
       REAL, ALLOCATABLE :: LON_OUT(:)    !IN/OUT Longitude array to perform regridding to (read from file) - TP 06.08.15
       REAL, ALLOCATABLE :: LAT_OUT(:)    !IN/OUT Latitude array to perform regridding to (read from file) - TP 06.08.15
@@ -333,6 +351,12 @@ C  This converts compile-time sizing to run-time sizing.]
       ALLOCATE(SW_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
       ALLOCATE(DTEMP_OUT_M_REGRID(NGPOINTS,MM,32))
       ALLOCATE(F_WET_CLIM_REGRID(NGPOINTS,MM))
+C [B1: ALLOCATE the 3 new REGRID arrays (same shape as T_OUT_M_REGRID
+C  per NSDMAX-indexed sub-daily granularity); deallocated symmetrically
+C  at line ~1300 below. - DKB 2026-05-12]
+      ALLOCATE(WIND_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
+      ALLOCATE(QHUM_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
+      ALLOCATE(PSTAR_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX))
       ALLOCATE(LON_OUT(NGPOINTS))
       ALLOCATE(LAT_OUT(NGPOINTS))
       PRINT *,'IMOGEN: ALLOCATEd regrid arrays for NGPOINTS=',NGPOINTS
@@ -961,9 +985,19 @@ C             Also want the number of wet days per month as an output
 
           IF (REGRID) THEN
             !Regrid the output data using nearest-neighbour interpolation - TP 06.08.15
+C [B1: Extended REGRID_CLIM signature with 3 new IN arrays
+C  (WIND_OUT, QHUM_OUT, PSTAR_OUT) + 3 new OUT arrays
+C  (WIND_OUT_M_REGRID, QHUM_OUT_M_REGRID, PSTAR_OUT_M_REGRID). The new
+C  args are appended at the end of the existing list to keep the diff
+C  minimal + preserve the historical argument order. See
+C  REGRID_CLIM subroutine definition at line ~1320 below for the
+C  extended dummy-argument list + new nearest-neighbor passthrough
+C  assignments. - DKB 2026-05-12]
             CALL REGRID_CLIM(T_OUT_M,SW_OUT_M,P_OUT_M,DTEMP_OUT_M,F_WET_CLIM_OUT,MM,NSDMAX,GPOINTS,LONG,LAT
      &       ,T_OUT_M_REGRID,P_OUT_M_REGRID,SW_OUT_M_REGRID,DTEMP_OUT_M_REGRID,F_WET_CLIM_REGRID,NGPOINTS
-     &       ,LON_OUT,LAT_OUT,DIR_COMMON,THISYEAR,FILE_GRIDLIST)
+     &       ,LON_OUT,LAT_OUT,DIR_COMMON,THISYEAR,FILE_GRIDLIST
+     &       ,WIND_OUT,QHUM_OUT,PSTAR_OUT
+     &       ,WIND_OUT_M_REGRID,QHUM_OUT_M_REGRID,PSTAR_OUT_M_REGRID)
 
             PRINT *,'Writing regridded anomalies for year: ',IYEAR
 C [Step 17b (F-N B10 - symmetric Fortran engine writer fix) of
@@ -1040,6 +1074,18 @@ C  (Fortran source change in standalone engine; symmetric with the
 C  in-process C++ port). - DKB 2026-05-12]
             OPEN(100,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmin_anom.dat',STATUS='REPLACE')
             OPEN(101,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmax_anom.dat',STATUS='REPLACE')
+C [Step 17b (F-12 sub-milestone C2; audit item B1): NEW Rh_anom.dat +
+C  W_anom.dat writers (REGRID branch). Symmetric with C++ in-process
+C  port at lpjguess/modules/climatemodel.cpp:1046-1047 (file96 = Rh,
+C  file97 = Wind ofstream OPEN). The C++ port has no REGRID branch
+C  (closed by B3 docs-only commit ceb2766; cf. STEP_17b.md section 3e)
+C  so this Fortran-engine REGRID writer for Rh/W is canonical for any
+C  future remapped-grid use. Unit 96 = Rh, unit 97 = Wind to mirror
+C  C++ variable names; NOTE unit 97 is briefly re-opened later for the
+C  'done' marker (line ~1281) AFTER the CLOSE(97) at line ~1278 below
+C  -- the CLOSE/OPEN sequence is correct. - DKB 2026-05-12]
+            OPEN(96,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Rh_anom.dat',STATUS='REPLACE')
+            OPEN(97,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'W_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,NGPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !Advance one line in the output file
@@ -1058,6 +1104,12 @@ C  headers; same format as T_anom. - DKB 2026-05-12]
               WRITE(100,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B2 Tmin
               WRITE(101,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !B2 Tmax
               WRITE(101,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B2 Tmax
+C [B1: Rh_anom (unit 96) + W_anom (unit 97) per-cell LON/LAT headers;
+C  same format as T_anom. REGRID branch uses LON_OUT/LAT_OUT. - DKB 2026-05-12]
+              WRITE(96,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !B1 Rh
+              WRITE(96,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B1 Rh
+              WRITE(97,'(f8.3)',ADVANCE='NO') LON_OUT(IGP) !B1 W
+              WRITE(97,'(f8.3)',ADVANCE='NO') LAT_OUT(IGP) !B1 W
               DO IMM=1,MM
                 IF(DAILYOUT) THEN
                   DO IMD=1,31
@@ -1081,6 +1133,20 @@ C  REGRID DAILYOUT=TRUE branch. - DKB 2026-05-12]
                         WRITE(101,'(f10.3)',ADVANCE='NO')
      &                   T_OUT_M_REGRID(IGP,IMM,IMD,IND)
      &                  +DTEMP_OUT_M_REGRID(IGP,IMM,IMD)/2.0
+C [B1: Wind = direct passthrough from WIND_OUT_M_REGRID (m/s; mirror
+C  of C++ windOutM = windOut at climatemodel.cpp:865); Rh computed
+C  inline via Tetens-formula subroutine RH_FROM_QPT (kg/kg + Pa + K
+C  -> %; mirror of C++ rhOutM = computeRelativeHumidityFromSpeificHumidty
+C  at climatemodel.cpp:866). REGRID DAILYOUT=TRUE branch.
+C  - DKB 2026-05-12]
+                        WRITE(97,'(f10.3)',ADVANCE='NO')
+     &                   WIND_OUT_M_REGRID(IGP,IMM,IMD,IND)
+                        CALL RH_FROM_QPT(
+     &                   QHUM_OUT_M_REGRID(IGP,IMM,IMD,IND),
+     &                   PSTAR_OUT_M_REGRID(IGP,IMM,IMD,IND),
+     &                   T_OUT_M_REGRID(IGP,IMM,IMD,IND),
+     &                   RH_TMP)
+                        WRITE(96,'(f10.3)',ADVANCE='NO') RH_TMP
                       ENDIF
                     ENDDO
                   ENDDO
@@ -1103,6 +1169,16 @@ C  REGRID DAILYOUT=FALSE branch (monthly mean). - DKB 2026-05-12]
                   WRITE(101,'(f10.3)',ADVANCE='NO')
      &              T_OUT_M_REGRID(IGP,IMM,1,1)
      &             +DTEMP_OUT_M_REGRID(IGP,IMM,1)/2.0
+C [B1: Wind + Rh, REGRID DAILYOUT=FALSE branch (monthly mean; uses
+C  ,1,1 sub-index). - DKB 2026-05-12]
+                  WRITE(97,'(f10.3)',ADVANCE='NO')
+     &              WIND_OUT_M_REGRID(IGP,IMM,1,1)
+                  CALL RH_FROM_QPT(
+     &              QHUM_OUT_M_REGRID(IGP,IMM,1,1),
+     &              PSTAR_OUT_M_REGRID(IGP,IMM,1,1),
+     &              T_OUT_M_REGRID(IGP,IMM,1,1),
+     &              RH_TMP)
+                  WRITE(96,'(f10.3)',ADVANCE='NO') RH_TMP
                 ENDIF
               ENDDO
               WRITE(92,'()') !Advance one line in the output file
@@ -1114,6 +1190,10 @@ C [B2: per-cell newlines for Tmin_anom (unit 100) + Tmax_anom (unit
 C  101). REGRID branch. - DKB 2026-05-12]
               WRITE(100,'()') !B2 Tmin
               WRITE(101,'()') !B2 Tmax
+C [B1: per-cell newlines for Rh_anom (unit 96) + W_anom (unit 97).
+C  REGRID branch. - DKB 2026-05-12]
+              WRITE(96,'()') !B1 Rh
+              WRITE(97,'()') !B1 W
             ENDDO
           ELSE
             !Output in the native IMOGEN grid - TP 06.08.15
@@ -1135,6 +1215,13 @@ C  Symmetric with REGRID OPEN block at line ~1023 (canonical doc).
 C  - DKB 2026-05-12]
             OPEN(100,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmin_anom.dat',STATUS='REPLACE')
             OPEN(101,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Tmax_anom.dat',STATUS='REPLACE')
+C [B1: NEW Rh_anom + W_anom OPENs in non-REGRID branch. Symmetric with
+C  REGRID OPEN block at line ~1054 (canonical doc). Non-REGRID branch
+C  is the canonical path for v1.0 production (REGRID is exercised only
+C  when user sets REGRID=.TRUE. via imogen_settings.txt; cf. B3
+C  finding for C++ side). - DKB 2026-05-12]
+            OPEN(96,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'Rh_anom.dat',STATUS='REPLACE')
+            OPEN(97,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'W_anom.dat',STATUS='REPLACE')
 
             DO IGP=1,GPOINTS
               WRITE(92,'(f8.3)',ADVANCE='NO') LONG(IGP) !Advance one line in the output file
@@ -1153,6 +1240,13 @@ C  vs REGRID's LON_OUT, LAT_OUT). - DKB 2026-05-12]
               WRITE(100,'(f8.3)',ADVANCE='NO') LAT(IGP) !B2 Tmin
               WRITE(101,'(f8.3)',ADVANCE='NO') LONG(IGP) !B2 Tmax
               WRITE(101,'(f8.3)',ADVANCE='NO') LAT(IGP) !B2 Tmax
+C [B1: Rh_anom (unit 96) + W_anom (unit 97) per-cell LON/LAT headers;
+C  non-REGRID branch (uses LONG, LAT vs REGRID's LON_OUT, LAT_OUT).
+C  - DKB 2026-05-12]
+              WRITE(96,'(f8.3)',ADVANCE='NO') LONG(IGP) !B1 Rh
+              WRITE(96,'(f8.3)',ADVANCE='NO') LAT(IGP)  !B1 Rh
+              WRITE(97,'(f8.3)',ADVANCE='NO') LONG(IGP) !B1 W
+              WRITE(97,'(f8.3)',ADVANCE='NO') LAT(IGP)  !B1 W
               DO IMM=1,MM
                 IF(DAILYOUT) THEN
                   DO IMD=1,31
@@ -1177,6 +1271,17 @@ C  _REGRID suffix). - DKB 2026-05-12]
                         WRITE(101,'(f10.3)',ADVANCE='NO')
      &                   T_OUT_M(IGP,IMM,IMD,IND)
      &                  +DTEMP_OUT_M(IGP,IMM,IMD)/2.0
+C [B1: Wind + Rh, non-REGRID DAILYOUT=TRUE branch (uses WIND_OUT,
+C  QHUM_OUT, PSTAR_OUT, T_OUT_M; no _REGRID suffix). Symmetric with
+C  REGRID branch at line ~1102. - DKB 2026-05-12]
+                        WRITE(97,'(f10.3)',ADVANCE='NO')
+     &                   WIND_OUT(IGP,IMM,IMD,IND)
+                        CALL RH_FROM_QPT(
+     &                   QHUM_OUT(IGP,IMM,IMD,IND),
+     &                   PSTAR_OUT(IGP,IMM,IMD,IND),
+     &                   T_OUT_M(IGP,IMM,IMD,IND),
+     &                   RH_TMP)
+                        WRITE(96,'(f10.3)',ADVANCE='NO') RH_TMP
                       ENDIF
                     ENDDO
                   ENDDO
@@ -1199,6 +1304,16 @@ C  non-REGRID DAILYOUT=FALSE branch (monthly mean). - DKB 2026-05-12]
                   WRITE(101,'(f10.3)',ADVANCE='NO')
      &             T_OUT_M(IGP,IMM,1,1)
      &            +DTEMP_OUT_M(IGP,IMM,1)/2.0
+C [B1: Wind + Rh, non-REGRID DAILYOUT=FALSE branch (monthly mean;
+C  uses ,1,1 sub-index). - DKB 2026-05-12]
+                  WRITE(97,'(f10.3)',ADVANCE='NO')
+     &             WIND_OUT(IGP,IMM,1,1)
+                  CALL RH_FROM_QPT(
+     &             QHUM_OUT(IGP,IMM,1,1),
+     &             PSTAR_OUT(IGP,IMM,1,1),
+     &             T_OUT_M(IGP,IMM,1,1),
+     &             RH_TMP)
+                  WRITE(96,'(f10.3)',ADVANCE='NO') RH_TMP
                 ENDIF
               ENDDO
               WRITE(92,'()') !Advance one line in the output file
@@ -1210,6 +1325,10 @@ C [B2: per-cell newlines for Tmin_anom (unit 100) + Tmax_anom (unit
 C  101). non-REGRID branch. - DKB 2026-05-12]
               WRITE(100,'()') !B2 Tmin
               WRITE(101,'()') !B2 Tmax
+C [B1: per-cell newlines for Rh_anom (unit 96) + W_anom (unit 97).
+C  non-REGRID branch. - DKB 2026-05-12]
+              WRITE(96,'()') !B1 Rh
+              WRITE(97,'()') !B1 W
             ENDDO
           ENDIF !End of REGRID conditional
 
@@ -1232,6 +1351,11 @@ C  with B10's unconditional-CLOSE-per-IYEAR-iteration semantics for
 C  units 92/93/94/95/11 above. - DKB 2026-05-12]
           CLOSE(100)
           CLOSE(101)
+C [B1: CLOSE Rh_anom (unit 96) + W_anom (unit 97). Unit 97 is then
+C  re-opened immediately below for the 'done' marker (line ~1304;
+C  pre-existing). - DKB 2026-05-12]
+          CLOSE(96)
+          CLOSE(97)
 
           !Write a temporary file to tell LPJ-GUESS that IMOGEN has completed writing the climate files - TP 29.07.15
           OPEN(97,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/IMOGEN/output/'//THISYEAR//'/'//'done',STATUS='REPLACE')
@@ -1280,6 +1404,11 @@ C  - DKB 2026-05-05]
       IF(ALLOCATED(SW_OUT_M_REGRID))    DEALLOCATE(SW_OUT_M_REGRID)
       IF(ALLOCATED(DTEMP_OUT_M_REGRID)) DEALLOCATE(DTEMP_OUT_M_REGRID)
       IF(ALLOCATED(F_WET_CLIM_REGRID))  DEALLOCATE(F_WET_CLIM_REGRID)
+C [B1: DEALLOCATE the 3 new REGRID arrays; symmetric with their
+C  ALLOCATE at line ~341. - DKB 2026-05-12]
+      IF(ALLOCATED(WIND_OUT_M_REGRID))  DEALLOCATE(WIND_OUT_M_REGRID)
+      IF(ALLOCATED(QHUM_OUT_M_REGRID))  DEALLOCATE(QHUM_OUT_M_REGRID)
+      IF(ALLOCATED(PSTAR_OUT_M_REGRID)) DEALLOCATE(PSTAR_OUT_M_REGRID)
       IF(ALLOCATED(LON_OUT))            DEALLOCATE(LON_OUT)
       IF(ALLOCATED(LAT_OUT))            DEALLOCATE(LAT_OUT)
 
@@ -1295,7 +1424,16 @@ C  - DKB 2026-05-05]
 
       SUBROUTINE REGRID_CLIM(T_OUT_M,SW_OUT_M,P_OUT_M,DTEMP_OUT_M,F_WET_CLIM_OUT,MM,NSDMAX,GPOINTS,LONG,LAT
      & ,T_OUT_M_REGRID,P_OUT_M_REGRID,SW_OUT_M_REGRID,DTEMP_OUT_M_REGRID,F_WET_CLIM_REGRID,NGPOINTS,LON_OUT
-     & ,LAT_OUT,DIR_COMMON,THISYEAR,FILE_GRIDLIST)
+     & ,LAT_OUT,DIR_COMMON,THISYEAR,FILE_GRIDLIST
+C [Step 17b (F-12 sub-milestone C2; audit item B1): extended signature
+C  with 3 new IN arrays (WIND_OUT, QHUM_OUT, PSTAR_OUT) + 3 new OUT
+C  arrays (WIND_OUT_M_REGRID, QHUM_OUT_M_REGRID, PSTAR_OUT_M_REGRID).
+C  Used by the REGRID-branch Rh_anom + W_anom writers in MAIN at line
+C  ~1086. Nearest-neighbor passthrough applied in the IND_MIN loop
+C  below mirrors the existing T_OUT_M / P_OUT_M / SW_OUT_M pattern.
+C  - DKB 2026-05-12]
+     & ,WIND_OUT,QHUM_OUT,PSTAR_OUT
+     & ,WIND_OUT_M_REGRID,QHUM_OUT_M_REGRID,PSTAR_OUT_M_REGRID)
 
       IMPLICIT NONE
 
@@ -1316,6 +1454,14 @@ C  - DKB 2026-05-05]
      &,DTEMP_OUT_M(GPOINTS,MM,31)          !IN Calculated daily temperature range for 365 day year
       INTEGER F_WET_CLIM_OUT(GPOINTS,MM)
 
+C [B1: NEW input dimension decls for Wind / Qhum / Pstar source arrays
+C  (passed from MAIN's CLIM_DISAG outputs). Same shape as T_OUT_M.
+C  - DKB 2026-05-12]
+      REAL
+     & WIND_OUT(GPOINTS,MM,31,NSDMAX)      !IN Calculated wind speed (m/s)
+     &,QHUM_OUT(GPOINTS,MM,31,NSDMAX)      !IN Calculated specific humidity (kg/kg)
+     &,PSTAR_OUT(GPOINTS,MM,31,NSDMAX)     !IN Calculated surface pressure (Pa)
+
       REAL
      & LAT(GPOINTS)                   !WORK Latitudinal position of land
      &,LONG(GPOINTS)                  !WORK Longitudinal position of lan
@@ -1326,6 +1472,13 @@ C  - DKB 2026-05-05]
      &,SW_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX) !OUT Regridded calculated shortwave radiation for 365 day year
      &,DTEMP_OUT_M_REGRID(NGPOINTS,MM,32)     !OUT Regridded calculated daily temperature range for 365 day year
       INTEGER F_WET_CLIM_REGRID(NGPOINTS,MM)
+
+C [B1: NEW output dimension decls for the 3 new regridded arrays.
+C  Same shape as T_OUT_M_REGRID. - DKB 2026-05-12]
+      REAL
+     & WIND_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)  !OUT Regridded calculated wind speed (m/s)
+     &,QHUM_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX)  !OUT Regridded calculated specific humidity (kg/kg)
+     &,PSTAR_OUT_M_REGRID(NGPOINTS,MM,32,NSDMAX) !OUT Regridded calculated surface pressure (Pa)
 
       REAL
      & LON_OUT(NGPOINTS)            !IN/OUT Longitude array to perform regridding to (read from file)
@@ -1396,12 +1549,59 @@ C  - DKB 2026-05-05]
               T_OUT_M_REGRID(NGP,IMM,IMD,IND)=T_OUT_M(IND_MIN,IMM,IMD,IND)
               P_OUT_M_REGRID(NGP,IMM,IMD,IND)=P_OUT_M(IND_MIN,IMM,IMD,IND)
               SW_OUT_M_REGRID(NGP,IMM,IMD,IND)=SW_OUT_M(IND_MIN,IMM,IMD,IND)
+C [B1: 3 new nearest-neighbor passthroughs. Same algorithm as T/P/SW
+C  above (use IND_MIN found via the GP loop). - DKB 2026-05-12]
+              WIND_OUT_M_REGRID(NGP,IMM,IMD,IND)=WIND_OUT(IND_MIN,IMM,IMD,IND)
+              QHUM_OUT_M_REGRID(NGP,IMM,IMD,IND)=QHUM_OUT(IND_MIN,IMM,IMD,IND)
+              PSTAR_OUT_M_REGRID(NGP,IMM,IMD,IND)=PSTAR_OUT(IND_MIN,IMM,IMD,IND)
             ENDDO
             DTEMP_OUT_M_REGRID(NGP,IMM,IMD)=DTEMP_OUT_M(IND_MIN,IMM,IMD)
           ENDDO
           F_WET_CLIM_REGRID(NGP,IMM)=F_WET_CLIM_OUT(IND_MIN,IMM)
         ENDDO
       ENDDO
+
+      RETURN
+      END
+
+!----------------------------------------------------------------------
+! [Step 17b (F-12 sub-milestone C2; audit item B1) of unified-codebase
+!  rebuild (2026-05-12): inline Tetens-formula relative-humidity
+!  computation from specific humidity Q (kg/kg), surface pressure
+!  P_PA (Pa) and air temperature T_K (Kelvin). Returns RH in PERCENT,
+!  clamped to [0,100]. Byte-level identical algebra to the C++
+!  in-process port's computeRelativeHumidityFromSpeificHumidty()
+!  at climatemodel.cpp:1228-1249 (Tetens formula; NOT the Goff-Gratch
+!  lookup used by the existing QSAT subroutine below at line ~3895).
+!  Tetens is preferred here for cross-engine bit-level parity with
+!  the C++ port; the slight precision difference vs Goff-Gratch is
+!  negligible for IMOGEN-engine Rh anomaly output use (~1% absolute
+!  Rh accuracy is sufficient for downstream LandSyMM/BLAZE consumers).
+!  Called 4 times from the climate-anomaly writer block in MAIN
+!  (lines ~1086, ~1118, ~1192, ~1224 post-B1). - DKB 2026-05-12
+!----------------------------------------------------------------------
+
+      SUBROUTINE RH_FROM_QPT(Q, P_PA, T_K, RH)
+
+      IMPLICIT NONE
+
+      REAL Q             !IN  specific humidity (kg/kg)
+      REAL P_PA          !IN  surface pressure (Pa)
+      REAL T_K           !IN  air temperature (Kelvin)
+      REAL RH            !OUT relative humidity (%, clamped [0,100])
+
+      REAL T_C           !WORK temperature in Celsius
+      REAL P_HPA         !WORK pressure in hPa
+      REAL E             !WORK vapor pressure (hPa)
+      REAL ES            !WORK saturation vapor pressure (hPa, Tetens)
+
+      T_C   = T_K   - 273.15
+      P_HPA = P_PA  / 100.0
+      E     = (Q * P_HPA) / (0.622 + 0.378 * Q)
+      ES    = 6.112 * EXP((17.67 * T_C) / (T_C + 243.5))
+      RH    = (E / ES) * 100.0
+      IF (RH .LT. 0.0)   RH = 0.0
+      IF (RH .GT. 100.0) RH = 100.0
 
       RETURN
       END
