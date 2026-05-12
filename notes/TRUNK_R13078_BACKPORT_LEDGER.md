@@ -1557,6 +1557,86 @@ B10's structural fix (unconditional OPEN/CLOSE per IYEAR iteration; 7 conditiona
 
 ---
 
+### Step 17b (B4 LANDED): `ImogenInput` Rh/W/Tmin/Tmax consumer wiring expansion in `lpjguess/modules/imogen_input.{cpp,h}` — +187 LOC additive in source + +15 LOC in `.ins`; **backport-RELEVANT** (functional code change)
+
+**Audit-item scope:** B4 = audit item bundling the loose-mode (`-input imogen`) counterpart to the tight-mode (`-input imogencfx`) step-9.5 wiring of Rh / Wind / Tmin / Tmax in `IMOGENCFXInput` (commit `a543e9d`; refined K→°C bug-fix at step-17a sub-step 7.3.2 commit `8aafe84`). Per the re-ordered Option A bundle sequence (B10 → B6 → B2 → B3 → **B4** → B1; user-confirmed 2026-05-11), B4 was scheduled as the consumer-side mirror of the engine-side step-9.5 wiring. Budgeted at 1 d; landed in ~0.5 d (direct mirror of the C1.1 IMOGENCFXInput pattern with zero unanticipated forensic findings). **Closes the loose-mode-vs-tight-mode 6-vs-10-fields gap** identified during the 2026-05-10 late-evening audit.
+
+**Pre-implementation investigation (forensic state captured before any edits):**
+
+- `imogen_input.h` pre-B4 declared `file_relhum` + `file_wind` + `file__pres` at lines 232-236 (in a "for Blaze need from imogen:" block) but `rg "file_relhum|file_wind|file__pres|file_tmin|file_tmax" imogen_input.cpp` returned **zero hits** — i.e. the declarations were vestigial header-only. No `file_tmin`/`file_tmax` declarations existed pre-B4. No per-day arrays for relhum/wind/tmin/tmax. No `all_drelhum`/`all_dwind`/`all_dtmin`/`all_dtmax` per-year caches.
+- `imogencfx.{cpp,h}` (the C1.1 reference) has all 4 path decls at `imogencfx.h:260-266`; all 4 per-day arrays at `imogencfx.h:204-218`; all 4 caches at `imogencfx.h:311-318`. `init()` reads 4 params at `imogencfx.cpp:427-430`; resize at `imogencfx.cpp:584-587`; `readenv()` guarded reads at `imogencfx.cpp:866-888`; `get_climate_for_gridcell()` monthly+daily branches at `imogencfx.cpp:986-1004` + `:1017-1028`; `getclimate()` consumer assignments at `imogencfx.cpp:1274-1277`; `getclimate_for_year()` consumer assignments at `imogencfx.cpp:1604-1607`.
+- The `Climate` struct already has all 4 target fields at `lpjguess/framework/guess.h:844-850` (`u10`, `relhum`, `tmin`, `tmax`); B4 only needs to populate them, not declare them.
+- Fortran-engine output state at B4-land time: post-B2 (commit `76b3b04`) the Fortran engine writes `Tmin_anom.dat` + `Tmax_anom.dat`; pre-B1 the Fortran engine does NOT write `Rh_anom.dat` / `W_anom.dat`. Pre-staged predecessor climate at `runs/SSP1-2.6/Common-directory/IMOGEN/output/YYYY/` contains ALL 4 files (verified 2026-05-12 pre-B4), so the xval window has full coverage independent of the B1-pending state.
+
+**What landed this commit (3 source files + 1 config file; +187 LOC source additive + +15 LOC .ins additive; ZERO source removals):**
+
+**File 1: `lpjguess/modules/imogen_input.h`** (3 sub-edits; +60 LOC):
+
+| # | Insertion site | Content |
+|---|---|---|
+| 1 | After `dNH4dep[]/dNO3dep[]` per-day arrays (line ~196 pre-B4) | 4 new per-day arrays `drelhum/dwind/dtmin/dtmax[Date::MAX_YEAR_LENGTH]` + ~30-line canonical B4 doc block citing: (a) the C1.1 IMOGENCFXInput symmetric pattern at `imogencfx.h:204-218`; (b) the K-vs-°C convention decision (ImogenInput keeps K in per-day arrays; converts at consumer site — opposite of IMOGENCFXInput post-step-17a-7.3.2); (c) source files consumed (Tmin/Tmax post-B2; Rh/Wind B1-pending); (d) unit conventions per field. |
+| 2 | After existing `file_wind` vestigial decl (line ~236 pre-B4) | (a) Doc block annotating the pre-existing vestigial `file_relhum`/`file_wind` decls as now-wired-by-B4 (preserving them rather than adding duplicates); (b) 2 new path decls `xtring file_tmin; xtring file_tmax;` with doc block mirroring `imogencfx.h:265-266`. |
+| 3 | After `all_dtr` per-year cache decl (line ~280 pre-B4) | 4 new per-year caches `all_drelhum/all_dwind/all_dtmin/all_dtmax` with doc block mirroring `imogencfx.h:311-318`. |
+
+**File 2: `lpjguess/modules/imogen_input.cpp`** (5 sub-edits; +127 LOC):
+
+| # | Insertion site | Content |
+|---|---|---|
+| 1 | After `file_dtr = param["file_dtr"].str;` in `init()` (line ~251 pre-B4) | ~30-line canonical B4 doc block (scope, B1-pending fallback rationale, ins-file-side cross-references to `main_xval_imogencfx.ins:96-99` + `main_xval_loose.ins` post-B4 + `main.ins:74-75`) + 4 param reads: `file_relhum = param["file_relhum"].str; file_wind = param["file_wind"].str; file_tmin = param["file_tmin"].str; file_tmax = param["file_tmax"].str;` |
+| 2 | After `resize3DimVector(all_dtr, ...)` in `init()` (line ~372 pre-B4) | Doc block (mirror of `imogencfx.cpp:575-583`) + 4 new `resize3DimVector` calls for `all_drelhum`, `all_dwind`, `all_dtmin`, `all_dtmax`. |
+| 3 | After `if (ifbvoc) { ... all_dtr ... }` block in `readenv()` (line ~615 pre-B4) | Doc block + 4 guarded reads using the `if ((char*)file_relhum != NULL && file_relhum != "") { filename = gen_filename(file_relhum, calendar_year, false); read_lines_from_file(filename, lons, lats, line_index, all_drelhum[store_index], monthly); }` pattern (mirror of `imogencfx.cpp:866-888`). 4 of these blocks for relhum/wind/tmin/tmax respectively. |
+| 4 | (a) After `interp_climate(...)` in `get_climate_for_gridcell()` monthly branch (line ~645 pre-B4); (b) After `if (ifbvoc) ddtr[i] = ...` in daily branch (line ~652 pre-B4) | **Monthly branch addition**: doc block (NO K→°C at this layer; ImogenInput convention) + 4 `m*[12]` arrays + 4 `have_*` booleans + 4 `interp_monthly_means_conserve` calls. **Daily branch addition**: doc block + 4 guarded daily passthroughs `if ((char*)file_relhum != NULL && file_relhum != "") drelhum[i] = all_drelhum[store_index][igrid][i];` (4 of these). |
+| 5 | (a) After `if (ifbvoc) { climate.dtr = ddtr[date.day]; }` in `getclimate()` (line ~892 pre-B4); (b) After same in `getclimate_for_year()` (line ~1158 pre-B4) | Doc block (citing the K→°C-at-consumer-site decision; cross-reference to the existing `climate.temp = dtemp - 273.15` line above; cross-reference to `imogencfx.cpp:1274-1277` + `:1604-1607` for the symmetric pattern on the tight-mode side) + 4 `climate.{relhum, u10, tmin, tmax}` assignments: `climate.relhum = drelhum[date.day]; climate.u10 = dwind[date.day]; climate.tmin = dtmin[date.day] - 273.15; climate.tmax = dtmax[date.day] - 273.15;` (replace `date.day` with `day_of_year` for the `getclimate_for_year` version). |
+
+**File 3: `runs/SSP1-2.6/main_xval_loose.ins`** (1 sub-edit; +15 LOC) — *NOT part of `trunk_r13078`'s tree; backport-side not needed but documented here for completeness*:
+
+| # | Insertion site | Content |
+|---|---|---|
+| 1 | After existing `file_dtr` param line 65 | Doc block + 4 new param directives mirroring `main_xval_imogencfx.ins:96-99`: `param "file_relhum" (str "./IMOGEN/output/YYYY/Rh_anom.dat") `, `param "file_wind" (str "./IMOGEN/output/YYYY/W_anom.dat") `, `param "file_tmin" (str "./IMOGEN/output/YYYY/Tmin_anom.dat") `, `param "file_tmax" (str "./IMOGEN/output/YYYY/Tmax_anom.dat") `. |
+
+**Net source change:** +60 LOC in `imogen_input.h` + +127 LOC in `imogen_input.cpp` = **+187 LOC additive** in `lpjguess/modules/`; **ZERO source removals**. Pure additive expansion.
+
+**Backport Sprint instructions for `trunk_r13078`:**
+
+**Files affected: `lpjguess/modules/imogen_input.h` + `lpjguess/modules/imogen_input.cpp`.** Apply the 8 source-side sub-edits (3 in `.h` + 5 in `.cpp`) in dependency order:
+
+1. **Verify the pre-B4 state in `trunk_r13078`**: run `rg "file_tmin|file_tmax|file_relhum|file_wind" trunk_r13078/lpjguess/modules/imogen_input.cpp` and `rg "file_tmin|file_tmax" trunk_r13078/lpjguess/modules/imogen_input.h`. If the result mirrors our pre-B4 state (zero hits in `.cpp` for these patterns; only the vestigial `file_relhum`/`file_wind` decls in `.h`), then proceed; B4's mechanical insertions are directly applicable.
+2. **`.h` edit 1** (per-day arrays): locate the `dNH4dep[]/dNO3dep[]` per-day array decls in the private section. Insert the 4 new per-day arrays `drelhum/dwind/dtmin/dtmax[Date::MAX_YEAR_LENGTH]` after them, with the full ~30-line doc block.
+3. **`.h` edit 2** (path decls): locate the pre-existing vestigial `file_relhum`/`file_wind`/`file__pres` decls. Insert the doc block annotating them as now-wired-by-B4 + 2 new path decls `xtring file_tmin; xtring file_tmax;` after them.
+4. **`.h` edit 3** (per-year caches): locate the `all_dtr` per-year cache decl. Insert the 4 new caches `all_drelhum/all_dwind/all_dtmin/all_dtmax` after it, with doc block.
+5. **`.cpp` edit 1** (init() param reads): locate `file_dtr = param["file_dtr"].str;` in `init()`. Insert the ~30-line canonical B4 doc block + 4 param reads after it.
+6. **`.cpp` edit 2** (init() resizes): locate `resize3DimVector(all_dtr, ...)` in `init()`. Insert 4 new resize calls after it, with doc block.
+7. **`.cpp` edit 3** (readenv() guarded reads): locate the `if (ifbvoc) { ... all_dtr ... }` block in `readenv()`. Insert 4 guarded reads after it, with doc block.
+8. **`.cpp` edit 4** (get_climate_for_gridcell() monthly + daily branches): locate `interp_climate(...)` in the monthly branch + `if (ifbvoc) ddtr[i] = ...` in the daily branch. Insert the monthly-branch additions (4 `m*[12]` + `have_*` + `interp_monthly_means_conserve`) + daily-branch additions (4 guarded passthroughs), with doc blocks at each branch.
+9. **`.cpp` edit 5** (consumer assignments): locate `if (ifbvoc) { climate.dtr = ddtr[date.day]; }` in `getclimate()` AND in `getclimate_for_year()`. Insert 4 `climate.{relhum, u10, tmin, tmax}` assignments after each, with K→°C `- 273.15` on tmin/tmax (mirror of existing `climate.temp = dtemp[date.day] - 273.15` pattern). NOTE: the doc block at each site should cross-reference the deliberate intentional difference from IMOGENCFXInput's monthly-array-step K→°C convention.
+
+**Critical safety details to preserve at backport:**
+
+1. **K→°C conversion site decision**: ImogenInput converts at the **consumer site** (`climate.tmin = dtmin - 273.15`), not at the monthly-array step. IMOGENCFXInput converts at the **monthly-array step** post-step-17a-7.3.2 (`mtmin[i] = all_dtmin[...] - 273.15`). These are intentionally distinct and the doc blocks at both sites must cross-reference each other to prevent future drift. **Do NOT unify** the K→°C handling site at backport — preserving the distinction is part of the design intent (justification: bit-exact reproduction of each input module's existing temp semantics).
+2. **B1-pending fallback**: the `if ((char*)file_relhum != NULL && file_relhum != "")` guard pattern is required around all 4 file reads in `readenv()`. Removing these guards (e.g. for "simplification") would break the B1-pending forward-safety: the run would `fail()` at `read_lines_from_file:550` when the `.ins` doesn't set the paths. **Preserve the guards verbatim.**
+3. **Vestigial decl repurposing**: don't add duplicate `file_relhum`/`file_wind` decls in the header. The existing pre-B4 decls (in the "for Blaze need from imogen:" block) get the B4 wiring; only `file_tmin` + `file_tmax` are added as NEW decls. The `file__pres` decl is left intact (still vestigial; future B-item).
+4. **`preload_all_climate` unchanged**: the C1.1 year_outer override delegates to `readenv()`. Extending `readenv()` (edit #7) is sufficient. Do NOT modify `preload_all_climate` for B4.
+
+**Verification gate at backport:**
+
+- Clean rebuild of `lpjguess/build/` and `lpjguess/build_mpi/` with zero new warnings (force rebuild of `imogen_input.{cpp,h}`).
+- 162 unit tests pass on both `build/runtests` and `build_mpi/runtests`.
+- All 4 xval scenarios PASS substantive (37/37 bit-exact + 0/37 NaN) against `build_mpi/guess` single-process.
+- 8 xval run.log files (4 scenarios × 2 modes) complete with "Finished" terminator without `read_lines_from_file` failures (proves all 4 new paths resolved correctly).
+- `rg "file_tmin|file_tmax|file_relhum|file_wind" trunk_r13078/lpjguess/modules/imogen_input.cpp | wc -l` should return >= 20 hits post-backport (was 0 pre-backport): 4 param reads in `init()` + 8 in `readenv()` (2 per field: `if (...) { ... }`) + 8 in `get_climate_for_gridcell()` (4 per field across monthly+daily branches) + similar in `getclimate()` + `getclimate_for_year()`.
+
+**Cross-references:**
+- `notes/STEP_17b.md` §3f — canonical forensic record (B4 forensic, design decisions, 8-sub-edit insertion summary, verification gate table, post-B4 consumer-wiring parity matrix)
+- `lpjguess/modules/imogencfx.{cpp,h}` (commit `a543e9d` + step-17a `8aafe84`) — C1.1 IMOGENCFXInput symmetric counterpart on the tight-mode side
+- `lpjguess/framework/guess.h:840-850` — `Climate` struct field declarations for `u10` / `relhum` / `tmin` / `tmax`
+- `runs/SSP1-2.6/main_xval_imogencfx.ins:96-99` — reference `.ins` configuration for the 4 new params
+- `notes/FOLLOWUPS.md` audit-table B4 row (now ✅ DONE 2026-05-12 night)
+- `_phase2_findings/decisions.md` Decision #11 — Tmin/Tmax algebraic derivation rationale
+
+**F-11 backport-sprint classification:** **RELEVANT (functional code change)**. The 8 source-side sub-edits should be applied to `trunk_r13078`'s `imogen_input.{cpp,h}` if its pre-B4 state matches our pre-B4 state. Treat as a ~1-2 hour mechanical replication during the F-11 sprint. The `runs/SSP1-2.6/main_xval_loose.ins` change is config-only and **not** part of `trunk_r13078`'s tree.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

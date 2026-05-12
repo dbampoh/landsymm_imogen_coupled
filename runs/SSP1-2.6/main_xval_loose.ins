@@ -65,6 +65,21 @@ param "file_wetdays"      (str "./IMOGEN/output/YYYY/WET.dat")
 param "file_dtr"          (str "./IMOGEN/output/YYYY/DTEMP_anom.dat")
 param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
 
+! [Step 17b (B4): IMOGEN-engine Rh / wind / Tmin / Tmax outputs. Mirrors
+!  main_xval_imogencfx.ins lines 96-99. All four pre-staged files exist
+!  in Common-directory/IMOGEN/output/YYYY/ (verified 2026-05-12 ahead of
+!  B4 land; sizes 246281 B each at YYYY=1871). file_tmin/file_tmax are
+!  available post-B2 (Fortran engine, commit `76b3b04`); file_relhum/
+!  file_wind are B1-pending in the Fortran engine but the pre-staged
+!  predecessor data fills the gap for the xval window. Empty value
+!  (no path set) is also a valid configuration; B4's read pipeline
+!  guards each path with `if ((char*)file_* != NULL && file_* != "")`.
+!  - DKB 2026-05-12]
+param "file_relhum"       (str "./IMOGEN/output/YYYY/Rh_anom.dat")
+param "file_wind"         (str "./IMOGEN/output/YYYY/W_anom.dat")
+param "file_tmin"         (str "./IMOGEN/output/YYYY/Tmin_anom.dat")
+param "file_tmax"         (str "./IMOGEN/output/YYYY/Tmax_anom.dat")
+
 ! ImogenInput-specific tuning. searchradius (climate) is 50 = generous so
 ! ImogenInput's IDWC nearest-neighbour search succeeds against the engine's
 ! native 1631-cell grid for whatever LPJG cells we ask for.

@@ -250,6 +250,40 @@ void ImogenInput::init() {
   file_insol = param["file_insol"].str;
   file_dtr = param["file_dtr"].str;
 
+  // [Step 17b (F-12 sub-milestone C2; audit item B4) of unified-codebase
+  //  rebuild (2026-05-12): wire the loose-mode (`-input imogen`) consumer
+  //  for IMOGEN engine's Rh / wind / Tmin / Tmax outputs. The Fortran
+  //  engine (`imogen/code/imogen_lpjg.f`) writes `Tmin_anom.dat` /
+  //  `Tmax_anom.dat` per year post-B2 (commit `76b3b04`); `Rh_anom.dat` /
+  //  `W_anom.dat` post-B1 (still pending; will be written by the Fortran
+  //  Rh + Wind physics port). Pre-staged climate at
+  //  `runs/SSP1-2.6/Common-directory/IMOGEN/output/YYYY/` already contains
+  //  all four files (predecessor's pre-staged set; mirror of
+  //  `imogencfx::init()` step-9.5 wiring at `imogencfx.cpp:415-430`).
+  //
+  //  The 4 paths are normally set in the ins file (see
+  //  `runs/SSP1-2.6/main_xval_loose.ins` post-B4 update + reference set in
+  //  `runs/SSP1-2.6/main_xval_imogencfx.ins` lines 96-99 + the canonical
+  //  `runs/SSP1-2.6/main.ins` lines 74-75). If unset, the reads in
+  //  `readenv()` are skipped (path empty -> filename resolves empty ->
+  //  `read_lines_from_file` is gated by `(char*)file_relhum != NULL`
+  //  + `file_relhum != ""` guards). This makes B4 forward-safe across
+  //  the B1-pending transition: even when `file_relhum` / `file_wind`
+  //  point at not-yet-existing files, an unset path triggers the
+  //  skip-branch gracefully.
+  //
+  //  Cross-references:
+  //  - `imogencfx.cpp:415-430` (step-9.5 symmetric wiring on the tight-mode
+  //    `IMOGENCFXInput` side; B4 is the loose-mode mirror)
+  //  - `notes/STEP_17b.md` §3f (B4 forensic record; NEW with this commit)
+  //  - `lpjguess/modules/imogen_input.h:232-247` (B4-extended path member
+  //    declarations)
+  //  - DKB 2026-05-12]
+  file_relhum = param["file_relhum"].str;
+  file_wind   = param["file_wind"].str;
+  file_tmin   = param["file_tmin"].str;
+  file_tmax   = param["file_tmax"].str;
+
   spatial_resolution = parse_spatial_resolution();
 
   spinup_year_idx = 0;
@@ -336,6 +370,20 @@ void ImogenInput::init() {
 	resize3DimVector(all_wetdays, nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
 	resize3DimVector(all_insol, nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
   resize3DimVector(all_dtr, nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
+
+	// [Step 17b (B4): storage for IMOGEN engine's Rh / wind / Tmin / Tmax
+	//  outputs. Same shape as `all_temp` etc. so the `read_lines_from_file`
+	//  calls in `readenv()` index correctly when the corresponding `file_*`
+	//  paths are set in the ins file. When paths are unset, these vectors
+	//  are still resized but the file-read is skipped (see `readenv()`
+	//  guards); leaves prior-cycle values in storage (mirror of
+	//  IMOGENCFXInput pattern at `imogencfx.cpp:584-587`). Defensive
+	//  zero-init on unset-path is a recommended follow-up hardening (B15;
+	//  same as IMOGENCFXInput). - DKB 2026-05-12]
+	resize3DimVector(all_drelhum, nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dwind,   nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmin,   nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmax,   nyears, ngrid, monthly?12:Date::MAX_YEAR_LENGTH);
 
 	all_co2.resize(nyears);
 	
@@ -613,6 +661,33 @@ int ImogenInput::readenv(std::vector<double> lons, std::vector<double> lats, int
 			filename = gen_filename(file_dtr, calendar_year, false);
 			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtr[store_index], monthly);
 		}
+
+		// [Step 17b (B4): read IMOGEN engine's Rh / wind / Tmin / Tmax outputs
+		//  from per-year ASCII files. Each path is YYYY-templated like the
+		//  others (e.g., "./IMOGEN/output/YYYY/Rh_anom.dat"). When path is
+		//  empty (parameter unset in ins), gen_filename produces an empty
+		//  string and read_lines_from_file is skipped to keep behavior
+		//  graceful when these files aren't being produced (e.g., Fortran
+		//  engine before B1's Rh + Wind physics port lands). Mirrors
+		//  IMOGENCFXInput's symmetric reads at `imogencfx.cpp:866-888`.
+		//  - DKB 2026-05-12]
+		if ((char*)file_relhum != NULL && file_relhum != "") {
+			filename = gen_filename(file_relhum, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_drelhum[store_index], monthly);
+		}
+		if ((char*)file_wind != NULL && file_wind != "") {
+			filename = gen_filename(file_wind, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dwind[store_index], monthly);
+		}
+		if ((char*)file_tmin != NULL && file_tmin != "") {
+			filename = gen_filename(file_tmin, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmin[store_index], monthly);
+		}
+		if ((char*)file_tmax != NULL && file_tmax != "") {
+			filename = gen_filename(file_tmax, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmax[store_index], monthly);
+		}
+
 		// already in init() determined, which grids have imogen climate coordinates lines
 		for (int i=0; i < coord_line.size(); i++) {
 			if (coord_line[i]>0)
@@ -644,12 +719,65 @@ void ImogenInput::get_climate_for_gridcell(int store_index, int igrid, long& see
 		}
 		interp_climate(mtmp,mprec,minsol,mdtr,mwet,dtemp,dprec,dinsol,ddtr,seed);
 
+		// [Step 17b (B4): monthly -> quasi-daily interpolation for the new
+		//  IMOGEN outputs (Rh, wind, Tmin, Tmax). Mirrors
+		//  `interp_monthly_means_conserve` usage in `imogencfx.cpp:1001-1004`.
+		//  Each block guarded by `have_*` so empty-path cases produce
+		//  zero-filled `m*[]` (per ImogenInput's pattern: zero monthlies
+		//  -> zero daily output post-interp; consumers gated downstream).
+		//
+		//  CONVENTION (B4 K-preservation): NO K -> degC conversion applied
+		//  to `mtmin/mtmax` at this monthly-array step. ImogenInput stores
+		//  Kelvin in `dtemp[]` (cf. mtmp[i] = all_temp[...] above with NO
+		//  - 273.15) and converts at the consumer site in `getclimate()`
+		//  line ~885 + `getclimate_for_year()` line ~1153. B4 applies the
+		//  SAME convention uniformly to `dtmin[]/dtmax[]` for cross-field
+		//  consistency. This DIFFERS from IMOGENCFXInput's post-step-17a-
+		//  7.3.2 convention (cited at `imogencfx.cpp:920-962` doc block)
+		//  which subtracts 273.15 here; preserved separately because the
+		//  two input modules have intentionally distinct K<->C handling
+		//  sites (see also imogen_input.h:202-217 B4 doc block).
+		//  - DKB 2026-05-12]
+		double mrelhum[12], mwind[12], mtmin[12], mtmax[12];
+		bool have_relhum = ((char*)file_relhum != NULL && file_relhum != "");
+		bool have_wind   = ((char*)file_wind   != NULL && file_wind   != "");
+		bool have_tmin   = ((char*)file_tmin   != NULL && file_tmin   != "");
+		bool have_tmax   = ((char*)file_tmax   != NULL && file_tmax   != "");
+		for (int i = 0; i < 12; i++) {
+			mrelhum[i] = have_relhum ? all_drelhum[store_index][igrid][i] : 0.0;
+			mwind[i]   = have_wind   ? all_dwind[store_index][igrid][i]   : 0.0;
+			mtmin[i]   = have_tmin   ? all_dtmin[store_index][igrid][i]   : 0.0;  // K (unconverted; K->C at consumer)
+			mtmax[i]   = have_tmax   ? all_dtmax[store_index][igrid][i]   : 0.0;  // K (unconverted; K->C at consumer)
+		}
+		if (have_relhum) interp_monthly_means_conserve(mrelhum, drelhum, 0);
+		if (have_wind)   interp_monthly_means_conserve(mwind,   dwind,   0);
+		if (have_tmin)   interp_monthly_means_conserve(mtmin,   dtmin);
+		if (have_tmax)   interp_monthly_means_conserve(mtmax,   dtmax);
+
 	} else {
 		for (int i = 0; i < Date::MAX_YEAR_LENGTH; i++) {
 			dtemp[i] = all_temp[store_index][igrid][i];
 			dprec[i] = all_prec[store_index][igrid][i]; // * 86400 / 1000; // convert to precip rate in kg/m2/s
 			dinsol[i] = all_insol[store_index][igrid][i];
 			if (ifbvoc) ddtr[i] = all_dtr[store_index][igrid][i];
+
+			// [Step 17b (B4): daily-mode passthrough for the new IMOGEN
+			//  outputs. Each guarded so empty-path doesn't index into
+			//  empty storage. CONVENTION (B4 K-preservation): NO K->degC
+			//  conversion here for dtmin/dtmax (mirror of dtemp[i] above
+			//  which preserves K; conversion deferred to consumer site).
+			//  Mirrors IMOGENCFXInput daily-branch pattern at
+			//  `imogencfx.cpp:1019-1027` BUT WITHOUT the -273.15
+			//  subtraction (the distinguishing factor between the two
+			//  input modules' K<->C handling sites). - DKB 2026-05-12]
+			if ((char*)file_relhum != NULL && file_relhum != "")
+				drelhum[i] = all_drelhum[store_index][igrid][i];
+			if ((char*)file_wind != NULL && file_wind != "")
+				dwind[i] = all_dwind[store_index][igrid][i];
+			if ((char*)file_tmin != NULL && file_tmin != "")
+				dtmin[i] = all_dtmin[store_index][igrid][i];  // K (unconverted; K->C at consumer)
+			if ((char*)file_tmax != NULL && file_tmax != "")
+				dtmax[i] = all_dtmax[store_index][igrid][i];  // K (unconverted; K->C at consumer)
 		}
 	}
 	
@@ -890,7 +1018,29 @@ bool ImogenInput::getclimate(Gridcell& gridcell) {
   if(ifbvoc){
     climate.dtr = ddtr[date.day];
   }
-  
+
+  // [Step 17b (B4): populate `Climate` struct's relhum / u10 / tmin / tmax
+  //  from the IMOGEN engine outputs that B4's wiring (above) loaded into
+  //  drelhum / dwind / dtmin / dtmax. Mirrors `imogencfx.cpp:1274-1277`
+  //  symmetric assignments BUT with K -> degC conversion for tmin / tmax
+  //  applied here at the consumer site (matching the existing
+  //  `climate.temp = dtemp[date.day] - 273.15` pattern on line ~885 above).
+  //  Relhum / wind require no unit conversion (passed through as-read).
+  //
+  //  When the corresponding ins parameters are unset (file_relhum etc. = ""),
+  //  the per-day arrays may carry uninitialized memory or stale prior-cycle
+  //  values (see get_climate_for_gridcell guards above + imogen_input.h
+  //  B4 doc block). Downstream consumers (BLAZE; LandSyMM crop dynamics)
+  //  are gated separately on `firemodel == BLAZE` etc. and should not
+  //  consume these fields when their ins-side sources are unwired.
+  //  Defensive zero-init on unset-path is a recommended follow-up hardening
+  //  (B15-style; mirrors IMOGENCFXInput's same latent concern).
+  //  - DKB 2026-05-12]
+  climate.relhum = drelhum[date.day];
+  climate.u10    = dwind[date.day];
+  climate.tmin   = dtmin[date.day] - 273.15;  // K -> degC (mirror of climate.temp pattern)
+  climate.tmax   = dtmax[date.day] - 273.15;  // K -> degC (mirror of climate.temp pattern)
+
   // Nitrogen deposition
 	gridcell.dNH4dep = dNH4dep[date.day];
 	gridcell.dNO3dep = dNO3dep[date.day];
@@ -1157,6 +1307,20 @@ bool ImogenInput::getclimate_for_year(Gridcell& gridcell,
 	if (ifbvoc) {
 		climate.dtr = ddtr[day_of_year];
 	}
+
+	// [Step 17b (B4): year_outer-mode counterpart to the
+	//  `getclimate()` B4 assignments above (lines ~915-921). Same
+	//  semantics: K -> degC conversion at consumer site for tmin / tmax
+	//  (mirror of `climate.temp = dtemp[day_of_year] - 273.15` on the
+	//  line just above); pass-through for relhum / wind. Indexed by
+	//  `day_of_year` (the year_outer per-day driver argument). Mirror of
+	//  IMOGENCFXInput year_outer override at `imogencfx.cpp:1604-1607`,
+	//  preserving the same K-vs-C-handling-site distinction between the
+	//  two input modules. - DKB 2026-05-12]
+	climate.relhum = drelhum[day_of_year];
+	climate.u10    = dwind[day_of_year];
+	climate.tmin   = dtmin[day_of_year] - 273.15;  // K -> degC
+	climate.tmax   = dtmax[day_of_year] - 273.15;  // K -> degC
 
 	gridcell.dNH4dep = dNH4dep[day_of_year];
 	gridcell.dNO3dep = dNO3dep[day_of_year];

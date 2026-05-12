@@ -195,6 +195,51 @@ private:
   /// Daily N deposition for one year
 	double dNH4dep[Date::MAX_YEAR_LENGTH],dNO3dep[Date::MAX_YEAR_LENGTH];
 
+	// [Step 17b (F-12 sub-milestone C2; audit item B4) of unified-codebase
+	//  rebuild (2026-05-12): per-day arrays for Rh / Wind / Tmin / Tmax
+	//  consumer wiring expansion. Mirrors IMOGENCFXInput's step-9.5 wiring
+	//  (`lpjguess/modules/imogencfx.h` lines ~204-218 + `imogencfx.cpp`
+	//  lines ~990-1027 + ~1264-1277) but follows ImogenInput's existing
+	//  K-stored-in-per-day-array convention (cf. `dtemp[]` semantics here at
+	//  `imogen_input.cpp:639` / `:649`; K -> Celsius conversion applied at
+	//  the consumer site in `getclimate()` line ~885 + `getclimate_for_year()`
+	//  line ~1153, NOT at the monthly-array population step in
+	//  `get_climate_for_gridcell()`). This intentionally DIFFERS from
+	//  IMOGENCFXInput's post-step-17a-7.3.2 K -> C-at-monthly-array convention
+	//  (cited at `imogencfx.cpp:1587-1590` doc block); preserved separately
+	//  because the two input modules have intentionally distinct K<->C
+	//  handling sites (see also `getclimate_for_year()` doc block at
+	//  `imogen_input.cpp:1147-1152` for the same K-convention rationale
+	//  applied to climate.temp).
+	//
+	//  Source files consumed (post-B2 commit `ceb2766` / B1 pending):
+	//  - file_relhum -> Rh_anom.dat   (B1-pending; Fortran engine port to land)
+	//  - file_wind   -> W_anom.dat    (B1-pending; Fortran engine port to land)
+	//  - file_tmin   -> Tmin_anom.dat (B2-available; commit `76b3b04`)
+	//  - file_tmax   -> Tmax_anom.dat (B2-available; commit `76b3b04`)
+	//
+	//  Unit conventions (post-B4):
+	//  - Rh:   fraction or %         (no unit conversion; stored as-read)
+	//  - Wind: m/s (per IMOGEN's `W_anom.dat`)  (no unit conversion;
+	//          `climate.u10` per `guess.h:843-844` documents "km/h" but
+	//          IMOGENCFXInput passes through m/s untransformed at
+	//          `imogencfx.cpp:1605`; B4 preserves that for cross-input-module
+	//          parity. A formal unit-alignment audit is a follow-up.)
+	//  - Tmin/Tmax: Kelvin in per-day array; K -> degC at consumer site
+	//          (mirror of `climate.temp = dtemp[date.day] - 273.15`).
+	//  - DKB 2026-05-12]
+	/// Relative humidity for current gridcell and current year (Rh as-read; fraction or %)
+	double drelhum[Date::MAX_YEAR_LENGTH];
+
+	/// Wind for current gridcell and current year (m/s; passed through to climate.u10)
+	double dwind[Date::MAX_YEAR_LENGTH];
+
+	/// Minimum daily temperature for current gridcell and current year (Kelvin; K -> degC at consumer)
+	double dtmin[Date::MAX_YEAR_LENGTH];
+
+	/// Maximum daily temperature for current gridcell and current year (Kelvin; K -> degC at consumer)
+	double dtmax[Date::MAX_YEAR_LENGTH];
+
   /// DKB Reset virtual function
   void reset();
 
@@ -232,8 +277,21 @@ private:
 // for Blaze need from imogen:
 	xtring file__pres;
 //	int historic_timestep_specifichum;
+	// [Step 17b (B4): repurposed from pre-existing vestigial declarations.
+	//  Prior to commit `ceb2766` (B3), `file_relhum` + `file_wind` were
+	//  declared in this header (header-only; never referenced in the .cpp
+	//  pre-B4). B4 wires them in init() + readenv() + get_climate_for_gridcell()
+	//  + getclimate()/getclimate_for_year(). - DKB 2026-05-12]
 	xtring file_relhum;
 	xtring file_wind;
+
+	// [Step 17b (B4): NEW path declarations for Tmin_anom.dat / Tmax_anom.dat.
+	//  Mirrors `imogencfx.h:265-266` step-9.5 wiring. Wired in init() +
+	//  readenv() + get_climate_for_gridcell() + getclimate()/getclimate_for_year().
+	//  - DKB 2026-05-12]
+	xtring file_tmin;
+	xtring file_tmax;
+
     
   /// Nitrogen deposition forcing for current gridcell
   Lamarque::NDepData ndep;
@@ -278,7 +336,22 @@ private:
 	std::vector< std::vector< std::vector<double> > > all_wetdays;
   std::vector< std::vector< std::vector<double> > > all_insol;
   std::vector< std::vector< std::vector<double> > > all_dtr;
-	
+
+	// [Step 17b (B4): per-year caches for Rh / Wind / Tmin / Tmax across all
+	//  gridcells x all months/days in the smoke window. Same shape as
+	//  `all_temp` etc. so the `read_lines_from_file` calls in `readenv()`
+	//  index correctly when the corresponding `file_*` paths are set in the
+	//  ins file. When paths are unset, these vectors are still resized but
+	//  the file-read is skipped (see `readenv()` guards); leaves prior-cycle
+	//  values in storage (same behaviour as IMOGENCFXInput; see `imogencfx.cpp:
+	//  996-999` `have_*` guards). Defensive zero-init on unset-path is a
+	//  recommended follow-up hardening (B15-style). Mirrors `imogencfx.h:
+	//  311-318`. - DKB 2026-05-12]
+	std::vector< std::vector< std::vector<double> > > all_drelhum;
+	std::vector< std::vector< std::vector<double> > > all_dwind;
+	std::vector< std::vector< std::vector<double> > > all_dtmin;
+	std::vector< std::vector< std::vector<double> > > all_dtmax;
+
 	// Timers for keeping track of progress through the simulation
 	Timer tprogress,tmute;
 	static const int MUTESEC=20; // minimum number of sec to wait between progress messages
