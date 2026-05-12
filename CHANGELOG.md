@@ -17,6 +17,114 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-12 (afternoon-evening, session 3) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.0; **B15+B16 FORENSIC RECORD LANDED** — forensic-only; ZERO `lpjguess/` and `imogen/code/` source change; **NEW persistent operational heuristic rule #8**): comprehensive forensic write-up of two audit items surfaced during session-3 onboarding audit of the C2 close-out tag at `f6c192e`; documents the class-mismatch defect (B15) that silently disabled the `year_outer` code path in all four C1+C2 cross-validation scenarios + the latent eager-cache-fullness defect (B16) in `preload_all_climate`; un-tagged checkpoint above `f6c192e`
+
+This commit lands the **B15 + B16 forensic record** as Step 17c.0 PREP sub-phase **17c.0.0** — the documentation-only first sub-phase of the revised 8-sub-phase PREP plan that emerged from the session-3 onboarding audit. **ZERO source change** to `lpjguess/` or `imogen/code/`; only `notes/STEP_17c.md` (NEW) + the four-file documentation cascade (CHANGELOG + EXECUTION_PLAN + FOLLOWUPS + session-3 handoff Part 1).
+
+#### Why this commit exists — session-3 onboarding audit finding
+
+The canonical anchors at the start of session 3 reported PASS substantive (37/37 bit-exact + 0/37 NaN) for all four xval scenarios at `f6c192e`, with the C2 close-out tag annotation `v0.17.5-step17b-c2-mpi-sync` declaring "tight-coupling closed-loop year_outer mode is now feature-complete on workstation (single-process + mpirun mimic READY)". A pre-cluster audit of what those PASSes actually exercised surfaced an inconsistency: nothing in the existing run.log artefacts contained the `[year_outer]` diagnostic banner that `framework.cpp:502` emits when the year_outer code path executes. This led to a forensic investigation across three independent evidence streams that all converge on the same root cause.
+
+#### B15 — class-mismatch defect (xval harness false-positive; root-caused)
+
+**The defect**: `framework_loop_mode` is declared via `declare_parameter("framework_loop_mode", &IMOGENConfig::framework_loop_mode, 20, "Framework loop ordering: gridcell_outer (default) | year_outer (F-12 C1)")` at `lpjguess/modules/imogencfx.cpp:353` + `lpjguess/modules/imogen_input.cpp:214`, binding it to the global C++ `xtring IMOGENConfig::framework_loop_mode` (initialised to `"gridcell_outer"` at `parameters.cpp:288`). The model consumes it via direct C++ variable read at `framework.cpp:464` (`if (IMOGENConfig::framework_loop_mode == "year_outer")`) — making it unambiguously **Class 1** (declare_parameter-bound; bare-keyword syntax). But the xval harness wrapper-writer (`scripts/cross_validate_year_outer.sh:138`) and the imported xval base ins (`runs/SSP1-2.6/main_xval_imogencfx.ins:176`) both set it using **Class-2 syntax** (`param "framework_loop_mode" (str "$mode")`), which writes only to the global `Paramlist param[...]` dictionary via `CB_STRPARAM` → `param.addparam(...)` — and **never touches** the C++ variable. The two storage paths (`Paramlist param[...]` vs `IMOGENConfig::framework_loop_mode`) are mechanically disjoint with zero cross-update. Result: the gate at `framework.cpp:464` always evaluated false; **all four C1+C2 xval scenarios silently ran in `gridcell_outer` mode in BOTH Run A and Run B**.
+
+**Three independent evidence streams converge on the class-mismatch root cause**:
+
+1. **Empirical reproduction on clean HEAD `f6c192e`** (after stashing all WIP and rebuilding `lpjguess/build/guess` from clean source): `scripts/cross_validate_year_outer.sh 1cell imogencfx` reports PASS substantive (harness exit 0; 37/37 bit-exact + 0/37 NaN); BUT zero `[year_outer]` banners in Run B `run.log`; BUT Run A and Run B `run.log` are sha256-byte-identical (`43c278b00c7e15bc15768cd004c3120938a92bc80e797b2e84bc67e147542c10`); BUT combined sha256 of all 37 `.out` files is identical between Run A and Run B (`ab23ea8054b4131b1e49bd8ddc74a7722f6bb6665c911dd5b19a359ea0a4908d`); BUT both runs show 11 `[F-10 caveat: per-gridcell-rolling]` flushes (the gridcell_outer signature at `imogenoutput.cpp:373`). Two LPJ-GUESS invocations with two intended-different `framework_loop_mode` values cannot produce byte-identical run logs with byte-identical outputs unless `framework_loop_mode` is being completely ignored.
+
+2. **`plib` parser source-level forensic walkthrough**: `param "key" (str "value")` is a custom SET layered on top of plib by `parameters.cpp` — `declareitem("param", BLOCK_PARAM, ...)` at line 991; inside BLOCK_PARAM scope (lines 1506-1514) only `str` and `num` sub-items are declared bound to module-static `strparam`/`numparam`; `CB_STRPARAM` callback (lines 1858-1860) calls `param.addparam(paramname, strparam)` writing exclusively to `Paramlist param[...]`. Separately, `declare_parameter` (parameters.h:821-860; parameters.cpp:736-756) only pushes the (name, &cppvar) tuple into module-static `std::vector`s; the global-scope branch of `plib_declarations` (lines 995-1018) iterates those vectors and calls `declareitem(name, &cppvar, ...)` — registering bare-keyword commands that write directly to the C++ variable through the stored pointer. The two storage paths are disjoint. Mathematically, no value supplied via Class-2 syntax can reach a Class-1 variable.
+
+3. **Canonical pattern from `version_A/` and `version_B/` reference setups**: a strict two-class convention is observable across all 17 reference `.ins` files in `version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/landsymm_imogen_setup/` and `version_B/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/landsymm_imogen/`: Class 1 (declare_parameter-bound C++ vars; e.g. `nyear_spinup`, `freenyears`, `firsthistyear`, `firstoutyear`, `lasthistyear`, `lastoutyear`, `ifdyn_phu_limit`, `nyear_dyn_phu`) takes bare-keyword syntax; Class 2 (Paramlist-dict-only items; file paths and string variable names; e.g. `file_ndep`, `file_gridlist`, `ndep_timeseries`, `variable_temp`, `variable_relhum`, `file_lu`, `file_lucrop`) takes `param "key" (str "value")` syntax. `framework_loop_mode` is unambiguously Class 1; setting it Class 2 violates the canonical convention.
+
+**Why the defect wasn't caught earlier** (three concurrent gaps in observability):
+
+1. No signal-of-life assertion in `compare_outputs()` — the harness only checks `cmp -s` byte-equality + `grep -l 'nan'` NaN-gate. Neither asserts that the year_outer code path actually executed in Run B.
+2. Bit-equal-of-identical-output is a degenerate-pass class: two runs of the same wrong path trivially bit-match.
+3. No diagnostic print of `IMOGENConfig::framework_loop_mode` after `.ins` ingest, so the parsed-vs-intent discrepancy was not visible in either run.log.
+
+**Forensic artefacts preserved**: `_chat_artifacts/forensic_clean_HEAD_xval_2026-05-12.log` (full harness output; 4942 B) + `_chat_artifacts/forensic_clean_HEAD_run_A_run.log` (7395 B; sha256 `43c278b0…`) + `_chat_artifacts/forensic_clean_HEAD_run_B_run.log` (7395 B; sha256 `43c278b0…` — identical to Run A) + `_chat_artifacts/B15_B16_WIP_PRE_FORENSIC_2026-05-12.patch` (16 881 B; sha256 `a5d6c5b0bb2d2a4bc55f1a6342f461bce177dd79abde93f55d749c9860b59271`; pre-forensic exploratory WIP for B15+B16, also preserved as `git stash@{0}`).
+
+#### B16 — eager cache-fullness check (latent; downstream of B15; acknowledged)
+
+While testing a proposed B15 fix end-to-end on the 4cell scenarios (during the pre-forensic exploratory WIP that has been stashed), a downstream-of-B15 latent defect surfaced in `ImogenInput::preload_all_climate` and `IMOGENCFXInput::preload_all_climate`. The eager sanity check `if (last_store_index >= nyears) fail("...: stored_years cache already full ...")` at the start of `preload_all_climate` (after the per-cell mapping update but BEFORE the per-imogen-year cache-miss loop) **mis-models the cache as per-cell**. The actual design intent — per the inner cache-miss branch's own comments ("Cache miss: load year-imogen_year climate for ALL cells") — is that the `stored_years` cache is **cumulative across cells**: cell 0 fills the cache with all distinct imogen_years it needs; subsequent cells produce 100% cache hits if those imogen_years are already loaded. The eager check fires on entry to `cell_idx >= 1` even when the cell needs zero new slots, aborting the run with a misleading "cache already full" message. Latent since C1.3 sub-step 7.3.2 (commit `d7f6c74`, 2026-05-10); undetected because B15 silently prevented year_outer from ever executing in any C1 or C2 xval run.
+
+**B16 fix is deferred to a separate commit AFTER B15 lands** (rationale: B15 is the higher-level harness defect; fixing it is a prerequisite for ANY substantive year_outer validation; B16 surfaces only when B15 is fixed AND a multi-cell year_outer run is attempted; the B15-fixed harness on 1cell scenarios will pass cleanly without ever triggering B16, providing a clean baseline; bundling B15+B16 into a single commit would conflate two distinct defects with different surface and audit lineages).
+
+#### Recommended B15 fix design (DEFERRED to commit 17c.0.1; presented for user review here)
+
+The fix is purely syntactic at three sites; ZERO C++ source change in 17c.0.1:
+
+- **(F1)** `runs/SSP1-2.6/main_xval_imogencfx.ins:176` — change `param "framework_loop_mode" (str "gridcell_outer")` → `framework_loop_mode "gridcell_outer"` with in-place doc comment block citing `notes/STEP_17c.md` §0.
+- **(F2)** `runs/SSP1-2.6/main_xval_loose.ins:182` — symmetric change.
+- **(F3)** `scripts/cross_validate_year_outer.sh:138` (the `write_wrapper_ins` function) — change wrapper template line `param "framework_loop_mode" (str "$mode")` → `framework_loop_mode "$mode"` with doc block at top of `write_wrapper_ins()`.
+- **(F4)** Add signal-of-life banner-presence assertion to `compare_outputs()` per **rule #8**: after the existing byte-equality + NaN checks, grep both run.logs for `[year_outer]` banners; pass condition `banner_a == 0` AND `banner_b >= 1`; failure exits with code 4 (new exit class).
+- **(F5; OPTIONAL, ~3 LOC C++)**: runtime diagnostic at LPJ-GUESS startup echoing `IMOGENConfig::framework_loop_mode` after `.ins` ingest — `dprintf("[framework] framework_loop_mode = \"%s\" (after .ins parse)\n", (const char*)IMOGENConfig::framework_loop_mode);` — placed in the post-plib initialisation path before framework loop entry. Would have surfaced B15 immediately if it had existed. User authorisation pending.
+
+#### NEW persistent operational heuristic — rule #8
+
+**Rule #8 (signal-of-life banner-presence assertion for code-path-gated cross-validation)**: every cross-validation harness whose Run A and Run B exercise different gated code paths in the same binary MUST (a) place a unique `dprintf` banner inside the gated branch; (b) have the harness's compare phase grep both run logs for the banner; (c) assert Run A banner count == 0 AND Run B banner count >= 1; (d) exit non-zero on either invariant violation. Bit-equality + NaN-cleanliness are necessary but not sufficient — they pass trivially when both runs collapse to the same code path. Joins the existing rules #1, #6, #7 in `notes/FOLLOWUPS.md` "Operational heuristics — lessons learned".
+
+#### C2 close-out tag annotation amendment — DECISION DEFERRED to 17c.0.5
+
+Three options on the table for handling `v0.17.5-step17b-c2-mpi-sync` at `f6c192e` (whose annotation message is now known to be misleading without reading `notes/STEP_17c.md` §0):
+
+- **(a) Errata-style**: leave the existing tag untouched; document the validation-gap-vs-tag-annotation discrepancy in `notes/STEP_17c.md` §0 as the canonical errata. Cleanest history; no force-push.
+- **(b) Retroactive correction**: delete + re-create the tag with amended annotation acknowledging the validation gap; force-push to all 3 remotes. Tag annotation accurately reflects substantive-validation state at tag time; but force-push on a multi-remote tag is destructive.
+- **(c) Defer**: decide AFTER B15 is fixed and the four xval scenarios are re-run with year_outer actually exercised. If the re-verification on the same commit (`f6c192e`) substantively passes (i.e., the underlying code at the tag is correct, only the harness was broken), option (a)'s minimal errata note suffices. If the re-verification reveals real correctness gaps in the year_outer block at `f6c192e`, option (b) becomes substantively justified.
+
+**Decision (this 17c.0.0 commit): (c) defer.** Rationale: the B15 fix lands at HEAD, not at the tagged commit; the four-xval re-verification will exercise both `build/guess` and `build_mpi/guess` at HEAD-with-B15-fix, but the underlying code logic at `f6c192e` is unchanged — so the re-verification effectively answers the question "does the year_outer block at the tagged commit substantively work?" The answer is what should drive the tag-amendment decision in 17c.0.5.
+
+#### Step 17c.0 PREP plan — REVISED (5-phase original plan → 8-sub-phase plan)
+
+The original PREP phase (per session-3 handoff Part 0 §0.4) was a single workstation `mpirun -np 4` mimic verification. The B15 forensic surfaced two prerequisites that must land first.
+
+| Sub-phase | Scope | Effort | Status |
+|---|---|---|---|
+| 17c.0.0 | **B15 + B16 forensic record (this commit).** Doc-only; ZERO source change. | 0.5 d (actual) | ✅ DONE |
+| 17c.0.1 | **B15 fix (F1-F4 syntactic; ZERO C++ source) + signal-of-life assertion + optional F5 (~3 LOC C++).** | 0.5-1 d | ⏳ NEXT |
+| 17c.0.2 | **Four-xval re-verification on B15-fixed HEAD.** First time year_outer actually exercised. 1cell should pass cleanly; 4cell may surface B16. | 0.5 d | ⏳ |
+| 17c.0.3 | **B16 forensic + fix.** Eager-cache-check removal in `preload_all_climate` (both modules). | 0.5-1 d | ⏳ (gated on 17c.0.2 surfacing the failure on 4cell) |
+| 17c.0.4 | **Four-xval re-verification on B15+B16-fixed HEAD.** All four scenarios should pass cleanly with year_outer exercised. | 0.5 d | ⏳ |
+| 17c.0.5 | **C2 close-out tag annotation amendment decision** (option a/b/c per `notes/STEP_17c.md` §0.11). | 0.2 d | ⏳ |
+| 17c.0.6 | **Workstation `mpirun -np 4` mimic verification** (the original PREP obligation; deferred-from-C2). Adapts `scripts/run_parallel_mimic.sh` to support `coupling_mode "prescribed"` + `imogencfx` tight-mode variant for proper C2-core exercise. | 1 d | ⏳ |
+| 17c.0.7 | **PREP phase close-out** — doc cascade + (un-tagged) checkpoint commit. | 0.2 d | ⏳ |
+
+**Total revised PREP estimate: ~3.5-5 d** (was: ~0.5-1 d for `mpirun -np 4` only). The B15+B16 surface adds ~3 d of necessary work but produces durable artefacts (rule #8 + the signal-of-life assertion + the cumulative-cache documentation) that benefit every future code-path-gated cross-validation.
+
+#### Verification (this commit; doc-only forensic — minimal regression check)
+
+| Gate | Result |
+|---|---|
+| `git status --porcelain` shows ZERO source changes (`lpjguess/`, `imogen/code/`) | ✅ Only `notes/`, `CHANGELOG.md`, `EXECUTION_PLAN.md`, and `_chat_artifacts/` modified. |
+| Working tree pre-commit | Clean except for the cascade docs + STEP_17c.md NEW. |
+| Forensic artefacts archived in `_chat_artifacts/` (4 files) | ✅ Preserved with sha256 hashes for future reproducibility. |
+| Pre-forensic exploratory WIP preserved | ✅ `git stash@{0}` + `_chat_artifacts/B15_B16_WIP_PRE_FORENSIC_2026-05-12.patch` (will be re-derived from forensic-first principles in 17c.0.1, NOT applied verbatim). |
+
+No build/test verification on this commit since it's doc-only. The 17c.0.1 commit (B15 fix) WILL run the full clean-build + 162 unit tests + four-xval substantive re-verification gate.
+
+#### Estimate updates
+
+- **17c.0 PREP estimate**: revised UP to **~3.5-5 d remaining** (was ~0.5-1 d) — surface added by B15+B16 work.
+- **C3-era estimate**: still ~1-2 weeks SSH-iterative cluster work (17c.1 → 17c.4) on top of 17c.0 PREP.
+- **v1.0 % done**: held at **~62-65%** (this commit is doc-only; substantive progress comes in 17c.0.1+).
+
+#### Docs cascade (4 files; this commit)
+
+- `notes/STEP_17c.md` NEW (~370 lines; full B15+B16 forensic + fix design + B16 acknowledgement + rule #8 + revised PREP plan + cluster-phase skeleton; replaces the implicit step-17c skeleton previously held in EXECUTION_PLAN.md row 17c only)
+- `CHANGELOG.md` NEW 17c.0.0 forensic entry above the prior B1 entry (this entry)
+- `EXECUTION_PLAN.md` row 17c status refresh — adds 17c.0 PREP sub-phase plan + B15+B16 forensic surface
+- `notes/FOLLOWUPS.md` status dashboard refresh + **rule #8 added** to "Operational heuristics — lessons learned" section
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 1 NEW (this commit narrative + remaining work)
+
+`TRUNK_R13078_BACKPORT_LEDGER.md` unchanged — this commit is forensic-only with no source change; no cross-fork backport implication. The subsequent 17c.0.1 B15 fix commit will be backport-IRRELEVANT (only `.ins` + `.sh` changes); the 17c.0.3 B16 fix commit will be backport-RELEVANT (C++ source change in `lpjguess/modules/imogen_input.cpp` + `imogencfx.cpp`).
+
+**Backport-IRRELEVANT** (forensic record only; no source change).
+
+**Un-tagged checkpoint on top of `f6c192e`** (the C2 close-out tag commit). No new tag with this commit; the next C3-era tag remains `v0.18.0-step17c-c3-cluster-tight` after all 17c sub-phases complete.
+
+---
+
 ### 2026-05-12 (early morning, session 3 continuation) — Step 17b (F-12 sub-milestone C2; **B1 LANDED** — last audit item before C2 close-out): Fortran-engine Rh + Wind COMPUTATION + write-block port to `imogen/code/imogen_lpjg.f`; closes the cross-engine Rh/W parity gap; +202 LOC additive in Fortran source; 18 surgical sub-edits including new `RH_FROM_QPT` Tetens-formula SUBROUTINE; un-tagged checkpoint above `2bd5222`
 
 This commit closes **audit item B1** (Fortran Rh + Wind COMPUTATION port) — the LAST item in the re-ordered Option A bundle sequence (B10 → B6 → B2 → B3 → B4 → **B1**; user-confirmed 2026-05-11). Post-B1 the C2-era work is feature-complete; next is the C2 close-out tag `v0.17.5-step17b-c2-mpi-sync`.
