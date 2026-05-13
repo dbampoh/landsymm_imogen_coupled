@@ -302,8 +302,8 @@ compare_outputs() {
   #                   PASS for the substantive-validation gate)
   #   SORTED_DIFFER - raw differs AND sorted-cmp -s differs (B17(a) + B17(b);
   #                   confirmed numerical drift on top of row-ordering;
-  #                   counted toward FAIL; B17(b) closure deferred to sub-
-  #                   phase 17c.0.5 per notes/STEP_17c.md §3 + §3.6)
+  #                   counted toward controlled-FAIL; B17(b) provisionally
+  #                   accepted at 2% per notes/STEP_17c.md §3.8.5 + §3 + §3.6)
   #
   # PASS/FAIL semantics (updated): the substantive-validation gate now
   # passes when BIT_EXACT + SORTED_EXACT == total (zero SORTED_DIFFER).
@@ -426,7 +426,7 @@ compare_outputs() {
     echo "  BIT_EXACT     (raw cmp -s passed)                              : $matches / $total"
     echo "  SORTED_EXACT  (raw differs, sorted cmp -s passes; PURE B17(a)) : $sorted_exact"
     echo "  SORTED_DIFFER (raw differs AND sorted cmp -s differs;          : $sorted_differ"
-    echo "                 B17(a) + B17(b) drift; closure in 17c.0.5)"
+    echo "                 B17(a) + B17(b) drift; B17(b) accepted at 2% per §3.8.5)"
     echo "  Total accounted for                                            : $((matches + sorted_exact + sorted_differ)) / $total"
   fi
 
@@ -481,7 +481,10 @@ compare_outputs() {
   #  mismatches that NORMALIZE to bit-equality via the sort-then-diff layer
   #  above (PURE B17(a) cases) count as semantic-byte-equal (Decision-12
   #  equality of CONTENT, not emission order). SORTED_DIFFER files (B17(a)
-  #  + B17(b) drift) remain FAIL until 17c.0.5 closes B17(b). - DKB 2026-05-13]
+  #  + B17(b) drift) remain controlled-FAIL per the B17(b) provisional
+  #  acceptance at 2% cell-total tolerance (notes/STEP_17c.md §3.8.5);
+  #  formal Option α/β closure deferred to a future sub-phase TBD that
+  #  reactivates only on a §3.8.5 re-eval trigger. - DKB 2026-05-13/14]
   local effective_pass=$((matches + sorted_exact))
   local bit_exact_ok=0
   if [ "$effective_pass" -eq "$total" ] && [ "$total" -gt 0 ]; then
@@ -627,7 +630,9 @@ compare_outputs() {
     echo "  bit-exact in BOTH modes; cells 1+ progressively diverge in low-biomass PFTs"
     echo "  while cell totals stay within ~1.4% relative). Closure plan in"
     echo "  notes/STEP_17c.md §3 (B17(b) forensic) + §3.6 (recommended-fix skeleton)"
-    echo "  + sub-phase 17c.0.5 (decision: tolerance-based comparison vs root-cause fix)."
+    echo "  + §3.8.5 (B17(b) provisionally accepted at 2% per 2026-05-13 user directive;"
+    echo "    formal Option α tolerance vs Option β root-cause closure deferred to a"
+    echo "    future sub-phase TBD reactivated only on a §3.8.5 re-eval trigger)."
     return 2
   fi
 }

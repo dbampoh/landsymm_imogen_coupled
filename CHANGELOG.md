@@ -17,6 +17,71 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-13 (night-late, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.5; **FULL 4-XVAL RE-VERIFY ON B15+B16+B17(a)+B17(b)-PROVISIONALLY-ACCEPTED HEAD `2771939` LANDED (gates 1-8 per user-authorised collapsed renumbering convention) + harness stale-reference cleanup post-collapsed-renumbering convention adoption** — 1 source file modified; +10/−5 LOC; ZERO source-logic change; pure stale-reference cleanup at 4 surgical sites in `scripts/cross_validate_year_outer.sh::compare_outputs()`; gate 1+2 binary sha256 byte-identical pre/post → no source change since `4d09b62` (17c.0.3 build epoch); gates 3+4 unit tests 25/25 / 162/162 PASS both builds; gates 5+6 1cell xval PASS exit 0 with 37/37 raw BIT_EXACT; gates 7+8 4cell xval CONTROLLED-FAIL exit 2 with **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** envelope BYTE-IDENTICAL between LOOSE (gate 7) and TIGHT (gate 8) coupling — stronger empirical confirmation than 17c.0.4 provided that B17(b) is **coupling-invariant**; un-tagged checkpoint above `2771939`)
+
+This commit lands the **17c.0.5** sub-phase of the Step 17c.0 PREP plan: full 4-xval re-verify on B15+B16+B17(a)+B17(b)-provisionally-accepted HEAD per the user-authorised **collapsed renumbering convention** (per `notes/STEP_17c.md` §3.8.5 "Sub-phase renumbering implication" sub-section; user-authorised 2026-05-13 night-late session 4). Per the collapsed convention, 17c.0.5 = full 4-xval re-verify on `2771939` HEAD (gates 1-8) confirming regression-clean status with the §3.8.5 provisional B17(b) acceptance envelope intact — REPLACING the originally-planned 17c.0.5 (α/β decision) sub-phase. The deferred formal Option α (tolerance-based comparison upgrade to `compare_outputs()`) OR Option β (seed-tracking dprintf root-cause investigation per §3.8.4) reactivates as a future sub-phase TBD only on a §3.8.5 re-evaluation trigger firing per the new §3.8.5.5 cadence.
+
+#### What landed
+
+| Change | Site | Description | Backport |
+|---|---|---|---|
+| **Harness stale-reference cleanup post-collapsed-renumbering** | `scripts/cross_validate_year_outer.sh::compare_outputs()` | 4 surgical -1/+1-or-+2 edits at lines 305-306 (header doc-comment block), 429 (B17(a) NORMALIZATION SUMMARY classification line), 484 (effective-pass block trailing comment), 630 (FAIL message at SORTED_DIFFER > 0 path) — replacing the prior "sub-phase 17c.0.5 (decision: tolerance-based comparison vs root-cause fix)" framing with post-acceptance §3.8.5 cross-references. ZERO behaviour change; bash syntax + smoke-retest verified — gate 7 still controlled-fails at exit 2 with new §3.8.5 message text appearing in FAIL output | TRUNK-IRRELEVANT (.sh harness only) |
+
+Net code diff: **+10 / −5** across **1 source file** (`scripts/cross_validate_year_outer.sh`). All other deltas are documentation. **ZERO source-logic change**; no `compare_outputs()` logic change; no exit-code change; no harness behaviour change; no C++ source change; no `.ins`/`.cpp`/`.h` touch.
+
+#### Verification gates 1-8 (full re-verify per user-approved scope)
+
+| Gate | Test | Result |
+|---|---|---|
+| 1 | `lpjguess/build/` rebuild | **NO-OP confirmed** (binary sha256 `8daa1339...`, size 2 974 248 B, ts 2026-05-13 16:43 byte-identical pre/post) |
+| 2 | `lpjguess/build_mpi/` rebuild | **NO-OP confirmed** (binary sha256 `dd307488...`, size 2 974 248 B, ts 2026-05-13 16:59 byte-identical pre/post) |
+| 3 | `lpjguess/build/runtests` | **25 cases / 162 assertions PASS** (regression-clean; third independent confirmation since 17c.0.4) |
+| 4 | `lpjguess/build_mpi/runtests` | **25 cases / 162 assertions PASS** (build-agnostic) |
+| 5 | 1cell xval imogen | **PASS exit 0** (37/37 raw BIT_EXACT; 0/0 NaN; banner_a=0 / banner_b=5; sort block skipped per idempotency) |
+| 6 | 1cell xval imogencfx | **PASS exit 0** (same envelope as gate 5) |
+| 7 | 4cell xval imogen | **CONTROLLED-FAIL exit 2** within §3.8.5 envelope (15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER + 0/0 NaN + banner_a=0 / banner_b=5 — IDENTICAL to 17c.0.4 envelope) |
+| 8 | 4cell xval imogencfx | **CONTROLLED-FAIL exit 2** within §3.8.5 envelope (same envelope as gate 7 — coupling-invariance confirmed: gate-7-vs-gate-8 manifest diff EMPTY) |
+
+The 5 SORTED_EXACT files (PURE B17(a); identical to 17c.0.4 manifest): `mch4.out`, `mch4_diffusion.out`, `mch4_ebullition.out`, `mch4_plant.out`, `npool.out`. The 17 SORTED_DIFFER files (B17(a) + B17(b) drift; identical to 17c.0.4 manifest + drift-line counts): `aaet`, `agpp`, `anpp`, `cflux`, `clitter`, `cmass`, `cpool`, `cton_leaf`, `fpc`, `lai`, `nflux`, `ngases`, `nlitter`, `nmass`, `nsources`, `nuptake`, `tot_runoff`.
+
+#### Three user decisions landed in this commit
+
+1. **Sub-phase renumbering convention**: **COLLAPSED CONVENTION ADOPTED** (17c.0.5 = full 4-xval re-verify; deferred Option α/β reactivates as future sub-phase TBD only on §3.8.5.5 trigger). Locked in `notes/STEP_17c.md` §3.8.5 "Sub-phase renumbering implication" sub-section.
+2. **B17(b) re-evaluation cadence**: **LOCKED IN** as routine xval re-verify (every 4-xval re-verify run on this branch — establishes the canonical 17c.0.5 baseline envelope `15+5+17+exit 2` as the **expected** routine outcome) + C3-era cluster smoke runs (per §3.8.5 trigger 3) + paper-stage analysis (per §3.8.5 trigger 4) + ad-hoc on any §3.8.5 trigger firing outside routine cadence. Cadence canonicalised in NEW `notes/STEP_17c.md` §3.8.5.5.
+3. **Re-verify scope**: **FULL (gates 1-8)** approved (NOT abbreviated to gates 5-8 only) — chosen to establish the canonical baseline envelope at the highest-fidelity verification level, which all future routine xval re-verifies on this branch will be compared against.
+
+#### Documentation cascade
+
+6-file source-level cascade (verification + .sh-comment-only): `scripts/cross_validate_year_outer.sh` (+10/-5 LOC stale-ref cleanup) + `notes/STEP_17c.md` (~+250 LOC: NEW §1.4 + §1.5 landing records + §1 sub-phase table updates marking 17c.0.4-followup ✅ + 17c.0.5 ✅ + §3.8.5 closing-paragraph supersession + §3.8.5 sub-phase renumbering lock-in + NEW §3.8.5.5 re-evaluation cadence sub-section + header date refresh + status block update + Index updates) + this `CHANGELOG.md` entry + `EXECUTION_PLAN.md` row 17c update + `notes/FOLLOWUPS.md` status dashboard refresh + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17c-17c.0.5 entry + `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 5 NEW.
+
+#### Backport classification
+
+**TRUNK-IRRELEVANT** (verification + .sh-comment-only). No engine source change; `scripts/cross_validate_year_outer.sh` is per-fork harness (no analogous file in `trunk_r13078`). Recorded in `notes/TRUNK_R13078_BACKPORT_LEDGER.md` as a new step-17c-17c.0.5 row classified `IRRELEVANT-by-novelty + verification-only`.
+
+#### What 17c.0.6 must do next
+
+Per the (now-locked-in) collapsed renumbering convention, 17c.0.6 is the **C2 close-out tag (`v0.17.5-step17b-c2-mpi-sync`) annotation amendment decision** (option a/b/c per `notes/STEP_17c.md` §0.11). 17c.0.5 verification empirically confirms that the underlying year_outer code at `f6c192e` (the C2 close-out tag commit) substantively passes within the §3.8.5 provisional-acceptance envelope when the four-xval is run with the post-B15+B16 fixes, so 17c.0.6 is now **ACTIONABLE**. Estimated effort: ~0.2 d. Decision option recommendation TBD with user when 17c.0.6 begins.
+
+#### v1.0 % done estimate
+
+Revised UP slightly to **~63-66%** (was ~62-65% at end of 17c.0.4-followup). 17c.0.5 establishes the canonical regression-clean baseline + §3.8.5.5 cadence; meaningful operational milestone — even though zero source-logic change, it locks in the operational envelope for all downstream sub-phases.
+
+---
+
+### 2026-05-13 (night, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.4 FOLLOW-UP; **B17(b) OPERATIONAL ACCEPTANCE AT PROVISIONAL 2% TOLERANCE LANDED** + sub-phase renumbering decision deferral; doc-only commit `2771939`; ZERO source-logic change; rolls user-authorised strategic decision into version-controlled history with canonical SHA per user directive that the strategic significance warrants its own version-controlled history entry rather than rolling into the next work commit)
+
+This commit lands the **§4.13 operational-acceptance decision** (per user directive 2026-05-13 night, session 4) as a standalone doc-only follow-up to the 17c.0.4 commit `027d90d`. It documents the user-authorised provisional-acceptance of B17(b) (per `notes/STEP_17c.md` §3.8.5 + chat handoff §4.13) at a provisional 2% cell-total tolerance envelope, deferring the formal Option α (tolerance-based comparison upgrade in `scripts/cross_validate_year_outer.sh::compare_outputs()`) to a future sub-phase that reactivates only on one of four named re-evaluation triggers per §3.8.5.
+
+User verbatim directive (2026-05-13 night, session 4): _"Well I do not think we should implement anything in code for now, just simply documenting in the chat handoff that there is some divergence and we are accepting a 2% tolerance for now, but we may need to re-evaluate later. I suppose you could also include it as comment in the comparison code or something to that effect. It may be that we could come back and look at it and decide to do something about it."_
+
+Net code change: **ZERO** (no `compare_outputs()` logic change; no exit codes change; no harness behaviour change). Net documentation change: ~30 LOC inline comment in `compare_outputs()` near the SORTED_DIFFER classification + NEW `notes/STEP_17c.md` §3.8.5 sub-section (~140 LOC) + `notes/FOLLOWUPS.md` status dashboard line update.
+
+3 in-tree files: `scripts/cross_validate_year_outer.sh` (inline comment block; ZERO logic change) + `notes/STEP_17c.md` (NEW §3.8.5) + `notes/FOLLOWUPS.md` (Last updated header refresh + B17 row status update from "RECLASSIFIED + decision deferred to 17c.0.5" → "RECLASSIFIED + PROVISIONALLY ACCEPTED at 2% tolerance + (α)/(β) reactivates on re-evaluation trigger") + 1 sibling-artifact (`_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 4).
+
+**Backport**: TRUNK-IRRELEVANT (doc-only + .sh-comment-only). v1.0 % done estimate held at ~62-65% (this decision is doc-only; no fresh substantive milestone landed).
+
+---
+
 ### 2026-05-13 (late evening, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.4; **B17 FORENSIC DEEP-DIVE (PHASE A) + B17(a) ROW-EMISSION-ORDER DIVERGENCE FIX LANDED (.sh-only sort-then-diff harness upgrade) + B17(b) RECLASSIFIED FROM "~1 ULP NUMERICAL ROUNDOFF" TO "STOCHASTIC-PROCESS SENSITIVITY PER CELL-ITERATION-ORDER RNG SLIP"** — 1 source file modified; +103/−3 LOC; ZERO C++ source change; ZERO `.ins`/`.cpp`/`.h` touch; B17(a) mechanically CLOSED + B17(b) decision (α tolerance vs β root-cause) deferred to 17c.0.5 per Option A scoping decision; gates 1+2 SKIPPED (.sh-only fix); gates 3+4 unit tests 162/162 PASS both builds; gates 5+6 1cell xval PASS exit 0 idempotently (37/37 raw BIT_EXACT; sort block skipped per `if mismatches > 0` guard); gates 7+8 4cell xval CONTROLLED-FAIL exit 2 with EXACTLY-PREDICTED **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** classification on BOTH .ins variants; effective-pass count for 4cell scenarios advanced from 15/37 (pre-17c.0.4) → 20/37 (post-17c.0.4; 33% improvement on the controlled-fail surface); un-tagged checkpoint above `4d09b62`)
 
 This commit lands the **17c.0.4** sub-phase of the Step 17c.0 PREP plan: the B17(a) fix proper + Phase A forensic deep-dive of B17 + reclassification of B17(b), per the §3.3 (B17(a) characterization) + §3.6 option (a1) (recommended fix design) + §1.3 (NEW landing record) + §3.8 (NEW reclassified-B17(b) sub-section) walkthroughs in `notes/STEP_17c.md`. The B17(a) fix is **mechanically closed**: gates 7+8 verification confirms the 5 PURE B17(a) files (`npool.out`, `mch4.out`, `mch4_diffusion.out`, `mch4_ebullition.out`, `mch4_plant.out`) successfully normalize via sort-then-diff to byte-identical content. **B17(b) is RECLASSIFIED + DECISION DEFERRED to 17c.0.5** per Phase A forensic deep-dive: the §3.4-original `~1 ULP numerical drift` characterization was empirically refuted (drift magnitudes 0.67-17.7% relative — six orders too large for FP-summation roundoff at value-magnitude 0.02; max cell-total drift bounded ≤ 1.4% relative; signature is stochastic-process sensitivity per cell-iteration-order RNG slip, NOT FP-roundoff); §3.4 hypothesis 1 + 2 FALSIFIED; §3.4 hypothesis 3 surviving + refined to "setup-phase-ordering interaction with stochastic dynamics" via empirical localizer "cell 0 BIT-EXACT in ALL 17 drift files; cells 1, 2, 3 progressively diverge with cell index". 17c.0.5 will decide between **Option α (tolerance-based comparison upgrade; ~0.5-1 d; recommended)** and **Option β (seed-tracking dprintf root-cause investigation; +1-2 d)**.

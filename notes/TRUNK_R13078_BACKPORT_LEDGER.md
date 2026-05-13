@@ -1868,6 +1868,71 @@ Documentation cascade also touches: `notes/STEP_17c.md` (NEW §1.3 landing recor
 
 ---
 
+### Step 17c (17c.0.4-followup LANDED): B17(b) operational acceptance at provisional 2% tolerance + sub-phase renumbering decision deferral — **TRUNK-IRRELEVANT** (doc-only + .sh-comment-only)
+
+**Date:** 2026-05-13 (night; session 4). **Commit hash:** `2771939` (3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main` 2026-05-13 night).
+
+**Backport relevance summary:**
+- **TRUNK-IRRELEVANT (doc-only + .sh-comment-only)**: zero source-logic change. The commit lands user-authorised provisional-acceptance of B17(b) per §3.8.5 (2% cell-total tolerance envelope; defers formal Option α/β closure to a future sub-phase TBD reactivated only on a §3.8.5 re-evaluation trigger). 3 in-tree files: `notes/STEP_17c.md` NEW §3.8.5 sub-section + `notes/FOLLOWUPS.md` "Last updated" header refresh + B17 row status update + `scripts/cross_validate_year_outer.sh` ~30-LOC inline comment block in `compare_outputs()` near the SORTED_DIFFER classification (ZERO logic change). Plus 1 sibling-artifact (`_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 4).
+- **No backport directive** — this commit's changes are doc-only + .sh-comment-only (no logic change; no .cpp/.h touch); nothing to backport. Documented here for completeness.
+
+#### Files in this commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Backport directive |
+|---|---|---|
+| `notes/STEP_17c.md` (~+140 LOC; NEW §3.8.5 sub-section) | Decision narrative + 4 re-evaluation triggers + sub-phase renumbering implication + documentation surface | N/A — `notes/` is per-fork |
+| `notes/FOLLOWUPS.md` (~+5 LOC: "Last updated" header refresh + B17 row status update) | Status dashboard update reflecting provisional acceptance | N/A — `notes/` is per-fork |
+| `scripts/cross_validate_year_outer.sh` (~+30 LOC inline comment block; ZERO logic change) | Documentation in `compare_outputs()` near SORTED_DIFFER classification capturing the operational context for runtime consumers + future maintainers without requiring them to leave the code | N/A — per-fork harness; not in `trunk_r13078` |
+
+#### Verification this commit
+
+Unit tests re-run as a sanity check: `lpjguess/build/runtests --reporter compact` → 25/25 / 162/162 PASS; `lpjguess/build_mpi/runtests --reporter compact` → 25/25 / 162/162 PASS. No xval re-verify (the next sub-phase 17c.0.5 does the canonical 4-xval re-verify per its own backport-ledger entry below).
+
+**With this commit, B17(b) is operationally accepted at a provisional 2% cell-total tolerance** per §3.8.5; formal Option α (tolerance-based comparison upgrade) AND Option β (seed-tracking dprintf root-cause investigation) DEFERRED to a future sub-phase TBD reactivated only on a §3.8.5 re-evaluation trigger firing.
+
+---
+
+### Step 17c (17c.0.5 LANDED): full 4-xval re-verify on B15+B16+B17(a)+B17(b)-provisionally-accepted HEAD per user-authorised collapsed renumbering convention + harness stale-reference cleanup post-collapsed-renumbering — **TRUNK-IRRELEVANT** (verification-only + .sh-comment-only)
+
+**Date:** 2026-05-13 (night-late; session 4). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `2771939`).
+
+**Backport relevance summary:**
+- **TRUNK-IRRELEVANT (verification + .sh-comment-only)**: zero engine source change. The commit lands the full 4-xval re-verify on `2771939` HEAD (gates 1-8) per the user-authorised collapsed renumbering convention (per `notes/STEP_17c.md` §3.8.5 "Sub-phase renumbering implication" sub-section), establishing the canonical baseline routine xval re-verify envelope (15+5+17 + exit 2) for the new §3.8.5.5 re-evaluation cadence. Opportunistically rolled in: 4 surgical -1/+1-or-+2 stale-reference cleanups at `scripts/cross_validate_year_outer.sh` lines 305-306, 429, 484, 630-633 (post-collapsed-renumbering convention adoption rendered the prior "sub-phase 17c.0.5 (decision: tolerance-based comparison vs root-cause fix)" framing factually incorrect; +10/-5 LOC; ZERO behaviour change).
+- **No backport directive** — this commit's changes are verification + .sh-comment-only (no logic change; no .cpp/.h touch); nothing to backport. The cleanup itself is a direct consequence of the renumbering decision and would not apply upstream where `framework_loop_mode = "year_outer"` doesn't exist.
+
+#### Files in this commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Trunk-equivalence | Backport directive |
+|---|---|---|---|
+| `scripts/cross_validate_year_outer.sh` (+10/−5; STALE-REF CLEANUP) | 4 surgical edits at lines 305-306 (header doc-comment), 429 (B17(a) NORMALIZATION SUMMARY classification), 484 (effective-pass block trailing comment), 630 (FAIL message at SORTED_DIFFER > 0 path) — replacing "sub-phase 17c.0.5 (decision: tolerance-based comparison vs root-cause fix)" framing with §3.8.5 cross-references. ZERO behaviour change; bash syntax + smoke-retest verified | The harness is per-fork (introduced at C1.1 era); trunk has no equivalent. The "17c.0.5 (decision)" terminology only makes sense in the per-fork PREP-phase ledger. | **N/A** — not in `trunk_r13078`. |
+
+Documentation cascade also touches: `notes/STEP_17c.md` (NEW §1.4 + §1.5 landing records + §1 sub-phase table updates marking 17c.0.4-followup ✅ + 17c.0.5 ✅ + §3.8.5 closing-paragraph supersession + §3.8.5 sub-phase renumbering lock-in + NEW §3.8.5.5 re-evaluation cadence sub-section + header date refresh + status block update + Index updates; ~+250 LOC), `notes/FOLLOWUPS.md` (status dashboard refresh + B17 row update), `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry), `EXECUTION_PLAN.md` (row 17c update), `CHANGELOG.md` (NEW dated entry), `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (Part 5 NEW). All documentation deltas are TRUNK-IRRELEVANT.
+
+#### Verification this commit (per `notes/STEP_17c.md` §1.5 — full gates 1-8)
+
+| Gate | Method | Result |
+|---|---|---|
+| 1 — `lpjguess/build/` rebuild | `cd lpjguess/build && cmake --build . --target guess` | ✅ NO-OP (binary sha256 `8daa1339...` byte-identical pre/post; no source change since `4d09b62`) |
+| 2 — `lpjguess/build_mpi/` rebuild | `cd lpjguess/build_mpi && cmake --build . --target guess` | ✅ NO-OP (binary sha256 `dd307488...` byte-identical pre/post) |
+| 3 — 162 unit tests (build/) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." (regression-clean; third independent confirmation since 17c.0.4) |
+| 4 — 162 unit tests (build_mpi/) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." (build-agnostic) |
+| 5 — xval `1cell imogen` | `scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ rc=0 / 37/37 raw BIT_EXACT / 0/0 NaN / banner_a=0 / banner_b=5 |
+| 6 — xval `1cell imogencfx` | `scripts/cross_validate_year_outer.sh 1cell imogencfx` | ✅ rc=0 / same metrics as gate 5 |
+| 7 — xval `4cell imogen` | `scripts/cross_validate_year_outer.sh 4cell imogen` | ⚠️ rc=2 (CONTROLLED-FAIL within §3.8.5 envelope) / **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** / 0/0 NaN / banner_a=0 / banner_b=5 — IDENTICAL to 17c.0.4 envelope |
+| 8 — xval `4cell imogencfx` | `scripts/cross_validate_year_outer.sh 4cell imogencfx` | ⚠️ rc=2 / IDENTICAL 15+5+17 envelope as gate 7 — **B17(b) coupling-invariance confirmed** (gate-7-vs-gate-8 manifest diff EMPTY) |
+
+#### Cross-references for the Backport Sprint reader
+
+- `notes/STEP_17c.md` §1.4 — canonical landing record for 17c.0.4-followup commit `2771939` (~75 LOC; B17(b) operational acceptance at 2%; doc-only)
+- `notes/STEP_17c.md` §1.5 — canonical landing record for 17c.0.5 commit (this commit; ~180 LOC; full 4-xval re-verify; gate-by-gate evidence; script renumbering cleanup detail in §1.5.7)
+- `notes/STEP_17c.md` §3.8.5 — operational acceptance decision narrative (B17(b) provisionally accepted at 2% per 17c.0.4-followup `2771939`; collapsed renumbering convention adopted in this commit per §3.8.5 "Sub-phase renumbering implication")
+- `notes/STEP_17c.md` §3.8.5.5 — NEW re-evaluation cadence sub-section (routine xval re-verify + C3-era cluster smoke + paper-stage analysis + ad-hoc on §3.8.5 trigger)
+- Future sub-phase TBD: deferred Option α (tolerance-based comparison upgrade; ~0.5-1 d; TRUNK-IRRELEVANT — .sh harness only) OR Option β (seed-tracking dprintf root-cause investigation; +1-2 d; targeted fix — backport classification depends on which file is touched). Reactivates only on §3.8.5 re-evaluation trigger firing per §3.8.5.5. To be classified at reactivation commit time.
+
+**With this commit, the full 4-xval re-verify on B15+B16+B17(a)+B17(b)-provisionally-accepted HEAD `2771939` is COMPLETE** with byte-identical envelope to 17c.0.4. The user-authorised collapsed renumbering convention is locked in. The §3.8.5.5 re-evaluation cadence is locked in with the canonical baseline envelope from this commit's gates 7+8 as the "expected" routine outcome that future routine xval re-verifies on this branch will be compared against. 17c.0.6 (C2 close-out tag annotation amendment decision; ACTIONABLE since 17c.0.5 has confirmed underlying year_outer code substantively passes within §3.8.5 envelope) is NEXT.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):
