@@ -179,7 +179,14 @@ ifcalccton          1              ! REQUIRED: enable init_cton_min() per PFT
 ! framework_loop_mode: harness writes a wrapper .ins that imports this
 ! file + adds the override. Default here is gridcell_outer (the
 ! existing baseline) so this .ins works standalone if invoked directly.
-param "framework_loop_mode" (str "gridcell_outer")
+!
+! [B15 FIX 2026-05-12 (session 3): MUST use bare plib syntax (NOT param
+!  "framework_loop_mode" (str "...")) because framework_loop_mode is bound
+!  via declare_parameter (imogen_input.cpp:214 + imogencfx.cpp:353) to the
+!  C++ xtring IMOGENConfig::framework_loop_mode that framework.cpp:464
+!  reads. See notes/STEP_17c.md §0 (audit item B15) for full forensic + parallel comment
+!  block in main_xval_imogencfx.ins.]
+framework_loop_mode "gridcell_outer"
 
 ! Output directory: harness sets cwd to a per-run dir; outputs go there.
 outputdirectory "./"

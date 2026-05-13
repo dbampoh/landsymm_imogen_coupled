@@ -17,6 +17,65 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-13 (afternoon, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phases 17c.0.1 + 17c.0.2; **B15 FIX + SIGNAL-OF-LIFE ASSERTION + FOUR-XVAL RE-VERIFICATION LANDED**): syntactic fixes (F1-F3) for the class-mismatch defect at three sites + harness-side rule-#8 banner-presence assertion (F4) + consumer-side ~3-LOC C++ runtime diagnostic in `framework.cpp` (F5; user-authorised); 1cell xval scenarios PASS substantive + signal-of-life clean (the **first** clean PASS where the year_outer code path actually executed in Run B since C1 close-out 2026-05-10); 4cell xval scenarios surface **B16 textbook-exactly per `notes/STEP_17c.md` §0.9** (positive empirical evidence; triggers 17c.0.3 as next sub-phase); un-tagged checkpoint above `2beff31`
+
+This commit lands two bundled sub-phases of the Step 17c.0 PREP plan: **17c.0.1** (the B15 fix proper, per the §0.8 design approved verbatim in session 4) and **17c.0.2** (the first four-xval re-verification on B15-fixed HEAD, in which the year_outer code path is actually exercised for the first time). The bundle is per `notes/STEP_17c.md` §1's plan ("17c.0.2 ... bundled with 17c.0.1 commit"). The B15 fix is **closed** and the codebase now has two independent defense layers (F4 harness-side + F5 consumer-side) against the class of defects exemplified by B15.
+
+#### What landed (F1-F5 implementation)
+
+| F-id | Site | Change | Backport |
+|---|---|---|---|
+| **F1** | `runs/SSP1-2.6/main_xval_imogencfx.ins:176` | `param "framework_loop_mode" (str "gridcell_outer")` → `framework_loop_mode "gridcell_outer"` + 13-line in-place doc block (cites `imogen_input.cpp:214` + `imogencfx.cpp:353` declare sites + `framework.cpp:464` consumer + `parameters.cpp:288` C++ initialiser; cross-references §0 audit item B15) | IRRELEVANT |
+| **F2** | `runs/SSP1-2.6/main_xval_loose.ins:182` | Symmetric to F1; shorter doc block referencing the parallel imogencfx comment | IRRELEVANT |
+| **F3** | `scripts/cross_validate_year_outer.sh:138` (`write_wrapper_ins` here-doc) | `param "framework_loop_mode" (str "$mode")` → `framework_loop_mode "$mode"` + 27-line top-of-template doc block (the two-class plib mechanism walkthrough citing `parameters.cpp:991 + 1506-1514 + 1858-1862` SET-block scope + `parameters.cpp:288` initialiser + `framework.cpp:464` consumer; explicit corollary that `outputdirectory` is also Class-1 declare_parameter-bound at `outputmodule.cpp:38`) | IRRELEVANT |
+| **F4** | `scripts/cross_validate_year_outer.sh::compare_outputs()` | NEW signal-of-life banner-presence assertion block per **rule #8**: greps both run.logs for `[year_outer]` banner emitted at `framework.cpp:502`; pass requires `banner_a == 0` AND `banner_b >= 1`; failure exits with new code **4** (non-overlapping with existing 0=PASS, 1=ZERO-out-files, 2=byte-mismatch, 3=NaN-substantive). Captures bash-`grep -c`-exit-rc gotcha with `[ -f file ]` guards + `(grep -c ... \|\| true)` defensive pattern. PASS message updated to mention banner counts. ~92 LOC additive (~62 LOC of code + ~30 LOC of doc) | IRRELEVANT |
+| **F5** | `lpjguess/framework/framework.cpp:339-357` (immediately after `read_instruction_file()` at line 337) | NEW runtime diagnostic: `dprintf("[framework] framework_loop_mode = \"%s\" (after .ins parse)\n", (const char*)IMOGENConfig::framework_loop_mode);` + ~17-line doc block citing §0.6 + §0.8(F5) + relationship to F4 (independent defense layers; F5 fires unconditionally and would catch typo'd values like `"year_outter"` that F4's banner check cannot surface) | **RELEVANT** (`framework.cpp` exists in `trunk_r13078`) |
+
+Net diff stats: +127/−3 (script) + +15/−1 + +8/−1 (two ins) + +21/0 (framework.cpp) = **+171 / −5** code; doc-cascade additions in `notes/STEP_17c.md` §1.1 (~190 LOC), `notes/FOLLOWUPS.md` status-dashboard refresh, `EXECUTION_PLAN.md` row 17c, `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17c-17c.0.1 entry, this CHANGELOG entry, and `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 2.
+
+#### Strategy: hybrid stash cherry-pick
+
+The 17c.0.0 forensic commit (`2beff31`) had stashed at `stash@{0}` a 5-file pre-forensic exploratory WIP for B15+B16. Per session-4 inspection, the WIP narrative comments aligned precisely with `notes/STEP_17c.md` §0.5's plib-parser walkthrough (the WIP author had the same parser mechanism in mind that was later formalised in the 17c.0.0 forensic). For F1-F4, this commit cherry-picks the three in-scope file hunks from the stash directly via `git show stash@{0}:<path> | sed 's/§0\.B15/§0 (audit item B15)/g'` (cosmetic anchor-text touch-up; 6 occurrences; `§0.B15` was a non-existent anchor). Net code identical to a fresh re-derivation; ~1 hour of doc-writing time saved; non-trivial `bash`-`grep -c` defensive pattern preserved verbatim. F5 was authored fresh against the canonical §0.5 + §0.8(F5) citations. The two C++ stash hunks for B16 (`lpjguess/modules/imogen_input.cpp` +35/-9 + `lpjguess/modules/imogencfx.cpp` +29/-11) were **NOT** applied; they remain in `stash@{0}` as starting material for sub-phase 17c.0.3.
+
+#### Verification gates 1-4 (clean rebuilds + unit tests)
+
+| # | Gate | Result |
+|---|---|---|
+| 1 | `cd lpjguess/build && cmake --build . --target guess` | ✅ ZERO new warnings (incremental: framework.cpp.o + relink) |
+| 2 | `cd lpjguess/build_mpi && cmake --build . --target guess` | ✅ ZERO new warnings (incremental: framework.cpp.o + imogen_input.cpp.o + imogencfx.cpp.o + relink; the latter two recompiled due to mtime cache, not behavioural) |
+| 3 | `lpjguess/build/runtests --reporter compact` | ✅ 25 cases / 162 assertions PASS |
+| 4 | `lpjguess/build_mpi/runtests --reporter compact` | ✅ 25 cases / 162 assertions PASS |
+
+#### Verification gates 5-8 (four-xval re-verification — the substantive 17c.0.2 evidence)
+
+| # | Scenario | harness `rc` | Bit-exact | NaN | banner_a / banner_b | F5 echo Run A / Run B | Result |
+|---|---|---|---|---|---|---|---|
+| 5 | `1cell imogen` | **0** | 37/37 | 0/0 | 0 / **5** | "gridcell_outer" / "year_outer" | ✅ **PASS substantive + signal-of-life** |
+| 6 | `1cell imogencfx` | **0** | 37/37 | 0/0 | 0 / **5** | "gridcell_outer" / "year_outer" | ✅ **PASS substantive + signal-of-life** |
+| 7 | `4cell imogen` | **99** | n/a | n/a | 0 / **3** (year_outer started; aborted at preload) | "gridcell_outer" / "year_outer" | ⚠️ **B16 anticipated surface** — Run B exits 99 with `"ImogenInput::preload_all_climate: stored_years cache already full (last_store_index=9 >= nyears=9) when preloading cell (-95.75,80.25)"` |
+| 8 | `4cell imogencfx` | **99** | n/a | n/a | 0 / **3** | "gridcell_outer" / "year_outer" | ⚠️ **B16 anticipated surface** — symmetric `IMOGENCFXInput::preload_all_climate` same fail at same cell |
+
+**Substantive interpretation**: gates 5-6 are the **first time** the year_outer code path has actually been exercised in any cross-validation since C1 close-out (`v0.17.0-step17a-c1-year-outer-single-process`). Run B's run.log shows the F5 banner at line 3 (`[framework] framework_loop_mode = "year_outer" (after .ins parse)`) followed immediately by the year_outer initialisation banner; Run A shows the F5 banner with `"gridcell_outer"` and zero `[year_outer]` banners. The contrast is observable, the gate is unambiguous, and the same 37 .out files match bit-for-bit with non-NaN sensible values. The byte-equality result that was a false positive at C2 close-out is now genuine.
+
+Gates 7-8 are positive empirical evidence that B15 is genuinely fixed (year_outer is reaching `preload_all_climate` for the first time across `cell_idx >= 1`) and that B16 surfaces exactly as `notes/STEP_17c.md` §0.9 predicted (both modules; same cell `(-95.75,80.25)`; identical `last_store_index=9 >= nyears=9` numerics; same fault site `cell_idx=1`). This becomes the canonical input data point for 17c.0.3 (B16 forensic + fix).
+
+#### Backport classification
+
+Mixed cluster-config-only + source-level commit:
+
+- **F1, F2, F3, F4: backport-IRRELEVANT** (per-fork cluster config + harness; not in `trunk_r13078`).
+- **F5: backport-RELEVANT** (`lpjguess/framework/framework.cpp` exists in `trunk_r13078`; the F5 dprintf placement is structurally identical at the analogous post-`read_instruction_file()` site; ~3-LOC `dprintf` + ~17-LOC doc block can be copied verbatim). `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17c-17c.0.1 entry captures the F5 backport directive.
+
+Per the cascade discipline carried forward from session 3 §0.6(4): because F5 is RELEVANT, this is a **6-file source-level cascade commit**: STEP_17c.md §1.1 (NEW landing record) + this CHANGELOG entry + EXECUTION_PLAN.md row 17c + FOLLOWUPS.md status dashboard refresh + TRUNK_R13078_BACKPORT_LEDGER.md step-17c-17c.0.1 entry + `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 2.
+
+#### Next: 17c.0.3 (B16 forensic + fix)
+
+Empirically triggered by gates 7+8 above. The B16 forensic write-up will land as a new top-level §2 of `notes/STEP_17c.md` (mirroring §0's structure for B15); the cluster-phases skeleton currently at §2 will renumber to §3. The fix per §0.9: remove the eager `if (last_store_index >= nyears) fail(...)` check at function entry in `(IMOGENCFX|Imogen)Input::preload_all_climate` (both `lpjguess/modules/imogen_input.cpp` and `lpjguess/modules/imogencfx.cpp`); add inline cumulative-across-cells cache documentation; verify the inner per-miss check still provides correct fail-fast semantics with proper context. The B16 C++ stash hunks at `stash@{0}` (`lpjguess/modules/imogen_input.cpp` +35/-9 + `lpjguess/modules/imogencfx.cpp` +29/-11) provide useful starting material; the `stash@{0}` entry is preserved unchanged across this commit.
+
+#### Operational heuristics — no new rules surface in this commit
+
+Rules #1, #6, #7, **#8** all remain in the active rule set. Rule #8 (added in 17c.0.0) is now operationally validated: F4 implements rule #8 verbatim and would have surfaced B15 immediately at C1 close-out had it existed then.
+
 ### 2026-05-12 (afternoon-evening, session 3) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.0; **B15+B16 FORENSIC RECORD LANDED** — forensic-only; ZERO `lpjguess/` and `imogen/code/` source change; **NEW persistent operational heuristic rule #8**): comprehensive forensic write-up of two audit items surfaced during session-3 onboarding audit of the C2 close-out tag at `f6c192e`; documents the class-mismatch defect (B15) that silently disabled the `year_outer` code path in all four C1+C2 cross-validation scenarios + the latent eager-cache-fullness defect (B16) in `preload_all_climate`; un-tagged checkpoint above `f6c192e`
 
 This commit lands the **B15 + B16 forensic record** as Step 17c.0 PREP sub-phase **17c.0.0** — the documentation-only first sub-phase of the revised 8-sub-phase PREP plan that emerged from the session-3 onboarding audit. **ZERO source change** to `lpjguess/` or `imogen/code/`; only `notes/STEP_17c.md` (NEW) + the four-file documentation cascade (CHANGELOG + EXECUTION_PLAN + FOLLOWUPS + session-3 handoff Part 1).

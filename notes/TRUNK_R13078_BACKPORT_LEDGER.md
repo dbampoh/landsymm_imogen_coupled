@@ -1681,6 +1681,110 @@ B10's structural fix (unconditional OPEN/CLOSE per IYEAR iteration; 7 conditiona
 
 ---
 
+### Step 17c (17c.0.0 LANDED): B15 + B16 forensic record — `notes/STEP_17c.md` NEW + 4-file documentation cascade; **backport-IRRELEVANT** (forensic record only; ZERO `lpjguess/` and `imogen/code/` source change)
+
+**Date:** 2026-05-12 (afternoon-evening; session 3). **Commit hash:** `2beff31` (un-tagged checkpoint on top of `f6c192e`).
+
+**Backport relevance:** **IRRELEVANT.** This commit is purely documentation (`notes/STEP_17c.md` NEW; CHANGELOG; EXECUTION_PLAN row 17c; FOLLOWUPS status dashboard refresh + new operational rule #8; session-3 chat handoff Part 1) — no `lpjguess/` or `imogen/code/` source touched. The B15+B16 ROOT CAUSES are now fully documented; the FIXES land at sub-phases 17c.0.1 + 17c.0.3 in subsequent commits (which will have their own LEDGER entries with backport directives).
+
+**Cross-references for the Backport Sprint reader:**
+- `notes/STEP_17c.md` §0 — full B15+B16 forensic record (~370 LOC) including §0.5 plib-parser source-level walkthrough, §0.8 recommended fix design (F1-F5), §0.9 B16 acknowledgement, §0.11 C2 tag-amendment decision deferral.
+- `notes/FOLLOWUPS.md` "Operational heuristics" rule #8 — signal-of-life banner-presence assertion for code-path-gated cross-validation. Rule applies to ANY harness, not just our project; consider replicating in any `trunk_r13078`-based xval harness as best practice.
+
+---
+
+### Step 17c (17c.0.1 + 17c.0.2 LANDED): B15 fix (F1-F5) + signal-of-life harness assertion + four-xval re-verification — F5 in `lpjguess/framework/framework.cpp` is the ONLY RELEVANT change; F1-F4 are config/harness IRRELEVANT
+
+**Date:** 2026-05-13 (afternoon; session 4). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `2beff31`).
+
+**Backport relevance summary:**
+- **F1, F2, F3, F4: IRRELEVANT** — per-fork cluster-config + harness; not in `trunk_r13078`'s tree. F1+F2 modify `runs/SSP1-2.6/main_xval_*.ins`; F3+F4 modify `scripts/cross_validate_year_outer.sh`. None of these files exist in `trunk_r13078`.
+- **F5: RELEVANT (functional C++ source change)** — `lpjguess/framework/framework.cpp:339-357` adds a ~3-LOC `dprintf` runtime diagnostic + ~17-LOC doc block. `framework.cpp` is a near-identical sibling file in `trunk_r13078`'s framework; the F5 dprintf placement is structurally identical at the analogous post-`read_instruction_file()` site.
+
+#### File: `lpjguess/framework/framework.cpp` (+21 LOC additive; F5 only)
+
+**Insertion site:** Immediately after `read_instruction_file(args.get_instruction_file());` returns (line 337 in our tree at this commit), before the existing `firsthistyear`/`lasthistyear` sanity check at line 362. In `trunk_r13078`'s framework loop, locate the analogous `read_instruction_file()` call site (likely the same call signature; the function is part of the upstream LPJ-GUESS framework) and place F5 immediately after it.
+
+**Change pattern (mechanical; copy verbatim):**
+
+```cpp
+	// Read the instruction file to obtain PFT static parameters and
+	// simulation settings
+	read_instruction_file(args.get_instruction_file());
+
+	// [Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.1) — F5: signal-of-
+	//  life RUNTIME DIAGNOSTIC for framework_loop_mode (added 2026-05-13).
+	//  Echoes the parsed value of IMOGENConfig::framework_loop_mode immediately
+	//  after read_instruction_file() returns, so every run.log contains a
+	//  visible "this is the loop mode I parsed" line. Closes the third gap
+	//  from notes/STEP_17c.md §0.6 (no consumer-side observability of the
+	//  parsed framework_loop_mode value), complementing the harness-side
+	//  rule-#8 banner-presence assertion in scripts/cross_validate_year_outer.sh
+	//  ::compare_outputs() (F4) with an independent defense layer that fires
+	//  unconditionally (not only when the framework.cpp:464 gate evaluates
+	//  true). Catches both B15-class class-mismatch defects (pre-2beff31
+	//  param-vs-bare-syntax) and any future typo'd framework_loop_mode value
+	//  ("year_outter" etc.) which the harness rule-#8 banner check cannot
+	//  surface (no banner emitted because no known gate matches). Backport-
+	//  RELEVANT (touches lpjguess/framework/framework.cpp which exists in
+	//  trunk_r13078). See notes/STEP_17c.md §0 (audit item B15) §0.6 + §0.8(F5).
+	//  - DKB 2026-05-13]
+	dprintf("[framework] framework_loop_mode = \"%s\" (after .ins parse)\n",
+	        (const char*)IMOGENConfig::framework_loop_mode);
+
+	// Initialise input/output
+```
+
+**Backport directive — apply if all of the following preconditions hold in `trunk_r13078`:**
+
+1. `IMOGENConfig::framework_loop_mode` is declared (i.e., the C1 foundation backport has landed and the `framework_loop_mode` parameter is `declare_parameter`-bound to `IMOGENConfig::framework_loop_mode` per the step-17a-foundation LEDGER entry). If the C1 foundation has NOT been backported, F5 is a forward-reference dangling on a non-existent variable and must wait until the C1 foundation lands first.
+2. `dprintf` is the canonical LPJ-GUESS log function in `trunk_r13078`'s framework (it is in our tree; verify by `rg "dprintf" trunk_r13078/lpjguess/framework/framework.cpp` returning many hits before applying).
+3. The `read_instruction_file()` call site is reachable in `trunk_r13078`'s framework() function with the same call signature (it should be; this is upstream LPJ-GUESS plumbing).
+
+If all three hold: copy the 21-LOC block verbatim immediately after `read_instruction_file(args.get_instruction_file());` returns. No other adjustments needed.
+
+If precondition 1 doesn't hold yet: defer F5 until the C1 foundation backport lands; F5 cannot be backported in isolation because `IMOGENConfig::framework_loop_mode` doesn't exist without it.
+
+**Why F5 matters for `trunk_r13078`-side validation:** F5 is the consumer-side defense layer against any future B15-class class-mismatch defect. Even if the harness-side rule-#8 banner check (F4) is absent in a `trunk_r13078`-based xval setup, F5's unconditional run.log echo of `framework_loop_mode` makes the parsed-vs-intent discrepancy directly observable. F5 also catches typo'd values like `"year_outter"` that would silently fall through F4 (no banner emitted because no known gate matches the typo). Treat F5 as ~5 minutes of mechanical work during the F-11 backport sprint; the doc block is informative and should be preserved as-is.
+
+#### Files NOT applicable to `trunk_r13078` backport (F1-F4)
+
+For Backport Sprint completeness, the per-fork files modified in this commit:
+
+| File | Change | Backport directive |
+|---|---|---|
+| `runs/SSP1-2.6/main_xval_imogencfx.ins` (+15/−1; F1) | `param "framework_loop_mode" (str "gridcell_outer")` → `framework_loop_mode "gridcell_outer"` + 13-line doc block | **N/A** — `runs/` is a per-fork cluster-config tree; not in `trunk_r13078`. |
+| `runs/SSP1-2.6/main_xval_loose.ins` (+8/−1; F2) | Symmetric to F1 | **N/A** — same reason as F1. |
+| `scripts/cross_validate_year_outer.sh` (+127/−3; F3 + F4) | F3: wrapper-template `param "framework_loop_mode" (str "$mode")` → `framework_loop_mode "$mode"` + 27-line top-of-template doc block. F4: NEW signal-of-life banner-presence assertion in `compare_outputs()` (greps both run.logs for `[year_outer]` banner; pass requires `banner_a == 0` AND `banner_b >= 1`; failure exits with new code 4). | **N/A for source backport** — the harness is per-fork. **HOWEVER, recommended best practice for any future `trunk_r13078`-based xval harness:** if a `trunk_r13078`-based smoke runs the analogous gridcell_outer-vs-year_outer cross-validation, replicate the F4 rule-#8 banner-presence assertion pattern in that harness's compare phase. The F4 implementation (~92 LOC including doc + bash defensive patterns for `grep -c`'s exit-rc semantics) is directly reusable. |
+
+#### Verification this commit (per `notes/STEP_17c.md` §1.1)
+
+| Gate | Method | Result |
+|---|---|---|
+| 1 — `lpjguess/build/` rebuild | `cd lpjguess/build && cmake --build . --target guess` | ✅ ZERO new warnings (incremental: framework.cpp.o + relink) |
+| 2 — `lpjguess/build_mpi/` rebuild | `cd lpjguess/build_mpi && cmake --build . --target guess` | ✅ ZERO new warnings (incremental: framework.cpp.o + imogen_input.cpp.o + imogencfx.cpp.o + relink; the latter two recompiled due to mtime cache, not behavioural) |
+| 3 — 162 unit tests (build/) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 4 — 162 unit tests (build_mpi/) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 5 — xval `1cell imogen` | `scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ rc=0 / 37/37 bit-exact / 0/37 NaN / banner_a=0 / banner_b=5 / F5 echoes "gridcell_outer" + "year_outer" — **first time year_outer code path actually exercised** |
+| 6 — xval `1cell imogencfx` | `scripts/cross_validate_year_outer.sh 1cell imogencfx` | ✅ rc=0 / same metrics as gate 5 |
+| 7 — xval `4cell imogen` | `scripts/cross_validate_year_outer.sh 4cell imogen` | ⚠️ rc=99 — **B16 anticipated surface** at `cell_idx=1` cell `(-95.75,80.25)` per `notes/STEP_17c.md` §0.9; positive empirical evidence for 17c.0.3 fix |
+| 8 — xval `4cell imogencfx` | `scripts/cross_validate_year_outer.sh 4cell imogencfx` | ⚠️ rc=99 — symmetric `IMOGENCFXInput::preload_all_climate` same fail at same cell |
+
+**Verification gate at `trunk_r13078`-backport time:** if the C1 foundation backport has landed in `trunk_r13078` AND F5 is applied per the directive above, the analogous re-build + run-some-LPJ-GUESS-with-an-`.ins`-that-sets-`framework_loop_mode "gridcell_outer"` smoke should show `[framework] framework_loop_mode = "gridcell_outer" (after .ins parse)` immediately after the `read_instruction_file` log lines. This is the trivial post-backport sanity check for F5.
+
+#### Cross-references
+
+- `notes/STEP_17c.md` §1.1 — canonical landing record (~190 LOC; F1-F5 implementation details + verification + B16 trigger)
+- `notes/STEP_17c.md` §0.6 + §0.8(F5) — the gap analysis + F5 design rationale
+- `notes/FOLLOWUPS.md` "Operational heuristics" rule #8 — the meta-rule that F4 implements
+- `lpjguess/framework/framework.cpp` line 502 — the `[year_outer]` diagnostic banner that F4 greps for
+- `lpjguess/framework/framework.cpp` line 464 — the gating decision that consumes `IMOGENConfig::framework_loop_mode`
+- B16 next: 17c.0.3 sub-phase will land C++ source changes in `lpjguess/modules/imogen_input.cpp` + `lpjguess/modules/imogencfx.cpp` (both **backport-RELEVANT**); separate LEDGER entry to be added then.
+
+**With this commit, B15 (the C1+C2 false-positive harness root cause) is closed**; year_outer is observably executed in 1cell xval scenarios for the first time. B16 surfaces empirically at cell_idx=1 in 4cell scenarios as anticipated by §0.9, triggering 17c.0.3.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

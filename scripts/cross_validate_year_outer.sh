@@ -132,12 +132,38 @@ write_wrapper_ins() {
 ! Import the base loose-mode .ins (sets all the standard params)
 import "$BASE_INS"
 
-! Overrides for this run
+! Overrides for this run.
+!
+! [B15 FIX 2026-05-12 (session 3): plib supports TWO disjoint param mechanisms:
+!   (1) Native plib  "key value"  bare syntax  -> directly mutates a C++
+!       variable bound at module init via declare_parameter("key", &var, ...).
+!       This is what framework.cpp:464's gate
+!         if (IMOGENConfig::framework_loop_mode == "year_outer")
+!       reads. So framework_loop_mode MUST be set with bare syntax.
+!
+!   (2) Plib SET-block  param "key" (str "value")  -> appends/overrides an
+!       entry in the global Paramlist dictionary 'param', read via
+!       param["key"].str (e.g. parameters.cpp:991 + 1506-1514 + 1858-1862).
+!       Some parameters (file_gridlist, file_gridlist_cf, firsthistyear etc.)
+!       are read ONLY through this Paramlist dictionary and MUST therefore
+!       be set with param-syntax.
+!
+! These mechanisms target DIFFERENT storage and do NOT cross-update.
+! Pre-B15, the wrapper used  param "framework_loop_mode" (str "...")  which
+! silently wrote only to Paramlist["framework_loop_mode"].str — an entry
+! NOTHING in the codebase reads. IMOGENConfig::framework_loop_mode stayed
+! at its declare-side default "gridcell_outer" (parameters.cpp:288), so the
+! framework.cpp:464 gate evaluated false and the year_outer block NEVER
+! executed in any C1/C2 cross-validation Run B. All "bit-exact" passes were
+! gridcell_outer == gridcell_outer identity matches. See notes/STEP_17c.md
+! §0 (audit item B15) for full forensic.]
 param "file_gridlist"     (str "$GRIDLIST")
 param "file_gridlist_cf"  (str "$GRIDLIST")
-param "framework_loop_mode" (str "$mode")
+framework_loop_mode "$mode"
 
-! Output directory: outputs go to this run dir
+! Output directory: outputs go to this run dir.
+! [outputdirectory is declare_parameter-bound (outputmodule.cpp:38) so it
+!  uses bare syntax — same mechanism class as framework_loop_mode above.]
 outputdirectory "$out_dir/"
 EOF
   echo "$wrapper"
@@ -313,9 +339,101 @@ compare_outputs() {
     return 3
   fi
 
+  # =============================================================================
+  # [Step 17c (B15; 2026-05-12) — SIGNAL-OF-LIFE ASSERTION
+  #  added after a critical audit finding.]
+  #
+  # After Run B completes, this gate asserts that the year_outer code path
+  # actually executed by grepping for the dprintf banner emitted at
+  # framework.cpp:502:
+  #     "[year_outer] starting framework_loop_mode = \"year_outer\" ..."
+  # If the banner is absent, the gate FAILS with exit code 4 — even if
+  # bit-equality and the NaN gate both pass — because that combination
+  # would only be possible if Run B silently degraded to gridcell_outer
+  # mode (then matched Run A trivially: gridcell_outer == gridcell_outer).
+  #
+  # Symmetric defensive check: if the [year_outer] banner appears in
+  # RUN A's log, the gate FAILS because that means our gridcell_outer
+  # baseline was wrongly entering the year_outer block — invalidating the
+  # baseline-vs-year_outer comparison semantics.
+  #
+  # BACKGROUND: This assertion exists because of B15 (the audit item that
+  # exposed the silent xval-harness defect 2026-05-12). The pre-B15 wrapper
+  # used  param "framework_loop_mode" (str "year_outer")  which writes
+  # only to the Paramlist custom-parameter dictionary, NOT to the C++ xtring
+  # IMOGENConfig::framework_loop_mode that framework.cpp:464 reads. Because
+  # Paramlist["framework_loop_mode"] is never consumed by any code path,
+  # the override was a silent no-op. Bit-equality and NaN gates therefore
+  # rubber-stamped four C1/C2 close-out validations that never actually
+  # exercised year_outer. The B15 wrapper-writer fix uses bare syntax
+  # (framework_loop_mode "year_outer") which mutates the correct C++ xtring,
+  # but a structural defense — this banner-presence assertion — is added
+  # to prevent any future analogous false-positive class.
+  #
+  # This becomes operational heuristic rule #8 in notes/FOLLOWUPS.md:
+  # "every code-path-gated cross-validation must have a signal-of-life
+  # assertion in the harness (banner-presence grep on a dprintf inside
+  # the gated branch). Bit-exact match alone is insufficient when both
+  # branches reduce to the same code."
+  #
+  # - DKB 2026-05-12
+  # =============================================================================
+  # [Subtle bash gotcha: grep -c always prints 0 to stdout when there are no
+  #  matches, but exits with rc=1, which would then cause `|| echo 0` to print
+  #  a SECOND "0", yielding a "0\n0" multiline string that fails subsequent
+  #  integer comparisons. Pattern below: feed the file via `< file` so missing
+  #  files become an empty stdin -> grep prints "0" with rc=1; suppress rc with
+  #  `|| true` and leave the single "0" stdout intact. - DKB 2026-05-12 (B15)]
+  local banner_a banner_b
+  if [ -f "$RUN_A_DIR/run.log" ]; then
+    banner_a=$(grep -c '\[year_outer\]' "$RUN_A_DIR/run.log" || true)
+  else
+    banner_a=0
+  fi
+  if [ -f "$RUN_B_DIR/run.log" ]; then
+    banner_b=$(grep -c '\[year_outer\]' "$RUN_B_DIR/run.log" || true)
+  else
+    banner_b=0
+  fi
+
+  echo
+  echo "================================================================================"
+  echo "SIGNAL-OF-LIFE (B15) — added 2026-05-12 per audit item B15"
+  echo "================================================================================"
+  echo "Run A (gridcell_outer baseline) [year_outer] banner count: $banner_a (expected: 0)"
+  echo "Run B (year_outer)              [year_outer] banner count: $banner_b (expected: >=1)"
+
+  if [ "$banner_a" -gt 0 ]; then
+    echo
+    echo "FAIL (signal-of-life A): Run A's run.log contains [year_outer] banners."
+    echo "  This means the gridcell_outer baseline somehow entered the year_outer"
+    echo "  code path, invalidating the baseline-vs-year_outer comparison."
+    echo "  Investigate: is framework_loop_mode being mis-set in the wrapper?"
+    echo "  See notes/STEP_17c.md §0 (audit item B15) for the plib parser-mechanism forensic."
+    echo "================================================================================"
+    return 4
+  fi
+
+  if [ "$banner_b" -eq 0 ]; then
+    echo
+    echo "FAIL (signal-of-life B): Run B's run.log contains ZERO [year_outer] banners."
+    echo "  This means the year_outer code path did NOT execute even though Run B"
+    echo "  was supposed to test it. The framework_loop_mode override is silently"
+    echo "  failing. Pre-B15, the wrapper used  param \"framework_loop_mode\" (str ...)"
+    echo "  which writes to plib's Paramlist dict (unread for this parameter) instead"
+    echo "  of mutating IMOGENConfig::framework_loop_mode (which framework.cpp:464"
+    echo "  reads). The B15 fix is to use bare syntax  framework_loop_mode \"year_outer\""
+    echo "  in the wrapper. See notes/STEP_17c.md §0 (audit item B15) for the full forensic."
+    echo "================================================================================"
+    return 4
+  fi
+
   if [ "$bit_exact_ok" -eq 1 ]; then
     echo
-    echo "PASS (substantive): All .out files are bit-exact AND non-NaN between Run A and Run B."
+    echo "PASS (substantive + signal-of-life): All .out files are bit-exact AND non-NaN"
+    echo "  between Run A and Run B, AND the year_outer banner appeared $banner_b time(s)"
+    echo "  in Run B's log (and 0 times in Run A's log) — confirming the year_outer"
+    echo "  code path was actually executed in Run B and NOT in Run A."
     return 0
   else
     echo

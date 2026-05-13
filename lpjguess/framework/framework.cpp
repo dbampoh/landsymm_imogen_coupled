@@ -336,6 +336,26 @@ int framework(const CommandLineArguments& args) {
 	// simulation settings
 	read_instruction_file(args.get_instruction_file());
 
+	// [Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.1) — F5: signal-of-
+	//  life RUNTIME DIAGNOSTIC for framework_loop_mode (added 2026-05-13).
+	//  Echoes the parsed value of IMOGENConfig::framework_loop_mode immediately
+	//  after read_instruction_file() returns, so every run.log contains a
+	//  visible "this is the loop mode I parsed" line. Closes the third gap
+	//  from notes/STEP_17c.md §0.6 (no consumer-side observability of the
+	//  parsed framework_loop_mode value), complementing the harness-side
+	//  rule-#8 banner-presence assertion in scripts/cross_validate_year_outer.sh
+	//  ::compare_outputs() (F4) with an independent defense layer that fires
+	//  unconditionally (not only when the framework.cpp:464 gate evaluates
+	//  true). Catches both B15-class class-mismatch defects (pre-2beff31
+	//  param-vs-bare-syntax) and any future typo'd framework_loop_mode value
+	//  ("year_outter" etc.) which the harness rule-#8 banner check cannot
+	//  surface (no banner emitted because no known gate matches). Backport-
+	//  RELEVANT (touches lpjguess/framework/framework.cpp which exists in
+	//  trunk_r13078). See notes/STEP_17c.md §0 (audit item B15) §0.6 + §0.8(F5).
+	//  - DKB 2026-05-13]
+	dprintf("[framework] framework_loop_mode = \"%s\" (after .ins parse)\n",
+	        (const char*)IMOGENConfig::framework_loop_mode);
+
 	// Initialise input/output
     
     // SSR
