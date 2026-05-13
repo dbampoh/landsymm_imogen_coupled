@@ -17,6 +17,55 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-13 (late evening, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.4; **B17 FORENSIC DEEP-DIVE (PHASE A) + B17(a) ROW-EMISSION-ORDER DIVERGENCE FIX LANDED (.sh-only sort-then-diff harness upgrade) + B17(b) RECLASSIFIED FROM "~1 ULP NUMERICAL ROUNDOFF" TO "STOCHASTIC-PROCESS SENSITIVITY PER CELL-ITERATION-ORDER RNG SLIP"** — 1 source file modified; +103/−3 LOC; ZERO C++ source change; ZERO `.ins`/`.cpp`/`.h` touch; B17(a) mechanically CLOSED + B17(b) decision (α tolerance vs β root-cause) deferred to 17c.0.5 per Option A scoping decision; gates 1+2 SKIPPED (.sh-only fix); gates 3+4 unit tests 162/162 PASS both builds; gates 5+6 1cell xval PASS exit 0 idempotently (37/37 raw BIT_EXACT; sort block skipped per `if mismatches > 0` guard); gates 7+8 4cell xval CONTROLLED-FAIL exit 2 with EXACTLY-PREDICTED **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** classification on BOTH .ins variants; effective-pass count for 4cell scenarios advanced from 15/37 (pre-17c.0.4) → 20/37 (post-17c.0.4; 33% improvement on the controlled-fail surface); un-tagged checkpoint above `4d09b62`)
+
+This commit lands the **17c.0.4** sub-phase of the Step 17c.0 PREP plan: the B17(a) fix proper + Phase A forensic deep-dive of B17 + reclassification of B17(b), per the §3.3 (B17(a) characterization) + §3.6 option (a1) (recommended fix design) + §1.3 (NEW landing record) + §3.8 (NEW reclassified-B17(b) sub-section) walkthroughs in `notes/STEP_17c.md`. The B17(a) fix is **mechanically closed**: gates 7+8 verification confirms the 5 PURE B17(a) files (`npool.out`, `mch4.out`, `mch4_diffusion.out`, `mch4_ebullition.out`, `mch4_plant.out`) successfully normalize via sort-then-diff to byte-identical content. **B17(b) is RECLASSIFIED + DECISION DEFERRED to 17c.0.5** per Phase A forensic deep-dive: the §3.4-original `~1 ULP numerical drift` characterization was empirically refuted (drift magnitudes 0.67-17.7% relative — six orders too large for FP-summation roundoff at value-magnitude 0.02; max cell-total drift bounded ≤ 1.4% relative; signature is stochastic-process sensitivity per cell-iteration-order RNG slip, NOT FP-roundoff); §3.4 hypothesis 1 + 2 FALSIFIED; §3.4 hypothesis 3 surviving + refined to "setup-phase-ordering interaction with stochastic dynamics" via empirical localizer "cell 0 BIT-EXACT in ALL 17 drift files; cells 1, 2, 3 progressively diverge with cell index". 17c.0.5 will decide between **Option α (tolerance-based comparison upgrade; ~0.5-1 d; recommended)** and **Option β (seed-tracking dprintf root-cause investigation; +1-2 d)**.
+
+#### What landed
+
+| Change | Site | Description | Backport |
+|---|---|---|---|
+| **B17(a) fix** (option (a1) from §3.6) | `scripts/cross_validate_year_outer.sh::compare_outputs()` | ~100-LOC SORT-THEN-DIFF NORMALIZATION block: 75-LOC documentation comment + conditional sort-then-diff block (mktemp+trap RETURN auto-cleanup; LC_ALL=C sort -k1,1n -k2,2n -k3,3n on (Lon, Lat, Year); preserves header line via head -1 + tail -n+2 \| sort) + BIT_EXACT/SORTED_EXACT/SORTED_DIFFER classification + effective-pass semantic update + refined PASS/FAIL messages | TRUNK-IRRELEVANT-by-novelty (per-fork harness) |
+
+Net code diff: **+103 / −3** across **1 source file** (`scripts/cross_validate_year_outer.sh`). All other deltas are documentation. ZERO C++ source change; ZERO `.ins` change; ZERO `lpjguess/` touch.
+
+#### Phase A forensic findings (revised §3.4 hypothesis space)
+
+| Hypothesis | Phase A status | Evidence (from §1.3.3) |
+|---|---|---|
+| §3.4 (1) FP-summation roundoff | ❌ **FALSIFIED** | Drift magnitudes 6 orders too large for ~1 ULP at value-magnitude 0.02 (e.g., `lai.out` cell `(-57.75,-33.75)` yr 1876 TrIBE: 0.0192 vs 0.0158 = 17.7% relative; cell-total drift bounded ≤ 1.4% relative) |
+| §3.4 (2) Global RNG state | ❌ **FALSIFIED** | `randfrac(long& seed)` at `lpjguess/modules/driver.cpp:42` is pure functional Park-Miller LCG; ALL randomness uses per-cell-isolated `gridcell.seed`+`stand.seed`; both initialise to 12345678 in their ctors; no global RNG state |
+| §3.4 (3) Per-cell init order | ⚠️ **Surviving — refined to "setup-phase-ordering interaction"** | Empirical localizer: cell 0 BIT-EXACT in ALL 17 drift files; cells 1, 2, 3 progressively diverge with cell index; drift cumulative-over-time within cell (first-drift at year 1873-1876; spinup years 1871-1872 BIT-EXACT in ALL cells); specific code site requires seed-tracking dprintf instrumentation deferred to 17c.0.5 (β option) |
+
+Full reclassified B17(b) characterization in NEW `notes/STEP_17c.md` §3.8.
+
+#### Verification gates 1-8
+
+| Gate | Test | Result |
+|---|---|---|
+| 1+2 | Clean rebuilds | SKIPPED (no C++ rebuild needed; .sh-only fix; binaries from 17c.0.3 reused) |
+| 3 | `lpjguess/build/runtests` | **162/162 PASS** (regression-clean) |
+| 4 | `lpjguess/build_mpi/runtests` | **162/162 PASS** (build-agnostic) |
+| 5 | 1cell xval imogen | **PASS exit 0** (37/37 raw BIT_EXACT; sort block skipped per idempotency) |
+| 6 | 1cell xval imogencfx | **PASS exit 0** (37/37 raw BIT_EXACT; sort block skipped per idempotency) |
+| 7 | 4cell xval imogen | **CONTROLLED-FAIL exit 2** with EXACTLY-PREDICTED 15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER classification |
+| 8 | 4cell xval imogencfx | **CONTROLLED-FAIL exit 2** with IDENTICAL 15 + 5 + 17 envelope (build-agnostic + .ins-agnostic) |
+
+#### Backport classification
+
+**TRUNK-IRRELEVANT-by-novelty**: `scripts/cross_validate_year_outer.sh` is a per-fork harness; doesn't exist in `trunk_r13078`. `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17c-17c.0.4 entry captures this.
+
+#### What 17c.0.5 must do next
+
+The remaining 17/37 SORTED_DIFFER files in 4cell scenarios surface B17(b) cleanly. The 17c.0.5 sub-phase decides:
+
+- **Option α (tolerance-based comparison upgrade to `compare_outputs()`)** — recommended given Phase A's empirically-clarified picture. ~0.5-1 d. Aligns with Decision-12 acceptance criterion 2 ("PASS substantive within an explicit tolerance specified in `notes/STEP_17b.md` §3a.7"). Backport: TRUNK-IRRELEVANT (.sh-only).
+- **Option β (seed-tracking dprintf root-cause investigation)** — +1-2 d focused investigation if α rejected. Surgical instrumentation at every `randfrac` consumer (driver.cpp prdaily/randfrac itself; vegdynam.cpp 1018+1061+1218+1482; spitfire.cpp 1744+2669+2700+2717; blaze.cpp 515+655). Diff seed-trace logs to identify FIRST cell + FIRST callsite where seeds diverge.
+
+The (α)/(β) decision is the user's call when 17c.0.5 begins.
+
+Full forensic + landing chain in `notes/STEP_17c.md` §1.3 (NEW; ~250 LOC) + §3.3+§3.4+§3.6 amendments + NEW §3.8 (~120 LOC).
+
 ### 2026-05-13 (evening, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.3; **B16 LATENT EAGER-CACHE-FULLNESS CHECK FIX LANDED (G1-G4)** — 3 C++ files modified; +78/−20 LOC; B16 mechanically closed; gates 1-6 PASS; gates 7+8 controlled-fail surfacing **NEW audit item B17 (a + b sub-defects); B17 forensic surface landed as new `notes/STEP_17c.md` §3; B17 fix deferred to NEXT sub-phase 17c.0.4** per same staged-discovery pattern as 17c.0.1 → 17c.0.3): G1+G2 remove the eager `if (last_store_index >= nyears) fail(...)` check at the start of `(Imogen|IMOGENCFX)Input::preload_all_climate` and replace it with extensive doc blocks (~38 LOC + ~20 LOC) explaining the cumulative-across-cells cache design intent; G3 augments base-class `InputModule::preload_all_climate` doc block in `inputmodule.h` with ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES"; G4 tightens inner per-miss `fail()` diagnostics in both modules with `cell_idx`; un-tagged checkpoint above `019c9dd`
 
 This commit lands the **17c.0.3** sub-phase of the Step 17c.0 PREP plan: the B16 fix proper, per the §0.9 (forecast) + §2.6 (G1-G4 design) walkthrough in `notes/STEP_17c.md`. The B16 fix is **mechanically closed**: pre-G1+G2 the 4cell year_outer Run B aborted at `preload_all_climate` exit 99 after 3 banners (per 17c.0.2's §1.1.7 evidence at `019c9dd`); post-G1+G2 the 4cell year_outer Run B emits all 5 banners and produces the full 37-.out-file output set. **However, gates 7+8 controlled-fail at exit 2 surfacing B17** — a brand-new audit item with two sub-defects (B17(a) row-emission-order divergence + B17(b) small ~1 ULP numerical drift in 17 per-PFT-total / `tot_runoff` files) — same staged-discovery pattern as 17c.0.1 → 17c.0.3 (B15 fix unmasked B16; B16 fix unmasks B17). The full B17 forensic surface lives as new `notes/STEP_17c.md` §3; the B17 fix is deferred to 17c.0.4.

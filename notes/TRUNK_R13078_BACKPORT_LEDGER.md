@@ -1826,6 +1826,48 @@ For Backport Sprint completeness, the per-fork files modified in this commit:
 
 ---
 
+### Step 17c (17c.0.4 LANDED): B17 forensic deep-dive (Phase A) + B17(a) row-emission-order divergence fix (.sh-only sort-then-diff harness upgrade) + B17(b) reclassified — change is **TRUNK-IRRELEVANT-by-novelty** (per-fork harness `scripts/cross_validate_year_outer.sh` does not exist in `trunk_r13078`)
+
+**Date:** 2026-05-13 (late evening; session 4). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `4d09b62`).
+
+**Backport relevance summary:**
+- **B17(a) FIX (option (a1) from `notes/STEP_17c.md` §3.6): TRUNK-IRRELEVANT-by-novelty (NOT by syntax/semantics)** — the `scripts/cross_validate_year_outer.sh` harness is a per-fork addition introduced at C1.1 era for cross-validating the per-fork `framework_loop_mode = "year_outer"` code path against `gridcell_outer`. `trunk_r13078` doesn't have either the `framework_loop_mode` parameter (per-fork; `framework.cpp` upstream has only the gridcell_outer code path) or this harness. The B17(a) row-emission-order divergence as a phenomenon also doesn't exist upstream because the upstream loop-order is the only one (cell-major), so there's no cross-mode comparison to make.
+- **B17(b) RECLASSIFIED + DECISION DEFERRED to 17c.0.5**: this commit does NOT touch any source file related to B17(b). The forensic deep-dive (Phase A) lives in `notes/STEP_17c.md` §1.3.3 + new §3.8; the (α tolerance vs β root-cause) decision is for 17c.0.5. If 17c.0.5 chooses (β), the resulting fix MAY touch upstream-relevant files (e.g., `lpjguess/framework/framework.cpp` year_outer setup-phase reordering — which would still be backport-IRRELEVANT because year_outer is a per-fork addition); to be classified at 17c.0.5 commit time.
+- **No backport directive** — this commit's changes have nothing to backport because the underlying machinery they modify (`scripts/cross_validate_year_outer.sh`) doesn't exist upstream. Documented here for completeness (so the Backport Sprint reader knows this commit was reviewed and explicitly classified as TRUNK-IRRELEVANT, not overlooked).
+
+#### Files in this commit (TRUNK-IRRELEVANT-by-novelty)
+
+| File | Change | Trunk-equivalence | Backport directive |
+|---|---|---|---|
+| `scripts/cross_validate_year_outer.sh` (+103/−3; B17(a) FIX) | INSERT ~100-LOC SORT-THEN-DIFF NORMALIZATION block in `compare_outputs()` between line 266 (end of "RAW BYTE-EQUALITY SUMMARY" block) and line 268 (start of NaN-check block): 75-LOC documentation comment + conditional sort-then-diff block (mktemp+trap RETURN auto-cleanup; LC_ALL=C sort -k1,1n -k2,2n -k3,3n on (Lon, Lat, Year); preserves header line via head -1 + tail -n+2 \| sort) + BIT_EXACT/SORTED_EXACT/SORTED_DIFFER classification + effective-pass semantic update + refined PASS/FAIL messages with B17(b) drift count reporting. Block IDEMPOTENT (guarded by `if mismatches > 0`; skipped when raw cmp -s passes). | The `scripts/cross_validate_year_outer.sh` harness is a per-fork addition (introduced at C1.1 era for `framework_loop_mode = "year_outer"` cross-validation); trunk has no equivalent harness because trunk has only the gridcell_outer loop-order. | **N/A** — not in `trunk_r13078`. |
+
+Documentation cascade also touches: `notes/STEP_17c.md` (NEW §1.3 landing record + §3.3+§3.4+§3.6 status updates + NEW §3.8 reclassified-B17(b) sub-section + header date/status updates; ~+200 LOC), `notes/FOLLOWUPS.md` (status dashboard refresh), `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry), `EXECUTION_PLAN.md` (row 17c update), `CHANGELOG.md` (NEW dated entry), `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (Part 4 NEW). All documentation deltas are TRUNK-IRRELEVANT.
+
+#### Verification this commit (per `notes/STEP_17c.md` §1.3.5 + §1.3.6)
+
+| Gate | Method | Result |
+|---|---|---|
+| 1+2 — clean rebuilds | SKIPPED | NO C++ rebuild needed (.sh-only fix; binaries from 17c.0.3 reused) |
+| 3 — 162 unit tests (build/) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." (regression-clean; .sh fix does not affect compiled binary) |
+| 4 — 162 unit tests (build_mpi/) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." (build-agnostic) |
+| 5 — xval `1cell imogen` | `scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ rc=0 / 37/37 raw BIT_EXACT / sort block skipped per idempotency / 0/37 NaN / banner_a=0 / banner_b=5 — preserves PASS exit 0 |
+| 6 — xval `1cell imogencfx` | `scripts/cross_validate_year_outer.sh 1cell imogencfx` | ✅ rc=0 / same metrics as gate 5 |
+| 7 — xval `4cell imogen` | `scripts/cross_validate_year_outer.sh 4cell imogen` | ⚠️ rc=2 (CONTROLLED-FAIL) / EXACTLY-PREDICTED **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** classification / 0/37 NaN / banner_a=0 / banner_b=5 — B17(a) successfully normalizes 5 PURE B17(a) files (`npool.out`, `mch4.out`, `mch4_diffusion.out`, `mch4_ebullition.out`, `mch4_plant.out`) via sort-then-diff to byte-identical content; effective-pass count advanced from 15/37 → 20/37 (33% improvement); 17 SORTED_DIFFER files surface B17(b) cleanly (full reclassified forensic in `notes/STEP_17c.md` §3.8) |
+| 8 — xval `4cell imogencfx` | `scripts/cross_validate_year_outer.sh 4cell imogencfx` | ⚠️ rc=2 / IDENTICAL 15+5+17 envelope as gate 7 — confirms B17 is build-agnostic + .ins-agnostic (the divergence is in the framework's year_outer code path, not input-module-specific) |
+
+#### Cross-references for the Backport Sprint reader
+
+- `notes/STEP_17c.md` §1.3 — canonical landing record for 17c.0.4 (~250 LOC; B17(a) implementation details + Phase A forensic + verification + B17(b) reclassification + 17c.0.5 plan)
+- `notes/STEP_17c.md` §3.3 — B17(a) status update (CLOSED 2026-05-13 evening via §3.6 option (a1))
+- `notes/STEP_17c.md` §3.4 — B17(b) status update (RECLASSIFIED + decision deferred to 17c.0.5; §3.4 hypothesis 1+2 FALSIFIED; hypothesis 3 surviving + refined)
+- `notes/STEP_17c.md` §3.6 — recommended-fix subsection update (option (a1) IMPLEMENTED in this commit; option (β) for B17(b) deferred to 17c.0.5)
+- `notes/STEP_17c.md` §3.8 — NEW reclassified-B17(b) sub-section (~120 LOC; empirical signature + hypothesis-bisection summary + scientific interpretation + Phase A's wall on root-cause identification)
+- B17(b) next: 17c.0.5 sub-phase will decide between Option α (tolerance-based comparison upgrade to `compare_outputs()`; ~0.5-1 d; recommended; TRUNK-IRRELEVANT) and Option β (seed-tracking dprintf root-cause investigation; +1-2 d; targeted fix — backport classification depends on which file is touched). To be classified at 17c.0.5 commit time.
+
+**With this commit, B17(a) (the row-emission-order divergence in multi-cell year_outer xval) is closed** via harness sort-then-diff normalization; effective-pass for 4cell scenarios advances from 15/37 → 20/37 (33% improvement). **B17(b) is reclassified** from "~1 ULP numerical roundoff" (FALSIFIED) to "stochastic-process sensitivity per cell-iteration-order RNG slip"; 17c.0.5 will decide the closure path.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

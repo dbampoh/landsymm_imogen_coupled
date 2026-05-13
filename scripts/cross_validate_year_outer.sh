@@ -262,8 +262,134 @@ compare_outputs() {
 
   echo
   echo "================================================================================"
-  echo "BYTE-EQUALITY SUMMARY: $matches/$total bit-exact matches; $mismatches mismatches"
+  echo "RAW BYTE-EQUALITY SUMMARY: $matches/$total bit-exact matches; $mismatches mismatches"
   echo "================================================================================"
+
+  # =============================================================================
+  # [Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.4) — B17(a) FIX
+  #  (landed 2026-05-13 evening, session 4): SORT-THEN-DIFF NORMALIZATION
+  #  layer added.
+  #
+  # Added because B17(a) (row-emission-order divergence) is a STRUCTURAL
+  # property of the year_outer loop, NOT a defect:
+  #   - gridcell_outer emits .out rows in CELL-MAJOR order
+  #     (cell 0 yr0..N, cell 1 yr0..N, ..., cell M yr0..N) because its
+  #     loop is `for cell { for year { outannual } }`
+  #     (framework.cpp::736-817).
+  #   - year_outer    emits .out rows in YEAR-MAJOR order
+  #     (yr0 cell0..M, yr1 cell0..M, ..., yrN cell0..M) because its
+  #     loop is `for year { for cell { outannual } }`
+  #     (framework.cpp::588-628).
+  # Both modes call output_modules.outannual(gridcell) per (cell, year)
+  # tuple at end-of-year; emission ORDER == loop ORDER. The two modes
+  # produce IDENTICAL data rows but in different sequences. Raw cmp -s
+  # therefore reports MISMATCH on EVERY multi-cell xval scenario even
+  # when the underlying data is identical (which it is for the 5
+  # "PURE B17(a)" files in our 4cell envelope: npool, mch4, mch4_
+  # diffusion, mch4_ebullition, mch4_plant).
+  #
+  # The fix sorts each file's BODY (lines 2..N) by (Lon, Lat, Year) using
+  # LC_ALL=C numeric sort -k1,1n -k2,2n -k3,3n. This matches the natural
+  # ordering of both modes' output and is IDEMPOTENT on already-sorted
+  # input. Per-LC summed files and 1cell scenarios already pass raw cmp -s
+  # and skip the sort-then-diff entirely.
+  #
+  # File classification produced by this block (printed per-file +
+  # summarized after the loop):
+  #   BIT_EXACT     - raw cmp -s succeeded (identical bytes; no sort needed)
+  #   SORTED_EXACT  - raw differs but sorted-cmp -s succeeds (PURE B17(a);
+  #                   pure row-ordering divergence; counted toward effective
+  #                   PASS for the substantive-validation gate)
+  #   SORTED_DIFFER - raw differs AND sorted-cmp -s differs (B17(a) + B17(b);
+  #                   confirmed numerical drift on top of row-ordering;
+  #                   counted toward FAIL; B17(b) closure deferred to sub-
+  #                   phase 17c.0.5 per notes/STEP_17c.md §3 + §3.6)
+  #
+  # PASS/FAIL semantics (updated): the substantive-validation gate now
+  # passes when BIT_EXACT + SORTED_EXACT == total (zero SORTED_DIFFER).
+  # FAIL exit 2 when SORTED_DIFFER > 0. This is a SEMANTIC interpretation
+  # of Decision-12 byte-equality (equality of CONTENT, not of emission
+  # order), which is the architecturally correct interpretation given
+  # year_outer's loop-restructure mandate. The strict literal byte-
+  # equality interpretation is structurally unachievable for any multi-
+  # cell year_outer scenario without engine-level row-buffering (the
+  # alternative architectural option (a2) per notes/STEP_17c.md §3.6;
+  # NOT taken).
+  #
+  # Sort-key invariant: ALL .out files in this codebase have (Lon, Lat,
+  # Year) as columns 1, 2, 3. Verified empirically across all 37 files
+  # in the 4cell xval envelope (per Phase A.2 forensic in 17c.0.4
+  # investigation). If a future output file uses a different column
+  # layout, this assumption must be revisited.
+  #
+  # Cleanup: temp dir created via mktemp; auto-cleaned via trap RETURN.
+  # No side effects outside this function.
+  #
+  # Cross-references:
+  #   - notes/STEP_17c.md §3 (B17 forensic surface)
+  #   - notes/STEP_17c.md §3.3 (B17(a) characterization + emission-order
+  #     mechanism)
+  #   - notes/STEP_17c.md §3.6 option (a1) (recommended-fix skeleton;
+  #     this implementation realizes that recommendation)
+  #   - notes/STEP_17c.md §1.3 (this commit's landing record)
+  #   - notes/FOLLOWUPS.md "Audit item B17" (status dashboard)
+  #
+  # Backport classification: TRUNK-IRRELEVANT (.sh harness only;
+  # cross_validate_year_outer.sh is per-fork; trunk_r13078 has no
+  # year_outer mode and no cross-validation harness).
+  #
+  # - DKB 2026-05-13
+  # =============================================================================
+  local sorted_exact=0
+  local sorted_differ=0
+  if [ "$mismatches" -gt 0 ]; then
+    echo
+    echo "================================================================================"
+    echo "B17(a) SORT-THEN-DIFF NORMALIZATION (added 2026-05-13 per audit item B17)"
+    echo "  Sort key: (Lon, Lat, Year) = columns 1,2,3 (LC_ALL=C numeric sort)"
+    echo "  Header (line 1) preserved verbatim; only data rows (lines 2..N) sorted."
+    echo "================================================================================"
+    local sort_tmp
+    sort_tmp=$(mktemp -d -t b17a_sort_XXXXXX)
+    # Auto-cleanup of $sort_tmp on function return (success or failure path).
+    trap 'rm -rf "$sort_tmp"' RETURN
+
+    for fa in "$RUN_A_DIR"/*.out; do
+      local base
+      base=$(basename "$fa")
+      local fb="$RUN_B_DIR/$base"
+      # Skip files already passing raw byte-equality (no sort needed).
+      if cmp -s "$fa" "$fb" 2>/dev/null; then
+        continue
+      fi
+      # Skip files missing in Run B (already counted in $mismatches as MISSING).
+      if [ ! -f "$fb" ]; then
+        continue
+      fi
+      # Sort body of A and B by (Lon, Lat, Year) preserving header.
+      local sa="$sort_tmp/${base}.A.sorted"
+      local sb="$sort_tmp/${base}.B.sorted"
+      ( head -1 "$fa"; tail -n+2 "$fa" | LC_ALL=C sort -k1,1n -k2,2n -k3,3n ) > "$sa"
+      ( head -1 "$fb"; tail -n+2 "$fb" | LC_ALL=C sort -k1,1n -k2,2n -k3,3n ) > "$sb"
+      if cmp -s "$sa" "$sb"; then
+        echo "  $base : ✓ SORTED_EXACT (PURE B17(a) - pure row-ordering; data identical)"
+        sorted_exact=$((sorted_exact + 1))
+      else
+        local sorted_diff_lines
+        sorted_diff_lines=$(diff "$sa" "$sb" | wc -l)
+        echo "  $base : ✗ SORTED_DIFFER ($sorted_diff_lines lines; B17(a) + B17(b) drift)"
+        sorted_differ=$((sorted_differ + 1))
+      fi
+    done
+
+    echo
+    echo "B17(a) NORMALIZATION SUMMARY:"
+    echo "  BIT_EXACT     (raw cmp -s passed)                              : $matches / $total"
+    echo "  SORTED_EXACT  (raw differs, sorted cmp -s passes; PURE B17(a)) : $sorted_exact"
+    echo "  SORTED_DIFFER (raw differs AND sorted cmp -s differs;          : $sorted_differ"
+    echo "                 B17(a) + B17(b) drift; closure in 17c.0.5)"
+    echo "  Total accounted for                                            : $((matches + sorted_exact + sorted_differ)) / $total"
+  fi
 
   # =============================================================================
   # [Step 17b (F-12 sub-milestone C2 core; 2026-05-11) — SUBSTANTIVE-VALIDATION
@@ -310,8 +436,16 @@ compare_outputs() {
   echo "Run A .out files containing NaN: $nan_in_a / $n_a"
   echo "Run B .out files containing NaN: $nan_in_b / $n_b"
 
+  # [Step 17c (17c.0.4 B17(a) FIX, 2026-05-13): effective-pass semantics
+  #  updated to count BIT_EXACT + SORTED_EXACT toward PASS. Pre-17c.0.4 this
+  #  block computed bit_exact_ok = ($mismatches == 0). Post-17c.0.4, raw
+  #  mismatches that NORMALIZE to bit-equality via the sort-then-diff layer
+  #  above (PURE B17(a) cases) count as semantic-byte-equal (Decision-12
+  #  equality of CONTENT, not emission order). SORTED_DIFFER files (B17(a)
+  #  + B17(b) drift) remain FAIL until 17c.0.5 closes B17(b). - DKB 2026-05-13]
+  local effective_pass=$((matches + sorted_exact))
   local bit_exact_ok=0
-  if [ "$mismatches" -eq 0 ] && [ "$total" -gt 0 ]; then
+  if [ "$effective_pass" -eq "$total" ] && [ "$total" -gt 0 ]; then
     bit_exact_ok=1
   fi
 
@@ -430,14 +564,31 @@ compare_outputs() {
 
   if [ "$bit_exact_ok" -eq 1 ]; then
     echo
-    echo "PASS (substantive + signal-of-life): All .out files are bit-exact AND non-NaN"
-    echo "  between Run A and Run B, AND the year_outer banner appeared $banner_b time(s)"
-    echo "  in Run B's log (and 0 times in Run A's log) — confirming the year_outer"
+    echo "PASS (substantive + signal-of-life): All .out files are byte-exact (raw OR sorted-by-(Lon,Lat,Year)"
+    echo "  per B17(a) normalization) AND non-NaN between Run A and Run B, AND the year_outer banner"
+    echo "  appeared $banner_b time(s) in Run B's log (and 0 times in Run A's log) — confirming the year_outer"
     echo "  code path was actually executed in Run B and NOT in Run A."
+    if [ "$sorted_exact" -gt 0 ]; then
+      echo
+      echo "  Note: $sorted_exact file(s) required B17(a) sort-normalization (raw differs but data is"
+      echo "  identical after sort by (Lon, Lat, Year)). PURE B17(a) cases reflect the year_outer loop's"
+      echo "  year-major emission order vs gridcell_outer's cell-major emission order; data content is"
+      echo "  identical. See notes/STEP_17c.md §3.3."
+    fi
     return 0
   else
     echo
-    echo "FAIL: $mismatches files differ. Investigate divergences."
+    echo "FAIL: $sorted_differ file(s) have B17(b) drift (raw AND sorted both differ);"
+    echo "  $matches BIT_EXACT + $sorted_exact SORTED_EXACT (PURE B17(a)) + $sorted_differ SORTED_DIFFER"
+    echo "  + $((mismatches - sorted_exact - sorted_differ)) MISSING/other = $total total."
+    echo
+    echo "B17(b) is the small-magnitude (~0.5-2%) numerical drift in per-PFT-total +"
+    echo "  tot_runoff files between gridcell_outer and year_outer multi-cell runs."
+    echo "  Empirical signature: per-cell-isolated stochastic-process divergence (cell 0"
+    echo "  bit-exact in BOTH modes; cells 1+ progressively diverge in low-biomass PFTs"
+    echo "  while cell totals stay within ~1.4% relative). Closure plan in"
+    echo "  notes/STEP_17c.md §3 (B17(b) forensic) + §3.6 (recommended-fix skeleton)"
+    echo "  + sub-phase 17c.0.5 (decision: tolerance-based comparison vs root-cause fix)."
     return 2
   fi
 }
