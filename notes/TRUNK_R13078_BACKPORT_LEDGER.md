@@ -1785,6 +1785,47 @@ For Backport Sprint completeness, the per-fork files modified in this commit:
 
 ---
 
+### Step 17c (17c.0.3 LANDED): B16 fix (G1-G4) + B17 forensic surface — all changes **TRUNK-IRRELEVANT-by-novelty** (per-fork additions; `preload_all_climate` virtual function does not exist in `trunk_r13078`'s `InputModule` base class)
+
+**Date:** 2026-05-13 (evening; session 4). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `019c9dd`).
+
+**Backport relevance summary:**
+- **G1, G2, G3, G4: TRUNK-IRRELEVANT-by-novelty (NOT by syntax/semantics)** — the `preload_all_climate` virtual function + cumulative-across-cells cache machinery + eager-check anti-pattern are **per-fork additions** introduced at C1.3 sub-step 7.3.2 (commit `d7f6c74`, 2026-05-10) as part of the C1.1 inputmodule subclass refactor. `trunk_r13078`'s `InputModule` base class does not declare `preload_all_climate` as a virtual function; trunk's input modules use a different per-cell streaming paradigm (no cumulative-cache concept; no preload phase distinct from the per-year readenv phase).
+- **No backport directive** — this commit's changes have nothing to backport because the underlying machinery they modify doesn't exist upstream. Documented here for completeness (so the Backport Sprint reader knows this commit was reviewed and explicitly classified as TRUNK-IRRELEVANT, not overlooked).
+
+#### Files in this commit (all TRUNK-IRRELEVANT-by-novelty)
+
+| File | Change | Trunk-equivalence | Backport directive |
+|---|---|---|---|
+| `lpjguess/modules/imogen_input.cpp` (+38/−9; G1 + G4 part 1) | DELETE 8-line eager check at lines 1111-1118 (`if (last_store_index >= nyears) fail("...: stored_years cache already full ...")`); REPLACE with ~38-LOC doc block explaining cumulative-across-cells cache design intent + B16 root cause + cross-references to `notes/STEP_17c.md` §0.9 + §2.4 + §2.5. ALSO: add `cell_idx` to inner per-miss `fail()` message at lines 1158-1164 for unambiguous fault attribution (~4 LOC). | `ImogenInput::preload_all_climate` is a per-fork addition for the C1.1 cumulative-cache machinery; `trunk_r13078` doesn't have this method or this cache. | **N/A** — not in `trunk_r13078`. |
+| `lpjguess/modules/imogencfx.cpp` (+20/−11; G2 + G4 part 2) | Symmetric DELETE 11-line eager check at lines 1366-1376; REPLACE with ~20-LOC doc block (cross-references G1's full forensic in `imogen_input.cpp`). ALSO: add `cell_idx` to inner per-miss `fail()` message at lines 1421-1427 (~4 LOC). | `IMOGENCFXInput::preload_all_climate` is a per-fork addition; `trunk_r13078` doesn't have the IMOGENCFX module at all (the entire `imogencfx.cpp` file is per-fork, introduced for IMOGEN tight-coupling at C1 era). | **N/A** — not in `trunk_r13078`. |
+| `lpjguess/framework/inputmodule.h` (+20/0; G3) | AUGMENT existing `InputModule::preload_all_climate` virtual function doc block at lines 84-102 with ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES" formalising the cumulative-across-cells cache contract: subclasses MUST treat any per-cell cache as cumulative-across-cells; subclasses MUST NOT add eager early-exit checks at function entry that assume per-cell cache state. | The `preload_all_climate` virtual function declaration in `InputModule` is a per-fork addition; `trunk_r13078`'s `InputModule` base class doesn't have it. The augmentation is contract documentation for a virtual function that doesn't exist upstream. | **N/A** — not in `trunk_r13078`. |
+
+#### Verification this commit (per `notes/STEP_17c.md` §1.2)
+
+| Gate | Method | Result |
+|---|---|---|
+| 1 — `lpjguess/build/` rebuild | `cd lpjguess/build && cmake --build . --target guess` | ✅ ZERO new warnings (incremental: imogen_input.cpp.o + imogencfx.cpp.o + relink; inputmodule.h is included → triggers .cpp recompile) |
+| 2 — `lpjguess/build_mpi/` rebuild | `cd lpjguess/build_mpi && cmake --build . --target guess` (after `MPICH_CXX=g++` recovery; see §1.2.10) | ✅ ZERO new warnings touching G1-G4 sites (332 total = pre-existing union of `guess` + `runtests` build outputs) |
+| 3 — 162 unit tests (build/) | `lpjguess/build/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 4 — 162 unit tests (build_mpi/) | `lpjguess/build_mpi/runtests --reporter compact` | ✅ "Passed all 25 test cases with 162 assertions." |
+| 5 — xval `1cell imogen` | `scripts/cross_validate_year_outer.sh 1cell imogen` | ✅ rc=0 / 37/37 bit-exact / 0/37 NaN / banner_a=0 / banner_b=5 — regression-clean baseline |
+| 6 — xval `1cell imogencfx` | `scripts/cross_validate_year_outer.sh 1cell imogencfx` | ✅ rc=0 / same metrics as gate 5 |
+| 7 — xval `4cell imogen` | `scripts/cross_validate_year_outer.sh 4cell imogen` | ⚠️ rc=2 / 15/37 bit-exact / 22/37 differ / 0/37 NaN / banner_a=0 / banner_b=**5** — year_outer ran END-TO-END (3→5 banner-count delta vs 17c.0.2 = mechanical evidence B16 is fixed); 22/37 differ surfacing **B17** (full forensic in `notes/STEP_17c.md` §3) |
+| 8 — xval `4cell imogencfx` | `scripts/cross_validate_year_outer.sh 4cell imogencfx` | ⚠️ rc=2 / same metrics as gate 7 — confirms B17 is systemic year_outer multi-cell defect, not input-mode-specific |
+
+#### Cross-references for the Backport Sprint reader
+
+- `notes/STEP_17c.md` §1.2 — canonical landing record for 17c.0.3 (~115 LOC; G1-G4 implementation details + verification + B17 trigger)
+- `notes/STEP_17c.md` §2 — full B16 forensic record (~120 LOC; analogous to §0 for B15)
+- `notes/STEP_17c.md` §3 — B17 forensic surface (~110 LOC; recommended-fix subsection §3.6 to be elaborated in 17c.0.4 commit)
+- `notes/STEP_17c.md` §1.2.10 — MPI build recovery via `MPICH_CXX=g++` operational lesson (the script's preferred `mpicxx` + Anaconda3 `conda-forge gxx_linux-64` path failed at link with system NetCDF/HDF5 ABI mismatches; recovery via option (a) of `scripts/cluster/make_guess.sh`'s documented compiler-selection options)
+- B17 next: 17c.0.4 sub-phase will land the B17 forensic deep-dive + fix; if the fix touches `compare_outputs()` in `scripts/cross_validate_year_outer.sh` (B17(a) harness sort-then-diff upgrade), it will be IRRELEVANT (per-fork harness; not in `trunk_r13078`). If the fix touches engine code for B17(b) numerical drift (e.g., fixing per-PFT-total accumulator order to be cell-iteration-independent), it MAY be RELEVANT depending on which file is touched (the per-PFT-total accumulators may be in trunk's `commonoutput.cpp` or analogous; to be classified at 17c.0.4 commit time).
+
+**With this commit, B16 (the latent eager cache-fullness check defect) is closed**; year_outer 4cell now runs end-to-end (5 banners; 37 .out files in Run B; pre-fix the run aborted at exit 99 after 3 banners). B17 surfaces empirically with 22/37 .out file divergence between gridcell_outer and year_outer in 4cell scenarios, triggering 17c.0.4 (combined B17(a) + B17(b) scope).
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):

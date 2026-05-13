@@ -96,6 +96,50 @@ public:
 	 *  \param gridcell             The cell whose climate to preload
 	 *  \param first_calendar_year  First calendar year to preload (inclusive)
 	 *  \param last_calendar_year   Last calendar year to preload (inclusive)
+	 *
+	 *  IMPLEMENTATION GUIDANCE FOR SUBCLASSES (added 2026-05-13 after
+	 *  audit item B16 closure at sub-phase 17c.0.3; see
+	 *  notes/STEP_17c.md §2 for the full B16 forensic record + fix
+	 *  design + verification, and §0 / §1.1 for the upstream B15
+	 *  audit-item lineage that unmasked B16):
+	 *
+	 *  Subclasses whose underlying climate data files are keyed on a
+	 *  per-imogen_year basis (e.g., one climate file per spinup year +
+	 *  one per historical year, with each file serving climate for ALL
+	 *  cells of a given gridlist via a single read of the year's data
+	 *  block) SHOULD design their per-imogen_year cache to be
+	 *  CUMULATIVE ACROSS CELLS, not per-cell-fresh. Rationale: under
+	 *  the year_outer ordering, cell 0's preload populates the cache
+	 *  with all distinct imogen_years it needs; subsequent cells that
+	 *  need the same imogen_year set produce 100% cache hits and zero
+	 *  I/O. ImogenInput + IMOGENCFXInput's preload_all_climate are
+	 *  canonical patterns implementing this contract: the cache is a
+	 *  vector of per-imogen_year-keyed slots sized to nyears = (range
+	 *  of distinct imogen_years across the union of all cells), and
+	 *  the per-imogen_year readenv() call inside the cache-miss branch
+	 *  loads the climate for that year for ALL cells in a single I/O.
+	 *
+	 *  Subclasses MUST NOT eagerly reject preload_all_climate calls
+	 *  based on cache-fullness state from prior cells (e.g.,
+	 *  "if (last_store_index >= nyears) fail(...)" at function entry
+	 *  is incorrect for cumulative caches). The correct fail-fast
+	 *  point is the inner per-miss branch: when a true cache-miss
+	 *  produces a store_index >= cache size, that is when the cache
+	 *  was genuinely undersized for the workload. The per-miss check
+	 *  should fail with proper context (offending imogen_year + cell
+	 *  coordinates + cell_idx + year_idx + cache size) so a future
+	 *  debugger has all the information needed to determine whether
+	 *  the cache should be re-sized or whether the workload's cell
+	 *  set was unexpectedly broader than init() anticipated.
+	 *
+	 *  Subclasses that legitimately need per-cell-fresh caches (e.g.,
+	 *  if their climate data files are cell-specific rather than
+	 *  cell-shared) SHOULD reset the cache state at the start of
+	 *  preload_all_climate (clear the cache + reset last_store_index
+	 *  to 0) rather than fail-on-cumulative-state — the contract is
+	 *  "subclass MUST be safe to call once per cell"; cumulative-or-
+	 *  fresh is a subclass-internal design choice but must not abort
+	 *  multi-cell year_outer runs.
 	 */
 	virtual void preload_all_climate(Gridcell& gridcell,
 	                                 int first_calendar_year,

@@ -8,17 +8,23 @@
 
 **Date 17c.0 PREP four-xval re-verification (year_outer actually exercised) landed:** 2026-05-13 (this commit; bundled with 17c.0.1 per §1; 1cell scenarios PASS substantive + signal-of-life clean; 4cell scenarios surface B16 as anticipated per §0.8 verification gate 4 + §0.9)
 
-**Date 17c.0 PREP B16 forensic + fix landed:** _pending_ (NEXT sub-phase 17c.0.3; the 4cell B16 surface in 17c.0.2 above is the empirical trigger)
+**Date 17c.0 PREP B16 forensic + fix landed (sub-phase 17c.0.3):** 2026-05-13 (this commit; un-tagged checkpoint)
 
-**Date 17c.0 PREP workstation `mpirun -np 4` mimic verified (deferred-from-C2 obligation):** _pending_ (sub-phase 17c.0.6)
+**Date 17c.0 PREP B17 forensic surface from gates 7+8 controlled-fail recorded:** 2026-05-13 (this commit; B17 forensic landed as new §3; B17 fix deferred to NEXT sub-phase 17c.0.4)
 
-**Date 17c.0 PREP C2 close-out tag annotation amendment (if any):** _pending_ (sub-phase 17c.0.5; deferred until 17c.0.4 four-xval re-verify on B15+B16-fixed HEAD clarifies whether `f6c192e`'s underlying year_outer code substantively passes)
+**Date 17c.0 PREP B17 forensic deep-dive + fix landed:** _pending_ (NEXT sub-phase 17c.0.4; the 4cell controlled-fail surface in 17c.0.3's gates 7+8 is the empirical trigger)
+
+**Date 17c.0 PREP four-xval re-verification on B15+B16+B17-fixed HEAD landed:** _pending_ (sub-phase 17c.0.5)
+
+**Date 17c.0 PREP workstation `mpirun -np 4` mimic verified (deferred-from-C2 obligation):** _pending_ (sub-phase 17c.0.7; renumbered from 17c.0.6 to make room for B17 fix sub-phase)
+
+**Date 17c.0 PREP C2 close-out tag annotation amendment (if any):** _pending_ (sub-phase 17c.0.6; renumbered from 17c.0.5; deferred until 17c.0.5 four-xval re-verify on B15+B16+B17-fixed HEAD clarifies whether `f6c192e`'s underlying year_outer code substantively passes)
 
 **Date 17c.1 → 17c.4 cluster phases:** _pending_
 
 **Date C3 close-out tag `v0.18.0-step17c-c3-cluster-tight`:** _pending_
 
-**Status:** 🔧 IN PROGRESS — Sub-phases 17c.0.0 (B15+B16 forensic record; commit `2beff31`, 2026-05-12) and 17c.0.1 + 17c.0.2 (B15 fix + signal-of-life harness assertion + four-xval re-verification on B15-fixed HEAD; this commit, 2026-05-13) have landed. **B15 (class-mismatch defect) is closed**: F1+F2+F3 land bare-keyword syntax for `framework_loop_mode` at the three sites identified in §0.4 + §0.8; F4 lands the rule-#8 signal-of-life banner-presence assertion in `compare_outputs()` (new exit code 4); F5 lands the optional consumer-side runtime diagnostic at `framework.cpp:339-357` (echoes `IMOGENConfig::framework_loop_mode` after `read_instruction_file()` returns; closes the §0.6(3) consumer-side observability gap). The 1cell xval scenarios (gate 5: `1cell imogen`, gate 6: `1cell imogencfx`) PASS cleanly with **the year_outer code path actually executed for the first time** (5 `[year_outer]` banners per Run B; 0 per Run A; F5 echoes correct `framework_loop_mode` value in both runs). The 4cell xval scenarios (gate 7: `4cell imogen`, gate 8: `4cell imogencfx`) surface **B16 exactly as predicted** in §0.9: `(IMOGENCFX|Imogen)Input::preload_all_climate: stored_years cache already full (last_store_index=9 >= nyears=9) when preloading cell (-95.75,80.25)` — fires at the second cell (`cell_idx=1`), in BOTH input modules, in identical form. This is **positive empirical evidence** that B15 is now actually fixed (year_outer is reaching `preload_all_climate` for the first time across `cell_idx >= 1`) and triggers 17c.0.3 (B16 forensic + fix) as the next sub-phase. Remaining 17c.0 PREP sub-phases per §1 below: 17c.0.3 (B16 fix; ~0.5-1 d) → 17c.0.4 (four-xval re-verify on B15+B16-fixed HEAD; ~0.5 d) → 17c.0.5 (C2 close-out tag annotation amendment decision; ~0.2 d) → 17c.0.6 (workstation `mpirun -np 4` mimic; ~1 d) → 17c.0.7 (PREP phase close-out; ~0.2 d). Then 17c.1 → 17c.4 cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative). The C2 close-out tag `v0.17.5-step17b-c2-mpi-sync` annotation amendment (option a/b/c per §0.11) remains deferred to 17c.0.5; the underlying year_outer code at `f6c192e` is unchanged through 17c.0.1, so the tag-amendment decision will be informed by the re-verification at 17c.0.4 (after B16 is fixed).
+**Status:** 🔧 IN PROGRESS — Sub-phases 17c.0.0 (B15+B16 forensic record; commit `2beff31`, 2026-05-12), 17c.0.1 + 17c.0.2 (B15 fix + signal-of-life harness assertion + four-xval re-verification on B15-fixed HEAD; commit `019c9dd`, 2026-05-13), and **17c.0.3 (B16 forensic + fix; this commit, 2026-05-13)** have landed. **B16 (latent eager-cache-fullness check defect) is closed**: G1+G2 remove the eager `if (last_store_index >= nyears) fail(...)` check at the start of `(Imogen|IMOGENCFX)Input::preload_all_climate` and replace it with extensive doc blocks (~38 LOC + ~20 LOC) explaining the cumulative-across-cells cache design intent and B16 forensic; G3 augments the base-class `InputModule::preload_all_climate` doc block in `inputmodule.h` with ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES" formalising the cumulative-cache contract; G4 tightens the inner per-miss `fail()` diagnostics in both modules with `cell_idx` for unambiguous fault attribution. **However, gates 7 + 8 controlled-fail at 17c.0.3 surfacing B17 (a new audit item with two sub-defects)** — same staged-discovery pattern as 17c.0.1 → 17c.0.3 (B15 fix unmasked B16; B16 fix unmasks B17): **B17(a)** = row-emission-order divergence between gridcell_outer (cell-major: per-cell-then-year) and year_outer (year-major: per-year-then-cell) makes Decision-12 byte-equality structurally unachievable for any multi-cell xval scenario (5/37 files differ purely on row order — sort-then-diff returns 0); **B17(b)** = small ~1 ULP numerical drift in 17 per-PFT-total / `tot_runoff` files (per-LC summed files unaffected) most prominently in southern-hemisphere cell `(-57.75, -33.75)` after sorting away B17(a). Both build-agnostic (serial AND single-process MPI exhibit identical fail pattern; binaries differ at byte 913+ proving distinct compilation). The 1cell xval scenarios (gates 5+6) PASS cleanly post-G1-G4 with year_outer fully executed (5 `[year_outer]` banners per Run B; identical envelope to 17c.0.1+17c.0.2 verification record). The 4cell xval scenarios (gates 7+8) **CONTROLLED-FAIL exit 2** (22/37 differ; 0 NaN; banner_a=0 banner_b=5) — proving B16 is mechanically fixed (year_outer reaches `preload_all_climate` for `cell_idx >= 1` AND completes preload AND completes the full 9-year run AND emits all 37 .out files; pre-B16 fix the run aborted at `preload_all_climate` with exit 99 after ≥3 banners). B17 is the next sub-phase trigger (analogous to how B16 surface in 17c.0.2 triggered 17c.0.3). Remaining 17c.0 PREP sub-phases per §1 below: 17c.0.4 (B17 forensic deep-dive + fix; ~1-2 d; combined B17(a)+(b) scope) → 17c.0.5 (four-xval re-verify on B15+B16+B17-fixed HEAD; ~0.5 d) → 17c.0.6 (C2 close-out tag annotation amendment decision; ~0.2 d) → 17c.0.7 (workstation `mpirun -np 4` mimic; ~1 d) → 17c.0.8 (PREP phase close-out; ~0.2 d). Then 17c.1 → 17c.4 cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative). The C2 close-out tag `v0.17.5-step17b-c2-mpi-sync` annotation amendment (option a/b/c per §0.11) remains deferred to 17c.0.6; the underlying year_outer code at `f6c192e` is unchanged through 17c.0.3, so the tag-amendment decision will be informed by the re-verification at 17c.0.5 (after B17 is fixed).
 
 ---
 
@@ -36,9 +42,26 @@
   - [0.10 New persistent operational heuristic — rule #8](#010-new-persistent-operational-heuristic--rule-8-signal-of-life-banner-presence-assertion-for-every-code-path-gated-cross-validation)
   - [0.11 C2 close-out tag (`v0.17.5-step17b-c2-mpi-sync`) annotation — decision deferred](#011-c2-close-out-tag-v0175-step17b-c2-mpi-sync-annotation--decision-deferred)
   - [0.12 Salvaged WIP — what we stashed and why](#012-salvaged-wip--what-we-stashed-and-why)
-- [§1. 17c.0 PREP phase plan (revised post-B15 forensic)](#1-17c0-prep-phase-plan-revised-post-b15-forensic)
-  - [§1.1 17c.0.1 + 17c.0.2 landing record — B15 fix + signal-of-life assertion + four-xval re-verification (this commit, 2026-05-13)](#11-17c01--17c02-landing-record--b15-fix--signal-of-life-assertion--four-xval-re-verification-this-commit-2026-05-13)
-- [§2 onwards — 17c.1 through 17c.4 cluster phases](#2-onwards--17c1-through-17c4-cluster-phases) _(skeleton; populated when reached; B16 forensic + fix will land at 17c.0.3 as a new §2 section, renumbering cluster-phases to §3)_
+- [§1. 17c.0 PREP phase plan (revised post-B15 + post-B16 + post-B17 forensic)](#1-17c0-prep-phase-plan-revised-post-b15--post-b16--post-b17-forensic)
+  - [§1.1 17c.0.1 + 17c.0.2 landing record — B15 fix + signal-of-life assertion + four-xval re-verification (commit `019c9dd`, 2026-05-13)](#11-17c01--17c02-landing-record--b15-fix--signal-of-life-assertion--four-xval-re-verification-commit-019c9dd-2026-05-13)
+  - [§1.2 17c.0.3 landing record — B16 forensic + fix + four-xval re-verification surfacing B17 (this commit, 2026-05-13)](#12-17c03-landing-record--b16-forensic--fix--four-xval-re-verification-surfacing-b17-this-commit-2026-05-13)
+- [§2. B16 forensic + fix — audit item B16 (this commit)](#2-b16-forensic--fix--audit-item-b16-this-commit)
+  - [2.1 Why this section exists (post-17c.0.2 surface)](#21-why-this-section-exists-post-17c02-surface)
+  - [2.2 Anchors at the start of the B16 sub-investigation](#22-anchors-at-the-start-of-the-b16-sub-investigation)
+  - [2.3 The smoking gun — empirical reproduction at `019c9dd` 4cell year_outer Run B](#23-the-smoking-gun--empirical-reproduction-at-019c9dd-4cell-year_outer-run-b)
+  - [2.4 Cumulative-across-cells cache design intent (source-level walkthrough)](#24-cumulative-across-cells-cache-design-intent-source-level-walkthrough)
+  - [2.5 Why the eager check mis-models the cache (root cause)](#25-why-the-eager-check-mis-models-the-cache-root-cause)
+  - [2.6 Recommended B16 fix design — G1-G4](#26-recommended-b16-fix-design--g1-g4)
+  - [2.7 B17 acknowledgement (forensic surface in §3; fix deferred to 17c.0.4)](#27-b17-acknowledgement-forensic-surface-in-3-fix-deferred-to-17c04)
+- [§3. B17 forensic surface — audit item B17 (this commit; fix in 17c.0.4)](#3-b17-forensic-surface--audit-item-b17-this-commit-fix-in-17c04)
+  - [3.1 Why this section exists (post-17c.0.3 surface)](#31-why-this-section-exists-post-17c03-surface)
+  - [3.2 Anchors at the start of the B17 sub-investigation](#32-anchors-at-the-start-of-the-b17-sub-investigation)
+  - [3.3 B17(a) — row-emission-order divergence (cell-major vs year-major)](#33-b17a--row-emission-order-divergence-cell-major-vs-year-major)
+  - [3.4 B17(b) — small ~1 ULP numerical drift in per-PFT-total / tot_runoff files](#34-b17b--small-1-ulp-numerical-drift-in-per-pft-total--tot_runoff-files)
+  - [3.5 Build-agnostic confirmation (serial + single-process MPI both reproduce)](#35-build-agnostic-confirmation-serial--single-process-mpi-both-reproduce)
+  - [3.6 Recommended B17 fix design — to be elaborated in 17c.0.4 commit](#36-recommended-b17-fix-design--to-be-elaborated-in-17c04-commit)
+  - [3.7 Why B17 was not caught by 17c.0.0 forensic or 17c.0.1+17c.0.2 verification](#37-why-b17-was-not-caught-by-17c00-forensic-or-17c01172-verification)
+- [§4 onwards — 17c.1 through 17c.4 cluster phases](#4-onwards--17c1-through-17c4-cluster-phases) _(skeleton; populated when reached; renumbered from §2 in 17c.0.3 commit due to insertion of §2 (B16 forensic) + §3 (B17 forensic) above)_
 
 ---
 
@@ -340,22 +363,23 @@ The B16 fix commit will follow the same pattern after its dedicated forensic in 
 
 ---
 
-## 1. 17c.0 PREP phase plan (revised post-B15 forensic)
+## 1. 17c.0 PREP phase plan (revised post-B15 + post-B16 + post-B17 forensic)
 
-The 17c.0 PREP phase as originally planned (per session-3 handoff §0.4 → 5-phase plan item 1) was a single workstation `mpirun -np 4` mimic verification, fulfilling the deferred-from-C2 obligation. The B15 forensic surfaced two prerequisites that must land first. The revised PREP phase plan:
+The 17c.0 PREP phase as originally planned (per session-3 handoff §0.4 → 5-phase plan item 1) was a single workstation `mpirun -np 4` mimic verification, fulfilling the deferred-from-C2 obligation. The B15 forensic (17c.0.0) surfaced two prerequisites that must land first; the B16 fix (17c.0.3) further surfaced B17 (a third prerequisite). The revised PREP phase plan:
 | Sub-phase | Scope | Estimated effort | Status |
 |---|---|---|---|
 | 17c.0.0 | **B15 + B16 forensic record (commit `2beff31`).** Doc-only; ZERO source change. | 0.5 d (actual) | ✅ DONE 2026-05-12 |
-| 17c.0.1 | **B15 fix + signal-of-life assertion (F1-F5 from §0.8; F5 included).** Three .ins/.sh changes + harness assertion + ~3-LOC C++ runtime diagnostic. | 0.5-1 d (actual: ~3-4 h elapsed including doc cascade) | ✅ DONE 2026-05-13 (this commit; bundled with 17c.0.2) |
-| 17c.0.2 | **Four-xval re-verification on B15-fixed HEAD.** First time year_outer actually exercised. 1cell scenarios PASS substantive + signal-of-life clean; 4cell scenarios surface B16 as anticipated. | 0.5 d (actual: ~10 min wall-clock) | ✅ DONE 2026-05-13 (this commit; bundled with 17c.0.1) |
-| 17c.0.3 | **B16 forensic + fix.** Eager-cache-check removal in `preload_all_climate` (both modules). Full forensic write-up as §2 of this file (renumbered from §3). | 0.5-1 d | ⏳ NEXT (empirically triggered by 17c.0.2; 4cell scenarios reproduce B16 textbook-exactly per §0.9; see §1.1.7 below) |
-| 17c.0.4 | **Four-xval re-verification on B15+B16-fixed HEAD.** All four scenarios should pass cleanly with year_outer exercised. | 0.5 d | ⏳ pending (after 17c.0.3) |
-| 17c.0.5 | **C2 close-out tag annotation amendment decision (option a/b/c from §0.11).** Errata note OR re-tag based on 17c.0.4 evidence. | 0.2 d | ⏳ pending (after 17c.0.4) |
-| 17c.0.6 | **Workstation `mpirun -np 4` mimic verification** (the original PREP obligation). Adapts `scripts/run_parallel_mimic.sh` to support `coupling_mode "prescribed"` + `imogencfx` tight-mode variant for proper C2-core exercise. | 1 d | ⏳ pending (after 17c.0.5) |
-| 17c.0.7 | **PREP phase close-out.** Doc cascade + (un-tagged) checkpoint commit on top of the cascade. | 0.2 d | ⏳ pending (after 17c.0.6) |
-Total revised PREP estimate: ~3.5-5 d (was: ~0.5-1 d for `mpirun -np 4` only). The B15+B16 surface adds ~3 d of necessary work but produces durable artefacts (rule #8 + the signal-of-life assertion + the cumulative-cache documentation) that will benefit every future code-path-gated cross-validation. Sub-phases 17c.0.0 + 17c.0.1 + 17c.0.2 are landed; ~2.5-3.5 d remaining in PREP after this commit.
+| 17c.0.1 | **B15 fix + signal-of-life assertion (F1-F5 from §0.8; F5 included).** Three .ins/.sh changes + harness assertion + ~3-LOC C++ runtime diagnostic. | 0.5-1 d (actual: ~3-4 h elapsed including doc cascade) | ✅ DONE 2026-05-13 (commit `019c9dd`; bundled with 17c.0.2) |
+| 17c.0.2 | **Four-xval re-verification on B15-fixed HEAD.** First time year_outer actually exercised. 1cell scenarios PASS substantive + signal-of-life clean; 4cell scenarios surface B16 as anticipated. | 0.5 d (actual: ~10 min wall-clock) | ✅ DONE 2026-05-13 (commit `019c9dd`; bundled with 17c.0.1) |
+| 17c.0.3 | **B16 forensic + fix (G1-G4 from §2.6).** Eager-cache-check removal in `preload_all_climate` (both modules; G1+G2) + base-class doc augmentation in `inputmodule.h` (G3) + per-miss inner-fail tightening with `cell_idx` (G4). Full B16 forensic write-up as §2 of this file. Includes empirical surface of NEW audit item B17 from gates 7+8 controlled-fail (full B17 forensic surface as §3; B17 fix deferred to 17c.0.4). | 0.5-1 d (actual: ~3-4 h elapsed including doc cascade and recovery from MPI build mistake) | ✅ DONE 2026-05-13 (this commit; bundled with B17 surface forensic; B16 mechanically fixed; B17 surface exposed) |
+| 17c.0.4 | **B17 forensic deep-dive + fix (combined B17(a)+(b) scope).** B17(a) = harness sort-then-diff comparison (or engine row-buffering for cell-major emission in year_outer mode); B17(b) = code-correctness investigation of per-PFT-total / `tot_runoff` accumulator ordering between cell-major and year-major loops. Full forensic write-up as new §3.6+ subsections (replacing the §3.6 "to be elaborated" placeholder landed in 17c.0.3). | 1-2 d | ⏳ NEXT (empirically triggered by 17c.0.3; 4cell scenarios reproduce B17 textbook per §3) |
+| 17c.0.5 | **Four-xval re-verification on B15+B16+B17-fixed HEAD.** All four scenarios should pass cleanly (or pass with explicit tolerance per §3.6 if B17(b) is confirmed inherent-and-acceptable) with year_outer fully exercised + signal-of-life clean. | 0.5 d | ⏳ pending (after 17c.0.4) |
+| 17c.0.6 | **C2 close-out tag annotation amendment decision (option a/b/c from §0.11).** Errata note OR re-tag based on 17c.0.5 evidence. (Renumbered from 17c.0.5 in 17c.0.3 commit due to insertion of B17-fix sub-phase above.) | 0.2 d | ⏳ pending (after 17c.0.5) |
+| 17c.0.7 | **Workstation `mpirun -np 4` mimic verification** (the original PREP obligation). Adapts `scripts/run_parallel_mimic.sh` to support `coupling_mode "prescribed"` + `imogencfx` tight-mode variant for proper C2-core exercise. (Renumbered from 17c.0.6.) | 1 d | ⏳ pending (after 17c.0.6) |
+| 17c.0.8 | **PREP phase close-out.** Doc cascade + (un-tagged) checkpoint commit on top of the cascade. (Renumbered from 17c.0.7.) | 0.2 d | ⏳ pending (after 17c.0.7) |
+Total revised PREP estimate: ~4.5-7 d (was: ~3.5-5 d post-B15 forensic; was: ~0.5-1 d for `mpirun -np 4` only pre-forensic). The B15+B16+B17 surface adds ~4-6 d of necessary work but produces durable artefacts (rule #8 signal-of-life assertion + the cumulative-cache documentation + the B17-driven harness/engine row-ordering hardening) that will benefit every future code-path-gated cross-validation. Sub-phases 17c.0.0 + 17c.0.1 + 17c.0.2 + 17c.0.3 are landed; ~2.5-4 d remaining in PREP after this commit.
 
-### 1.1 17c.0.1 + 17c.0.2 landing record — B15 fix + signal-of-life assertion + four-xval re-verification (this commit, 2026-05-13)
+### 1.1 17c.0.1 + 17c.0.2 landing record — B15 fix + signal-of-life assertion + four-xval re-verification (commit `019c9dd`, 2026-05-13)
 
 The B15 fix design from §0.8 (F1-F5) was approved verbatim in session 4 with the user's authorisation to include F5 (the optional ~3-LOC C++ runtime diagnostic). The salvaged WIP at `stash@{0}` (per §0.12) was used as the starting point for F1-F4 via a hybrid cherry-pick strategy (per §0.12's "individual hunks may be pulled from the stash if useful" provision); F5 was authored fresh against the §0.5 + §0.8(F5) canonical citations.
 
@@ -460,11 +484,359 @@ The B16 forensic write-up (root cause + fix design + verification) will live as 
 
 `stash@{0}: On main: B15+B16 WIP, pre-forensic salvage [session 3, 2026-05-12]` is **preserved unchanged** across this commit. Its B16 C++ hunks (`lpjguess/modules/imogen_input.cpp` +35/-9 + `lpjguess/modules/imogencfx.cpp` +29/-11) remain useful starting material for 17c.0.3 (analogous to how its in-scope hunks were used here for F1+F2+F3+F4). After 17c.0.3 lands, the stash will be evaluated for drop vs further retention.
 
+### 1.2 17c.0.3 landing record — B16 forensic + fix + four-xval re-verification surfacing B17 (this commit, 2026-05-13)
+
+The B16 fix design from §0.9 + §2.6 (G1-G4) was approved verbatim in session 4 with the user's authorisation to include G4 (the inner per-miss diagnostic tightening with `cell_idx`). The salvaged WIP at `stash@{0}` (per §0.12) was used as the starting point for G1+G2 via the same hybrid cherry-pick strategy used for 17c.0.1's F1-F4; G3 was authored fresh against the cumulative-cache contract documented in §2.4; G4 was authored fresh against the inner-fail diagnostic patterns inherited from 17c.0.1's banner-presence asserts.
+
+#### 1.2.1 Strategy recap
+
+- **G1+G2**: hybrid cherry-pick from `stash@{0}` for the two C++ source files (`lpjguess/modules/imogen_input.cpp` and `lpjguess/modules/imogencfx.cpp`). The salvaged WIP comments aligned with §2.4's cumulative-cache walkthrough; cosmetic anchor-text touch-ups: `§0.B16` → `§2 (audit item B16)` (multiple occurrences); date refresh `2026-05-12` → `2026-05-13`; and addition of the cross-reference to commit `019c9dd` (the B15-fix commit that unmasked B16 empirically). The C++ stash hunks for `imogen_input.cpp` (+35/-9) and `imogencfx.cpp` (+29/-11) **were applied** with the touch-ups described above.
+- **G3**: authored fresh in `lpjguess/framework/inputmodule.h`. Augments the existing `InputModule::preload_all_climate` virtual function doc block with ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES" formalising the cumulative-across-cells cache contract (an implementation-level invariant that subclasses must respect; eager checks at function entry violate it).
+- **G4**: authored fresh additions to the inner per-miss `fail()` messages in both modules (~4 LOC each). Each inner-fail now reports `cell_idx` alongside the existing `(lon, lat)` + `imogen_year` + cache-size context, providing unambiguous fault attribution when the inner check (correctly) fires on a real cache exhaustion.
+- **Stash retention**: `stash@{0}` was the starting point for G1+G2; with G1+G2 now landed, the stash will be **dropped after this commit's 3-remote push converges** (recommended user disposition; the patch backup at `_chat_artifacts/B15_B16_WIP_PRE_FORENSIC_2026-05-12.patch` remains the canonical pre-fix snapshot).
+
+#### 1.2.2 Per-file diff stats
+
+| File | LOC | Class | Backport |
+|---|---|---|---|
+| `lpjguess/modules/imogen_input.cpp` (G1 + G4 part 1) | +38 / −9 | C++ source; modules | **TRUNK-IRRELEVANT-by-novelty** (`preload_all_climate` doesn't exist in `trunk_r13078`; introduced at C1.3 sub-step 7.3.2 commit `d7f6c74` 2026-05-10; per-fork addition) |
+| `lpjguess/modules/imogencfx.cpp` (G2 + G4 part 2) | +20 / −11 | C++ source; modules | **TRUNK-IRRELEVANT-by-novelty** (same rationale; `imogencfx` module is a per-fork addition for IMOGEN tight-coupling) |
+| `lpjguess/framework/inputmodule.h` (G3) | +20 / 0 | C++ source; framework | **TRUNK-IRRELEVANT-by-novelty** (the `preload_all_climate` virtual function is a per-fork addition to the `InputModule` base class for the cumulative-cache contract; not in `trunk_r13078`'s base class) |
+
+All three files are TRUNK-IRRELEVANT-by-novelty (not by syntax/semantics): the `preload_all_climate` cumulative-cache machinery was added by this fork as part of the C1.3 inputmodule subclass refactor; trunk's `InputModule` base class doesn't have this virtual function. The TRUNK_R13078_BACKPORT_LEDGER.md entry for step 17c.0.3 documents this directly.
+
+#### 1.2.3 G1+G2 (eager-check removal) — implementation per §0.9 + §2.6
+
+The eager check at `imogen_input.cpp:1111-1118` (and its symmetric twin at `imogencfx.cpp:1366-1376`) reads:
+
+```cpp
+if (last_store_index >= nyears) {
+    fail("ImogenInput::preload_all_climate: stored_years cache already full "
+         "(last_store_index=%d >= nyears=%d) when preloading cell (%g,%g). "
+         "Check init() nyears computation.", last_store_index, nyears, lon, lat);
+}
+```
+
+This eager check is **deleted** at both sites and replaced with a substantial doc block (~38 LOC at `imogen_input.cpp`; ~20 LOC at `imogencfx.cpp`, deferring to the imogen_input.cpp forensic for the full walkthrough) explaining (a) why the eager check was wrong (mis-models the cache as per-cell when it is cumulative across cells); (b) what the correct invariant is (cells produce 100% cache hits if the imogen_years they need are already loaded by prior cells); (c) the inner-fail provides correct fail-fast semantics for genuine cache exhaustion; (d) cross-references to §0.9 + §2 of this file. Anchor-text cosmetics: all `§0.B16` references touched up to `§2 (audit item B16)`. The two doc blocks are anchored at the `[Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.3) — G1/G2: ...]` headers for grep-discovery.
+
+#### 1.2.4 G3 (base-class doc augmentation) — implementation per §2.6
+
+`lpjguess/framework/inputmodule.h:84-102` already contained a doc block for the `InputModule::preload_all_climate` virtual function (declared abstract; no default implementation). The augmentation adds ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES" formalising the cumulative-across-cells cache contract: subclasses MUST treat any per-cell cache as cumulative-across-cells; subclasses MUST NOT add eager early-exit checks at function entry that assume per-cell cache state; the rationale is the multi-cell year_outer scenario where one cell's cache state is the legitimate starting point for the next cell's preload. Cross-references §2.5 (root cause) + §2.6 (G1+G2 fix).
+
+#### 1.2.5 G4 (inner per-miss diagnostic tightening) — implementation per §2.6
+
+The inner per-miss `fail()` messages at `imogen_input.cpp:1158-1164` and `imogencfx.cpp:1421-1427` already carried `(lon, lat)` + `imogen_year` + `nyears` + `last_store_index` context. G4 adds `cell_idx` to both: this is the most diagnostically valuable single piece of context for distinguishing "cell 0 ran out of slots due to genuine cache-size misconfiguration" (extremely rare) from "cell N>0 ran out of slots due to a different upstream bug shifting the imogen_year sequence" (extremely informative). Augmented `fail()` messages now read:
+
+```
+ImogenInput::preload_all_climate: cache exhausted at cell_idx=N (lon,lat)=(...)
+when preloading imogen_year=Y; last_store_index=K, nyears=M. ...
+```
+
+#### 1.2.6 Anchor-text touch-up
+
+`§0.B16` → `§2 (audit item B16)` across all stash hunks (G1+G2 sites). Zero `§0.B16` literals remain in the repository post-fix. G3+G4 freshly-authored doc blocks use the consistent `§2 (audit item B16)` format from inception.
+
+#### 1.2.7 Verification gates 1-4 — clean rebuilds + unit tests
+
+| # | Gate | Result | Notes |
+|---|---|---|---|
+| 1 | `cd lpjguess/build && cmake --build . --target guess` | ✅ ZERO new warnings | Incremental rebuild: imogen_input.cpp.o + imogencfx.cpp.o + relink (inputmodule.h is included by both sources; triggers their recompile) |
+| 2 | `cd lpjguess/build_mpi && cmake --build . --target guess` (after MPICH_CXX=g++ recovery; see §1.2.10) | ✅ ZERO new warnings (332 total, all pre-existing union of `guess` + `runtests` build outputs) | Clean reconfigure with `MPICH_CXX=g++` to bypass the broken-on-this-workstation Anaconda3 mpicxx-with-conda-gxx path |
+| 3 | `lpjguess/build/runtests --reporter compact` | ✅ 25 cases / 162 assertions PASS | Regression baseline preserved |
+| 4 | `lpjguess/build_mpi/runtests --reporter compact` | ✅ 25 cases / 162 assertions PASS | Regression baseline preserved |
+
+Empirical warning grep on each rebuild log shows only pre-existing warnings (Timer in `gutil.h`, `cru/guessio` etc.); G1-G4 introduce zero new warnings touching `imogen_input.cpp` / `imogencfx.cpp` / `inputmodule.h`.
+
+#### 1.2.8 Verification gates 5-8 — four-xval re-verification (THE substantive 17c.0.3 evidence)
+
+| # | Gate | harness `rc` | Bit-exact | NaN | banner_a | banner_b | F5 echo | Result |
+|---|---|---|---|---|---|---|---|---|
+| 5 | `scripts/cross_validate_year_outer.sh 1cell imogen` | **0** | 37/37 | 0 | 0 | **5** | "gridcell_outer" / "year_outer" | ✅ **PASS substantive + signal-of-life** (regression: identical envelope to 17c.0.2 gate 5) |
+| 6 | `scripts/cross_validate_year_outer.sh 1cell imogencfx` | **0** | 37/37 | 0 | 0 | **5** | "gridcell_outer" / "year_outer" | ✅ **PASS substantive + signal-of-life** (regression: identical envelope to 17c.0.2 gate 6) |
+| 7 | `scripts/cross_validate_year_outer.sh 4cell imogen` | **2** | 15/37 | 0 | 0 | **5** | "gridcell_outer" / "year_outer" | ⚠️ **CONTROLLED-FAIL — surfaces B17 (newly identified)** — Run A clean (37 .out files); **Run B completes the full 9-year run AND emits all 37 .out files** (proving B16 mechanically fixed: pre-fix Run B aborted at `preload_all_climate` exit 99 after 3 banners; post-fix Run B emits all 5 banners and produces full output set). 22/37 .out files differ between Run A + Run B; full B17 forensic surface in §3 below |
+| 8 | `scripts/cross_validate_year_outer.sh 4cell imogencfx` | **2** | 15/37 | 0 | 0 | **5** | "gridcell_outer" / "year_outer" | ⚠️ **CONTROLLED-FAIL — surfaces B17 (newly identified)** — symmetric: same 22/37 mismatch pattern; same banner counts; same F5 echo. Confirms B17 is **systemic year_outer multi-cell defect, not input-mode-specific** (identical between imogen and imogencfx variants) |
+
+**Interpretation of gates 5-6 (regression-clean baseline):** The 1cell scenarios PASS with identical envelope to 17c.0.2's gate 5+6 — confirming G1-G4 introduce zero numerical regression in the year_outer 1cell code path. Banner counts match (5 per Run B; 0 per Run A). F5 banner contents match. 37/37 bit-exact. 0/37 NaN. The 1cell scenarios remain the canonical "year_outer-substantively-PASSes" baseline.
+
+**Interpretation of gates 7-8 (B17 surface):** The 4cell scenarios run to **full completion** in both Run A (gridcell_outer baseline) and Run B (year_outer) — proving B16 is mechanically fixed (pre-G1+G2 the run aborted at `preload_all_climate` after `cell_idx=1` triggered the eager check; post-G1+G2 the run completes all 4 cells × 9 years = 36 cell-years emitting 5 `[year_outer]` banners + 37 .out files). However, 22/37 .out files differ byte-wise between Run A and Run B. **This is not B16 failure — B16 is fixed. It's a brand-new audit item (B17) surfacing now that B16 no longer masks the underlying year_outer multi-cell behaviour.** The full B17 forensic — comprising B17(a) (row-emission-order divergence; affects all 22 differing files; 5 of 22 are pure ordering with sort-then-diff returning 0 for those; the other 17 also have B17(b) drift) and B17(b) (small ~1 ULP numerical drift in 17 per-PFT-total / `tot_runoff` files, most prominently in southern-hemisphere cell `(-57.75, -33.75)`) — is documented in §3 of this file.
+
+#### 1.2.9 Cross-check: F5 banner observability + year_outer banner counts
+
+Banner-presence counts grepped from each scenario's two run.logs after gates 5-8:
+
+| Scenario | F5 banner present (Run A) | F5 banner present (Run B) | F5 echo Run A value | F5 echo Run B value | `[year_outer]` count Run A | `[year_outer]` count Run B |
+|---|---|---|---|---|---|---|
+| `1cell imogen` | ✅ | ✅ | `"gridcell_outer"` | `"year_outer"` | 0 | 5 |
+| `1cell imogencfx` | ✅ | ✅ | `"gridcell_outer"` | `"year_outer"` | 0 | 5 |
+| `4cell imogen` | ✅ | ✅ | `"gridcell_outer"` | `"year_outer"` | 0 | 5 (year_outer ran to completion; B17 surface is at output-comparison stage, not at run-time) |
+| `4cell imogencfx` | ✅ | ✅ | `"gridcell_outer"` | `"year_outer"` | 0 | 5 (same as 4cell imogen) |
+
+**Critical comparison vs 17c.0.2 (B15-fixed-but-B16-still-present)**: at 17c.0.2, gates 7+8 showed `banner_b=3` (year_outer started but aborted at `preload_all_climate`). At 17c.0.3, gates 7+8 show `banner_b=5` (year_outer started, completed preload, completed simulate, emitted writer-flush banner — same banner count as the 1cell PASS scenarios). The 3→5 banner-count delta is the unambiguous mechanical evidence that B16 is fixed.
+
+#### 1.2.10 MPI build recovery side-note (operational lesson)
+
+During gate 2 verification, an unforced operational error wiped `lpjguess/build_mpi/CMakeFiles` + `CMakeCache.txt` based on a misread of an apparent "warning count discrepancy" (8 in MPI build vs 166 in serial build) that was actually a normal stdout/stderr capture artefact. The script's preferred `mpicxx` + Anaconda3 `conda-forge gxx_linux-64` path subsequently failed at link with system NetCDF/HDF5 ABI mismatches. Recovery: clean reconfigure with `MPICH_CXX=g++ cmake -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_PREFIX_PATH=/home/bampoh-d/anaconda3 -DNETCDF_INCLUDE_DIR=/home/bampoh-d/anaconda3/include -DNETCDF_C_LIBRARY=/home/bampoh-d/anaconda3/lib/libnetcdf.so ..` — i.e., option (a) of the build script's documented compiler-selection options (use system g++ via the mpicxx wrapper for MPI flags only). This worked on first attempt; the resulting `build_mpi/guess` is 2 974 248 bytes vs the serial `build/guess` 2 974 248 bytes (same size; differ at byte 913+ as expected for distinct MPI-flag compilations). Operational lesson logged in `notes/FOLLOWUPS.md` operational-heuristics section: **never `rm -rf` an apparently-working build state without first verifying the hypothesis that triggered the rm (e.g., touch a single source file to confirm incremental rebuild detection works)**.
+
+#### 1.2.11 Backport classification
+
+This commit is a **pure C++ source-level commit** with all changes TRUNK-IRRELEVANT-by-novelty (not by syntax/semantics):
+- **TRUNK-IRRELEVANT-by-novelty**: G1 (`lpjguess/modules/imogen_input.cpp`), G2 (`lpjguess/modules/imogencfx.cpp`), G3 (`lpjguess/framework/inputmodule.h`), G4 (parts in both .cpp files). The `preload_all_climate` virtual function + cumulative-cache machinery + eager-check anti-pattern are all per-fork additions that don't exist in `trunk_r13078`. The TRUNK_R13078_BACKPORT_LEDGER.md entry for step-17c-17c.0.3 documents this with the rationale.
+
+Per session-4 prompt §"Documentation cascade" + the carry-forward rule from session 3 §0.6(4): because the changes are all C++ source-level, this commit follows the **6-file source-level cascade**: STEP_17c.md (this section §1.2 + new §2 + new §3 + §4 renumbering) + CHANGELOG.md + EXECUTION_PLAN.md row 17c + FOLLOWUPS.md status dashboard refresh + TRUNK_R13078_BACKPORT_LEDGER.md step-17c-17c.0.3 entry + session-3 chat handoff Part 3.
+
+#### 1.2.12 What 17c.0.4 must do next
+
+17c.0.4 will land the B17 forensic deep-dive + fix per §3.6's recommended approach skeleton (to be elaborated in 17c.0.4 commit):
+1. **B17(a) decision**: harness sort-then-diff comparison upgrade (lower-cost; preserves the engine's current per-row writer behaviour) OR engine row-buffering for cell-major emission in year_outer mode (higher-cost; preserves Decision-12 byte-equality strictly). Recommended: harness upgrade per Decision-12's substantive intent (data equality, not literal byte equality) + an explicit "year_outer emits in year-major order" doc note in the engine.
+2. **B17(b) investigation**: localise the per-PFT-total / `tot_runoff` accumulator drift. Hypothesis 1: floating-point summation order differs between cell-major and year-major iteration when the per-PFT total is computed cumulatively across cells. Hypothesis 2: a global random-number-generator state advancement order differs (interp_climate or similar). Hypothesis 3: a per-cell intermediate state (e.g., `Gridcell::seed`) is not actually independent of cell-iteration order. Bisect by re-running with single-cell-at-a-time year_outer and comparing against gridcell_outer to isolate the cell-ordering dependency.
+3. Re-run gates 5-8 (the four-xval scenarios) on B15+B16+B17-fixed HEAD (this is sub-phase 17c.0.5); all four should pass cleanly with year_outer fully exercised — OR pass with explicit tolerance per §3.6 if B17(b) is confirmed inherent-and-acceptable (e.g., float-summation-order-induced drift that is mathematically unavoidable).
+The B17 forensic surface (root cause skeletons for both sub-defects + recommended fix design skeleton) lives as new §3 of this file (analogous to §0 and §2's structure but with the fix-design subsection marked as "to be elaborated in 17c.0.4").
+
+#### 1.2.13 Stash entry retention recommendation
+
+`stash@{0}: On main: B15+B16 WIP, pre-forensic salvage [session 3, 2026-05-12]` was the starting point for G1+G2 (cherry-pick of its B16 hunks for the two .cpp files). With G1+G2 now landed in cleaned-up form (anchor-text touch-ups + date refresh + `019c9dd` reference), the stash's substantive content has been consumed. **Recommended disposition: drop `stash@{0}` after this commit's 3-remote push converges**; the patch backup at `_chat_artifacts/B15_B16_WIP_PRE_FORENSIC_2026-05-12.patch` (16 881 B; sha256 `a5d6c5b0bb2d2a4bc55f1a6342f461bce177dd79abde93f55d749c9860b59271`) remains the canonical pre-fix snapshot for any future archaeology. The drop command is `git stash drop stash@{0}` (executed by the user after the push converges).
+
 ---
 
-## 2 onwards — 17c.1 through 17c.4 cluster phases
+## 2. B16 forensic + fix — audit item B16 (this commit)
 
-_(Skeleton only at this commit; will be populated when reached.)_
+### 2.1 Why this section exists (post-17c.0.2 surface)
+
+The 17c.0.0 forensic record (commit `2beff31`) established B16 as a **predicted** latent defect (per §0.9 acknowledgement). The 17c.0.1 + 17c.0.2 commit (commit `019c9dd`) fixed B15 and re-ran the four xval scenarios, surfacing B16 **empirically and textbook-exactly** (per §1.1.7's gates 7+8 evidence: `(IMOGENCFX|Imogen)Input::preload_all_climate: stored_years cache already full (last_store_index=9 >= nyears=9) when preloading cell (-95.75,80.25)` — fires at `cell_idx=1`, in BOTH input modules, in identical form). This section formalises B16 from prediction to landed fix, providing the same depth of forensic that §0 provided for B15 (analogous structure: anchors, smoking gun, source-level walkthrough, root cause, fix design, downstream surface acknowledgement).
+
+### 2.2 Anchors at the start of the B16 sub-investigation
+
+| Anchor | Value | Source |
+|---|---|---|
+| HEAD at start of 17c.0.3 sub-investigation | `019c9dd` | post-17c.0.1+17c.0.2 commit |
+| B15 status | CLOSED (per `notes/FOLLOWUPS.md` status dashboard at `019c9dd`) | 17c.0.1 + 17c.0.2 verification |
+| B16 status | PREDICTED + EMPIRICALLY-SURFACED (per §0.9 + §1.1.7); fix not yet landed | 17c.0.0 forensic + 17c.0.2 verification |
+| 1cell xval scenarios at `019c9dd` | PASS substantive + signal-of-life clean | §1.1.7 gates 5+6 |
+| 4cell xval scenarios at `019c9dd` | FAIL exit 99 in Run B at `preload_all_climate` (B16 surface; banner_b=3) | §1.1.7 gates 7+8 |
+| Stash at `019c9dd` | `stash@{0}` preserved with B16 C++ hunks for `imogen_input.cpp` (+35/-9) and `imogencfx.cpp` (+29/-11) | §1.1.11 stash retention |
+| Working tree at start | Clean | `git status --short` returns empty |
+
+### 2.3 The smoking gun — empirical reproduction at `019c9dd` 4cell year_outer Run B
+
+At `019c9dd`, `scripts/cross_validate_year_outer.sh 4cell imogen` Run B (year_outer override) produces (per §1.1.7 gate 7 evidence):
+
+| Anchor | Value | Notes |
+|---|---|---|
+| Harness exit code | `99` (Run B aborted with `fail()` from `preload_all_climate`) | Run A baseline (gridcell_outer) completes cleanly with 37 .out files; Run B aborts at `preload_all_climate` with `cell_idx=1` |
+| Run B `[year_outer]` banner count | 3 | year_outer code path entered + first cell setup completed + first cell preload entered, then `fail()` fires |
+| Run B fail message (verbatim) | `ImogenInput::preload_all_climate: stored_years cache already full (last_store_index=9 >= nyears=9) when preloading cell (-95.75,80.25). Check init() nyears computation.` | Fault site: `imogen_input.cpp:1111-1118` (the eager check at the start of `preload_all_climate`); fault parameters: `cell_idx=1`, `last_store_index=9`, `nyears=9`, `(lon,lat)=(-95.75,80.25)` |
+| Run B `[year_outer]` banner count for `imogencfx` variant | 3 | identical fault semantics; symmetric site at `imogencfx.cpp:1366-1376` |
+| Run A `.out` file count | 37 | gridcell_outer code path is unaffected; runs through `preload_all_climate` correctly because (per §2.4) gridcell_outer doesn't call `preload_all_climate` (it uses the per-cell streaming path that doesn't engage the cumulative cache) |
+| Run B `.out` file count | 0 | Run B aborted at `preload_all_climate` before any output flush |
+
+Fault parameters numerically match §0.9's prediction precisely: `4 cells × 9 distinct imogen_years span = 9 cumulative slots; cell 0 fills all 9; cell 1 enters with last_store_index >= nyears true → eager check fires`. Both modules (`Imogen` + `IMOGENCFX`) reproduce identically. The 1cell scenarios (gates 5+6 at `019c9dd`) do NOT trigger B16 because there is no `cell_idx >= 1` cell — exactly per §0.9's prediction "B16 doesn't fire on 1-cell runs because `last_store_index >= nyears` only triggers on `cell_idx >= 1`".
+
+### 2.4 Cumulative-across-cells cache design intent (source-level walkthrough)
+
+The `stored_years` cache in `(Imogen|IMOGENCFX)Input::preload_all_climate` was designed at C1.3 sub-step 7.3.2 (commit `d7f6c74`, 2026-05-10) with **cumulative-across-cells** semantics. Source evidence:
+
+**(a) Cache is a `std::map<int,YearClimate>` — implementation detail at `imogen_input.h` (analogous in `imogencfx.h`).** The cache is keyed by `imogen_year` (the year-index in the IMOGEN climate forcing dataset, NOT by `cell_idx`). Multiple cells that need the same `imogen_year` share the cached climate data; only the first cell to need a given `imogen_year` pays the load cost.
+
+**(b) The inner cache-miss-branch comment says "Cache miss: load year-imogen_year climate for ALL cells".** The implementation at `imogen_input.cpp` (post-G1; the inner cache-miss branch is preserved) reads:
+
+```cpp
+// Cache miss: load year-imogen_year climate for ALL cells
+// (the cache is cumulative across cells; this load benefits every
+//  subsequent cell that needs imogen_year).
+```
+
+This comment was present at `019c9dd` (pre-G1+G2) and remains present post-G1+G2. It is the **canonical source-level statement of the cumulative-cache contract**.
+
+**(c) The `last_store_index` variable advances on cache-miss-only.** When a cell finds an `imogen_year` already in the cache, no new slot is allocated; `last_store_index` does not advance. When a cell misses, the cache loads the climate for that `imogen_year` for ALL cells, advances `last_store_index` by 1, and proceeds. So `last_store_index` is the **count of distinct imogen_years loaded so far across ALL cells** — a cumulative quantity that monotonically increases as new (unique) imogen_years are encountered.
+
+**(d) `nyears` is the **maximum** distinct imogen_years that any single run will need.** Specifically, `nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1` per the inner-fail message text. For a 4-cell × 9-year run, all 4 cells use the same imogen_year span (1871-1879), so `nyears=9` is correctly sized for the cumulative cache: cell 0 fills slots 0-8 (one per year 1871-1879); cells 1, 2, 3 each produce 100% cache hits (every imogen_year they need is already loaded).
+
+**(e) Per-cell mapping is updated on entry but does NOT affect cache slot allocation.** The `update_per_cell_imogen_year_mapping(...)` call at the top of `preload_all_climate` updates the cell-local mapping `(year, imogen_year)` so the cell knows which cached slots correspond to its years. It does NOT read from or write to `last_store_index`; it does NOT add new slots. So this is a per-cell function executed once per cell, but the cache slot allocation is purely cumulative across cells.
+
+The design intent is therefore clear: the cache is cumulative across cells; cell N>0 enters `preload_all_climate` with a non-empty cache (the union of all imogen_years loaded by cells 0 through N-1) and adds zero or more new slots only on genuine cache miss; `last_store_index >= nyears` at function entry is the **expected state for cell N>0** when the imogen_year span is fully covered by prior cells, NOT an error condition.
+
+### 2.5 Why the eager check mis-models the cache (root cause)
+
+The eager check at `imogen_input.cpp:1111-1118` (and symmetric at `imogencfx.cpp:1366-1376`) reads:
+
+```cpp
+if (last_store_index >= nyears) {
+    fail("...: stored_years cache already full ...");
+}
+```
+
+This check **assumes the cache is per-cell**: that on entry to `preload_all_climate` for any cell, the cache should have at least one free slot (`last_store_index < nyears`). This assumption was likely a copy-paste-and-think-too-fast error: a per-cell sanity check would naturally read this way; but the cache is cumulative (per §2.4), so cell N>0 will routinely enter with a full cache (`last_store_index == nyears`) representing **legitimate prior-cell loads**, not an error condition.
+
+The check fires textbook-exactly on the 4-cell × 9-year run: cell 0 fills slots 0-8 (9 loads; `last_store_index = 9`); cell 1 enters with `last_store_index == 9 == nyears`; eager check evaluates true; `fail()` fires; run aborts with the misleading "cache already full" message. **The actual situation is the opposite of "error": the cache IS full because cell 0 did its job correctly; cell 1 will correctly produce 100% cache hits.**
+
+The defect was undetected from C1.3 sub-step 7.3.2 (`d7f6c74` 2026-05-10) through 17c.0.0 forensic landing (`2beff31` 2026-05-12) because:
+1. **C1 close-out (`v0.17.0` 2026-05-10)** validation only ran 1cell scenarios + the 4cell scenarios silently degenerated to gridcell_outer per B15 — `preload_all_climate` was never called in any 4cell xval Run B.
+2. **C2 close-out (`v0.17.5` 2026-05-11)** validation reproduced the same B15 degeneracy — same outcome.
+3. **17c.0.0 forensic (`2beff31` 2026-05-12)** acknowledged B16 as predicted (per §0.9) but did not exercise it: doc-only commit; ZERO source change.
+4. **17c.0.1 + 17c.0.2 (`019c9dd` 2026-05-13)** fixed B15 → 4cell Run B finally entered year_outer mode → reached `preload_all_climate` for `cell_idx=1` → eager check fired → empirical surface of B16 textbook-exactly.
+
+### 2.6 Recommended B16 fix design — G1-G4
+
+The fix has four parts (G1-G4); G1+G2 are the substantive fix; G3+G4 are the correctness-and-clarity hardening.
+
+**(G1) Remove eager check at `imogen_input.cpp:1111-1118`.** The 8-line eager-check block is deleted and replaced with a ~38-LOC doc block explaining (a) the cumulative-across-cells cache design intent (per §2.4); (b) why the eager check was wrong (mis-models cache as per-cell; per §2.5); (c) the inner-fail still provides correct fail-fast semantics for genuine cache exhaustion (cache cannot grow past `nyears` slots without a real misconfiguration); (d) cross-references to §0.9 + §2.4 + §2.5 of this file. The doc block is anchored at `[Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.3) — G1: ...]` for grep-discovery.
+
+**(G2) Symmetric removal at `imogencfx.cpp:1366-1376`.** The 11-line eager check is deleted and replaced with a ~20-LOC doc block (shorter than G1 because it cross-references G1's full forensic in `imogen_input.cpp`). Anchor at `[Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.3) — G2: ...]`.
+
+**(G3) Augment `InputModule::preload_all_climate` base-class doc block at `inputmodule.h:84-102`.** Add ~20 LOC of "IMPLEMENTATION GUIDANCE FOR SUBCLASSES" formalising the cumulative-cache contract: subclasses MUST treat any per-cell cache as cumulative-across-cells; subclasses MUST NOT add eager early-exit checks at function entry that assume per-cell cache state. This is the **base-class-level contract documentation** that would have prevented B16 from being introduced in the first place; it is also the canonical doc to cite when auditing future subclass implementations of `preload_all_climate`.
+
+**(G4) Tighten inner per-miss `fail()` diagnostics in both modules.** The inner per-miss check at `imogen_input.cpp:1158-1164` (and symmetric at `imogencfx.cpp:1421-1427`) already provides correct fail-fast semantics with `(lon, lat)` + `imogen_year` + `nyears` + `last_store_index` context. G4 adds `cell_idx` to both `fail()` messages: this is the most diagnostically valuable single piece of context for distinguishing "cell 0 ran out of slots due to genuine cache-size misconfiguration" (extremely rare) from "cell N>0 ran out of slots due to an upstream bug shifting the imogen_year sequence" (extremely informative).
+
+**Verification gates for the B16 fix commit (this commit; landed per §1.2.7-1.2.8):**
+1. Clean rebuild of `lpjguess/build/` and `lpjguess/build_mpi/` with zero new warnings (G1-G4 are doc-block-heavy + small `fail()`-message strings; should not trigger any compile warnings).
+2. 162/162 unit tests pass on both builds.
+3. **All four xval scenarios re-run** — for the first time actually completing in 4cell year_outer mode. Pass conditions:
+   - 1cell scenarios: regression-clean (identical envelope to 17c.0.2 gates 5+6).
+   - 4cell scenarios: complete to **5 banners** in Run B (year_outer ran end-to-end; the 3→5 banner-count delta vs 17c.0.2 is the unambiguous mechanical evidence that B16 is fixed).
+4. **Note on possible new failures.** If 4cell year_outer outputs differ structurally from 4cell gridcell_outer outputs, that is **B17** (a new audit item; see §3 below). Specifically expected:
+   - 4cell scenarios may surface row-emission-order divergence (year_outer emits year-major; gridcell_outer emits cell-major) — making Decision-12 byte-equality structurally unachievable. This is **B17(a)**; documented in §3.3.
+   - 4cell scenarios may surface small ~1 ULP numerical drift in per-PFT-total / `tot_runoff` files. This is **B17(b)**; documented in §3.4.
+   - These were anticipated by §0.8(4)'s "Note on possible new failures" clause: "If 4cell year_outer outputs differ structurally from 4cell gridcell_outer outputs even after B15+B16 are both fixed, that is a real C1+C2 substantive-validation failure that was masked pre-B15."
+
+### 2.7 B17 acknowledgement (forensic surface in §3; fix deferred to 17c.0.4)
+
+While verifying the proposed B16 fix end-to-end on the 4cell scenarios (per §1.2.8 gates 7+8), a downstream-of-B16 substantive-correctness gap surfaced: 22/37 .out files differ byte-wise between Run A (gridcell_outer) and Run B (year_outer) in both 4cell scenarios. The differences split into two distinct sub-defects:
+- **B17(a)**: row-emission-order divergence (gridcell_outer emits cell-major; year_outer emits year-major). 5/22 differing files are pure ordering (sort-then-diff returns 0). All 22 are affected by ordering.
+- **B17(b)**: small ~1 ULP numerical drift in 17/22 differing files (per-PFT-total + `tot_runoff`; per-LC summed files unaffected). Most prominently in southern-hemisphere cell `(-57.75, -33.75)`.
+
+**The full B17 forensic surface lives in §3 below.** The B17 fix is deferred to the next sub-phase (17c.0.4) per the same staged-discovery pattern that 17c.0.0 used for B16: this commit (17c.0.3) lands the B16 fix + the B17 forensic surface; the 17c.0.4 commit will land the B17 fix + the four-xval re-verification on B15+B16+B17-fixed HEAD. Conservative ordering rationale (analogous to §0.9's B16-deferral rationale):
+1. B16 is the higher-level defect (without B16 fix, year_outer multi-cell never completes; B17 cannot be observed). Fixing it is a prerequisite for ANY substantive 4cell year_outer validation.
+2. B17 surfaces only when B16 is fixed AND a multi-cell year_outer run completes. The B16-fixed harness running on 1cell scenarios passes cleanly without ever triggering B17, providing a clean baseline.
+3. B17's fix is mechanically more involved than B16's (requires either harness sort-then-diff upgrade OR engine row-buffering for B17(a); requires deeper code-correctness investigation for B17(b)).
+4. Bundling B16 + B17 into a single commit would conflate two distinct defects with different surface (cache-management vs output-ordering+numerical-correctness) and different audit lineages.
+
+The B17 sub-section in this file (§3) below documents the full surface. The recommended-fix subsection (§3.6) is a skeleton that will be elaborated in the dedicated 17c.0.4 commit.
+
+---
+
+## 3. B17 forensic surface — audit item B17 (this commit; fix in 17c.0.4)
+
+### 3.1 Why this section exists (post-17c.0.3 surface)
+
+The 17c.0.3 four-xval re-verification (per §1.2.8 gates 7+8) ran the 4cell scenarios for the **first time end-to-end with year_outer fully exercised** (i.e., post-B15 fix → year_outer code path actually entered in Run B; post-B16 fix → year_outer multi-cell `preload_all_climate` completes for `cell_idx >= 1` and the run proceeds to full output emission). The result: gates 7+8 controlled-fail with 22/37 .out files differing byte-wise between Run A (gridcell_outer) and Run B (year_outer), even though both runs complete cleanly with 0 NaN and matching banner counts. **This is B17 — a brand-new audit item with two distinct sub-defects (B17(a) row-emission-order divergence + B17(b) small ~1 ULP numerical drift in per-PFT-total / `tot_runoff` files).** This section formalises the B17 surface analogous to §0 (B15 forensic) and §2 (B16 forensic) but with the recommended-fix subsection (§3.6) marked as "to be elaborated in 17c.0.4 commit" because the deep-dive investigation has not yet been completed.
+
+### 3.2 Anchors at the start of the B17 sub-investigation
+
+| Anchor | Value | Source |
+|---|---|---|
+| HEAD at start of B17 surface | post-G1+G2+G3+G4 (17c.0.3 work tree) | this commit |
+| B15 status | CLOSED | `notes/FOLLOWUPS.md` status dashboard at `019c9dd` |
+| B16 status | CLOSED (this commit) | §1.2 + §2.6 |
+| B17 status | EMPIRICALLY-SURFACED; fix deferred to 17c.0.4 | this section |
+| 1cell xval scenarios at 17c.0.3 | PASS substantive + signal-of-life clean (regression: identical envelope to 17c.0.2 gates 5+6) | §1.2.8 gates 5+6 |
+| 4cell xval scenarios at 17c.0.3 | CONTROLLED-FAIL exit 2 with 22/37 differ + 0 NaN + banner_a=0 banner_b=5 | §1.2.8 gates 7+8 |
+| Working tree at start | Modified (G1-G4 changes) | `git status --short` shows imogen_input.cpp, imogencfx.cpp, inputmodule.h modified |
+| Build configuration | `lpjguess/build/` (serial, system g++) AND `lpjguess/build_mpi/` (MPICH_CXX=g++ recovery; per §1.2.10) | both produce 162/162 PASS at 17c.0.3 |
+
+### 3.3 B17(a) — row-emission-order divergence (cell-major vs year-major)
+
+**Symptom.** All 22 .out files that differ between Run A and Run B in the 4cell scenarios show different row sequences. Specifically:
+- Run A (`gridcell_outer`): rows are emitted in **cell-major** order (cell 0 all 9 years, then cell 1 all 9 years, then cell 2 all 9 years, then cell 3 all 9 years).
+- Run B (`year_outer`): rows are emitted in **year-major** order (all 4 cells for year 1871, then all 4 cells for year 1872, …, then all 4 cells for year 1879).
+
+The data content is the same — same 4 cells × 9 years = 36 data rows + 1 header = 37 lines per file in both runs. Only the row sequence differs.
+
+**Empirical confirmation by sort-then-diff.** For 5 of the 22 differing files (`npool.out`, `mch4.out`, `mch4_diffusion.out`, `mch4_ebullition.out`, `mch4_plant.out`), sorting both files by `(lon, lat, year)` then `diff`-ing returns **zero diff lines** — i.e., the data is identical, only the row order differs. These 5 files are the **pure-B17(a)** cases. The other 17 differing files have non-zero post-sort diff (per §3.4 below: B17(a) PLUS B17(b)).
+
+**Mechanical cause.** The .out writer in LPJ-GUESS emits per-row as the simulation produces row-eligible state (typically annual flush per cell-year completion). gridcell_outer's loop is `for cell in cells: for year in years:`, so rows emit in cell-major order. year_outer's loop is `for year in years: for cell in cells:`, so rows emit in year-major order. The writer has no buffering layer that would re-emit in cell-major order regardless of loop structure.
+
+**Why this is a Decision-12 contract issue.** Decision-12 (per session-1 §"Decision-12: byte-equality between gridcell_outer baseline and year_outer migration") specified that the year_outer migration must NOT change observable output. By the strict literal interpretation (byte-equality between the .out files), this contract is **structurally unachievable** for any multi-cell run as long as the writer is per-row-flush + the loop structure differs — because the loop structure is the very thing year_outer changes. The semantic interpretation (data equality, not literal byte equality) IS achievable: the data IS identical (per the sort-then-diff test for the 5 pure-B17(a) cases) — only the row sequence differs.
+
+**Resolution options (to be elaborated in 17c.0.4 §3.6).** Two architectural paths:
+- **(a) Harness upgrade**: modify `compare_outputs()` in `scripts/cross_validate_year_outer.sh` to sort both files by `(lon, lat, year)` before diff-ing. Lower-cost; preserves the engine's current per-row writer behaviour; aligns Decision-12 with semantic-equality interpretation. Requires explicit doc note in the engine that "year_outer emits in year-major order, year_outer-loop-aware downstream tooling must sort or otherwise normalize row order".
+- **(b) Engine row-buffering**: add a buffer layer in year_outer mode that accumulates per-cell rows in memory and flushes in cell-major order at the end of the run (or at the end of each output-period). Higher-cost (memory + complexity); preserves Decision-12 byte-equality strictly. Required if any downstream tooling depends on cell-major row order without sorting.
+
+### 3.4 B17(b) — small ~1 ULP numerical drift in per-PFT-total / `tot_runoff` files
+
+**Symptom.** 17 of the 22 differing .out files show small numerical drift between Run A and Run B even after sorting by `(lon, lat, year)` (i.e., on top of the B17(a) row-ordering difference, there is a real numerical difference in some rows). Affected files (post-sort diff line count in parentheses):
+
+| File | Post-sort diff lines | Class |
+|---|---|---|
+| `lai.out` | 36 | per-PFT total |
+| `nmass.out` | 34 | per-PFT total |
+| `cflux.out` | 34 | per-PFT total |
+| `aaet.out` | 34 | per-PFT total |
+| `fpc.out` | 30 | per-PFT total |
+| `cpool.out` | 30 | per-PFT total |
+| `cmass.out` | 30 | per-PFT total |
+| `nuptake.out` | 28 | per-PFT total |
+| `nsources.out` | 28 | per-PFT total |
+| `ngases.out` | 26 | per-PFT total |
+| `cton_leaf.out` | 26 | per-PFT total |
+| `nlitter.out` | 24 | per-PFT total |
+| `clitter.out` | 24 | per-PFT total |
+| `anpp.out` | 24 | per-PFT total |
+| `tot_runoff.out` | 22 | per-cell aggregate |
+| `nflux.out` | 18 | per-PFT total |
+| `agpp.out` | 14 | per-PFT total |
+
+**Empirical example.** For cell `(-57.75, -33.75)` year 1877 in `nflux.out`:
+- Run A (`gridcell_outer`): `... fix= -14.80 ... NEE= -14.93`
+- Run B (`year_outer`):    `... fix= -14.85 ... NEE= -14.98`
+Drift magnitude: 0.05 in 2-decimal-place printed output, which corresponds to ~5e-2 in single-precision-printed-but-double-precision-internal floating-point — i.e., approximately 1 ULP at the double-precision representation level after the formatted printf rounding chain.
+
+**Cells most affected.** The drift is most prominent in southern-hemisphere cell `(-57.75, -33.75)` and the high-northern cells `(-103.75, 76.25)` and `(-95.75, 80.25)`. The mid-latitude cell `(94.25, 54.25)` is less affected. This pattern suggests the drift is not random floating-point noise but is correlated with cell properties (likely PFT mix, climate forcing magnitude, or accumulator depth).
+
+**Files NOT affected (per-LC summed files: `npool_cropland`, `npool_natural`, `npool_pasture`, `nflux_cropland`, `nflux_natural`, `nflux_pasture`, `cflux_cropland`, `cflux_natural`, `cflux_pasture`, `cpool_cropland`, `cpool_natural`, `cpool_pasture`, `anpp_cropland`, `anpp_natural`, `anpp_pasture`).** All 15 files in this class are bit-exact (raw diff = 0). This is structurally informative: per-LC files aggregate per-LC quantities at the cell level (no cross-cell summation involved); per-PFT-total files aggregate per-PFT quantities possibly with cross-cell intermediate state. **The drift is in the per-PFT-total accumulation pathway.**
+
+**Hypotheses for B17(b) root cause (to be investigated in 17c.0.4).**
+1. **Floating-point summation order**. If a per-PFT-total quantity is computed by summing over cells in a per-PFT-total accumulator (rather than computed per-cell and summed at output time), then cell-major iteration vs year-major iteration produces different summation sequences, which produce different roundoff errors at the ~1 ULP level. This is the most likely hypothesis given the affected-file pattern (per-PFT totals + `tot_runoff` which is also a per-cell aggregate possibly going through a cross-cell accumulator).
+2. **Global random-number-generator state advancement**. If `interp_climate(...)` or any other code path uses a global (non-per-cell) RNG state, then the order in which cells call into it determines the RNG sequence each cell sees. Cell-major and year-major iteration would produce different RNG sequences, leading to different stochastic disturbance / mortality / etc. outcomes that propagate into per-PFT-total numerics. Less likely than hypothesis 1 (the affected-cell pattern would be more uniform across cells under this hypothesis), but worth checking.
+3. **Per-cell intermediate state ordering**. If a per-cell intermediate state (e.g., `Gridcell::seed`) is initialized based on cell-iteration order rather than cell identity, then cell-major and year-major iteration would produce different per-cell initial states. This should not happen for `Gridcell::seed` (which is set per-cell at gridcell construction), but worth verifying for any other per-cell stateful objects in the year_outer code path.
+
+**Why drift IS observable now (post-B16 fix) but was NOT observable before.** Pre-B16 fix, the year_outer 4cell run aborted at `preload_all_climate` for `cell_idx=1` after 3 banners — the simulation never produced any .out emissions in Run B. Post-B16 fix, the year_outer 4cell run completes all 4 cells × 9 years, producing the full 37 .out files. So B17(b) is **brand-new surface**: it cannot have been observed at any previous commit (`v0.17.0`, `v0.17.5`, `2beff31`, `019c9dd`) because the run never reached the .out-emission stage.
+
+### 3.5 Build-agnostic confirmation (serial + single-process MPI both reproduce)
+
+To rule out the possibility that B17(b) is a build-config artefact (e.g., a side-effect of the `MPICH_CXX=g++` recovery; per §1.2.10), gates 7+8 were re-run with `GUESS_BIN=lpjguess/build_mpi/guess` (instead of the script's default `lpjguess/build/guess`). Result:
+
+| Run | Binary | Harness exit | Files differ | banner_a | banner_b |
+|---|---|---|---|---|---|
+| `4cell imogen` | `build/guess` (serial; system g++) | 2 | 22/37 | 0 | 5 |
+| `4cell imogen` | `build_mpi/guess` (MPI single-process; MPICH_CXX=g++ → system g++ via mpicxx) | 2 | 22/37 | 0 | 5 |
+
+The two binaries differ at byte 913+ (cmp output: `lpjguess/build/guess lpjguess/build_mpi/guess differ: byte 913, line 1`) — confirming they are distinct compilations (likely the MPI build links additional MPI runtime symbols even though MPI calls are unused in single-process mode). Same fail pattern across both builds → **B17 is build-agnostic**, i.e., a real engine-level defect, not an artefact of the MPI build's compiler/linker configuration.
+
+### 3.6 Recommended B17 fix design — to be elaborated in 17c.0.4 commit
+
+The recommended fix design splits along B17(a) + B17(b):
+
+**B17(a) — row-emission-order divergence.** Two architectural options (per §3.3 above):
+- **(a1) Harness upgrade (recommended)**: modify `compare_outputs()` in `scripts/cross_validate_year_outer.sh` to sort both files by `(lon, lat, year)` before diff-ing. Lower-cost; aligns Decision-12 with semantic-equality interpretation. Requires explicit doc note in the engine that "year_outer emits in year-major order, year_outer-aware downstream tooling must sort or otherwise normalize row order".
+- **(a2) Engine row-buffering**: add a buffer layer in year_outer mode that accumulates per-cell rows in memory and flushes in cell-major order. Higher-cost; preserves Decision-12 byte-equality strictly.
+
+**B17(b) — small ~1 ULP numerical drift.** Three hypotheses to bisect (per §3.4 above):
+1. Floating-point summation order in per-PFT-total accumulators (most likely; affects only per-PFT-total + `tot_runoff` files, consistent with cell-major vs year-major summation order changing the roundoff sequence).
+2. Global RNG state advancement order.
+3. Per-cell intermediate state initialization order.
+
+Bisection strategy: re-run year_outer with single-cell-at-a-time iteration (i.e., year_outer with NCELLS=1 in the cell-loop, then NCELLS=2, then NCELLS=3, then NCELLS=4) and compare each against the corresponding gridcell_outer baseline. The cell count at which divergence first appears localizes the bug. If divergence appears at NCELLS=2, the cause is per-cell-pair interaction (likely hypothesis 1 or 2). If divergence appears at NCELLS=N>=4, the cause is more subtle (likely hypothesis 1 with deep accumulator state).
+
+**Acceptance criteria for the 17c.0.4 fix.** Either:
+- All 4 xval scenarios PASS substantive (37/37 bit-exact + 0/37 NaN) + signal-of-life clean (banner_a=0, banner_b>=1) on B15+B16+B17-fixed HEAD; OR
+- All 4 xval scenarios PASS substantive within an explicit tolerance specified in `notes/STEP_17b.md` §3a.7 (the substantive-validation framework). Tolerance must be derived from the bisected B17(b) root cause: e.g., if hypothesis 1 is confirmed, the tolerance is the cumulative ~1 ULP roundoff bound for the per-PFT-total accumulator path, expressed as max-allowable absolute error per .out cell.
+
+The full fix design + landing record will live in 17c.0.4's commit message + a new §1.3 landing record in this file.
+
+### 3.7 Why B17 was not caught by 17c.0.0 forensic or 17c.0.1+17c.0.2 verification
+
+Three concurrent gaps allowed B17 to remain hidden through 17c.0.0 (`2beff31`) and 17c.0.1+17c.0.2 (`019c9dd`):
+1. **B15 silently degenerated all 4cell xval Run B to gridcell_outer** until 17c.0.1 fixed B15. Pre-17c.0.1, the 4cell scenarios silently passed bit-equality (both runs took the same code path, producing identical .out files). B17(a) and B17(b) cannot manifest when both runs take the same code path with the same .out emission order.
+2. **B16 silently aborted all 4cell xval Run B at `preload_all_climate`** after 17c.0.1 fixed B15 but before 17c.0.3 fixed B16. Post-17c.0.1, pre-17c.0.3, the 4cell Run B aborted at exit 99 after 3 banners — the simulation never produced any .out emissions, so B17(a) and B17(b) had no surface.
+3. **The 17c.0.0 forensic predicted B16 (per §0.9) but did not predict B17.** This was a forecasting gap: §0.9 acknowledged "If 4cell year_outer outputs differ structurally from 4cell gridcell_outer outputs even after B15+B16 are both fixed, that is a real C1+C2 substantive-validation failure that was masked pre-B15" (per §0.8(4)) but did not bisect that residual into the row-ordering vs numerical-drift sub-categories that we now call B17(a) and B17(b). The 17c.0.0 forensic was correct that "deeper code-correctness investigation or explicit tolerance specification" might be needed; it is now needed (this is 17c.0.4's scope).
+
+**Forecasting lesson (for §1.2.10's operational-heuristics carry-forward):** when a multi-stage staged-discovery defect chain is anticipated (B15 → B16 → ?), it is operationally valuable to enumerate the possible "?" sub-categories at the time of the initial forensic, even if they cannot be confirmed without first fixing the upstream defects. §0.8(4)'s "deeper code-correctness investigation OR explicit tolerance specification" was a coarse two-bucket forecast; a finer forecast would have enumerated row-ordering, summation-order roundoff, and global-RNG-state hypotheses explicitly. This forecasting refinement is recommended for any future analogous staged-discovery situations and could be added as **operational heuristic rule #9** if the 17c.0.4 investigation confirms the value (TBD).
+
+---
+
+## 4 onwards — 17c.1 through 17c.4 cluster phases
+
+_(Skeleton only at this commit; will be populated when reached. Renumbered from §2 in 17c.0.3 commit due to insertion of §2 (B16 forensic + fix) and §3 (B17 forensic surface) above.)_
 
 | Phase | Scope (per session-3 handoff §0.4) |
 |---|---|

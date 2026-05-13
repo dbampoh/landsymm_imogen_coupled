@@ -1363,17 +1363,80 @@ void IMOGENCFXInput::preload_all_climate(Gridcell& gridcell,
 	year_outer_cell_idx[coord_key]   = cell_idx;
 	year_outer_ndep_cache[coord_key] = ndep;  // value-copy NDepData
 
-	// 2. Sanity check: cache size.
-	if (last_store_index >= nyears) {
-		fail("IMOGENCFXInput::preload_all_climate: stored_years cache already "
-		     "full (last_store_index=%d >= nyears=%d) when preloading cell "
-		     "(%g,%g). Check init() nyears computation (formula: nyears = "
-		     "(lasthistyear - FIRST_SPINUP_YEAR) + 1; should be >= the number "
-		     "of distinct imogen_year values needed across all cells x all "
-		     "spinup years; bump lasthistyear in .ins if too small).",
-		     last_store_index, nyears,
-		     gridcell.get_lon(), gridcell.get_lat());
-	}
+	// [Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.3) — B16 FIX
+	//  (landed 2026-05-13, session 4). SYMMETRIC REMOVAL of the eager
+	//  cache-fullness sanity check that previously lived here. See the
+	//  parallel comment block at lpjguess/modules/imogen_input.cpp's
+	//  ImogenInput::preload_all_climate for the full audit-item B16
+	//  forensic + B15 lineage + safety-preservation argument + backport
+	//  classification rationale; one-paragraph summary reproduced here
+	//  for in-place readability:
+	//
+	//  The eager check ("if (last_store_index >= nyears) fail(...)")
+	//  mis-modeled the per-imogen_year stored_years cache as per-cell
+	//  when the actual design intent (per the inner cache-miss branch's
+	//  own comment a few lines below: "Cache miss: load year-imogen_year
+	//  climate for ALL cells") is that the cache is INTENTIONALLY
+	//  CUMULATIVE ACROSS CELLS. Once cell 0 fills the cache with all
+	//  distinct imogen_years, subsequent cells produce 100% cache hits
+	//  and need ZERO new slots. The eager check, however, fired on
+	//  `last_store_index >= nyears` regardless, unconditionally aborting
+	//  any multi-cell year_outer run on entry to cell index >= 1.
+	//
+	//  Latent since C1.3 sub-step 7.3.2 (commit d7f6c74, 2026-05-10);
+	//  surfaced 2026-05-13 only after audit item B15 (the cross-validation
+	//  harness wrapper-syntax + signal-of-life fix; closed at commit
+	//  019c9dd) caused the year_outer code path to actually execute in
+	//  xval Run B for the first time. Pre-B15, all "Run B" xval scenarios
+	//  silently ran in gridcell_outer mode; bit-exact "passes" were
+	//  trivial gridcell_outer == gridcell_outer identity matches and
+	//  never exercised the year_outer block. Post-B15 4cell xval gates
+	//  (gates 7+8 at the 17c.0.1+17c.0.2 commit) reproduced this B16
+	//  defect textbook-exactly: fail() on cell index 1 with
+	//  last_store_index=9 >= nyears=9 (4 cells x 9 distinct imogen_years
+	//  span = 9 cumulative slots; cell 0 fills all 9; cell 1 enters with
+	//  last_store_index >= nyears true → eager check fires).
+	//
+	//  Safety preserved: the inner cache-miss branch below (in the for-
+	//  loop's `if (store_index < 0)` arm) retains a per-miss
+	//  `if (store_index >= nyears) fail(...)` check that fires ONLY when
+	//  a true overflow would occur, with proper context (offending
+	//  imogen_year + cell coords + cell_idx + year_idx + cache size).
+	//  That inner check was further tightened with cell_idx in this same
+	//  commit (G4) per notes/STEP_17c.md §1.1.10 step 4. The previous
+	//  more-verbose error message about "(formula: nyears = (lasthistyear
+	//  - FIRST_SPINUP_YEAR) + 1; should be >= the number of distinct
+	//  imogen_year values needed across all cells x all spinup years;
+	//  bump lasthistyear in .ins if too small)" was actually slightly
+	//  misleading post-B16 because the cumulative-cache design means
+	//  nyears really only needs to be >= the union-of-distinct-imogen_year
+	//  values across all cells, NOT (cells x spinup years). The
+	//  cumulative-design-aware inner per-miss check naturally fires on
+	//  true overflow without needing this prescriptive sizing-formula
+	//  hint, which is why the inner check's message is the cleaner home
+	//  for the diagnostic.
+	//
+	//  Backport classification (notes/TRUNK_R13078_BACKPORT_LEDGER.md):
+	//  TRUNK-IRRELEVANT-by-novelty. preload_all_climate is a step-17a-
+	//  introduced method that does NOT exist in trunk_r13078; the eager
+	//  check, the surrounding doc, and the entire function are all
+	//  step-17a additions. There is nothing to backport.
+	//
+	//  Cross-references:
+	//  - notes/STEP_17c.md §2 (audit item B16 — full forensic record)
+	//  - notes/STEP_17c.md §0 (audit item B15 — the upstream harness
+	//    defect whose closure unmasked B16; closed at commit 019c9dd)
+	//  - notes/STEP_17c.md §1.1.10 (the 5-step plan for 17c.0.3 — this
+	//    block implements steps 2+3+4 simultaneously; step 1's symmetric
+	//    fix lives at the parallel site in imogen_input.cpp)
+	//  - notes/FOLLOWUPS.md F-12 row + B16 status dashboard entry
+	//  - lpjguess/modules/imogen_input.cpp ImogenInput::preload_all_climate
+	//    for the canonical fix at the ImogenInput site (the longer
+	//    forensic comment block lives there to avoid duplication)
+	//  - lpjguess/framework/inputmodule.h InputModule::preload_all_climate
+	//    base-class doc block for the cumulative-cache contract that
+	//    every subclass implementing this method MUST honour
+	//  - DKB 2026-05-13]
 
 	// 3. Pre-load all needed years for this cell.
 	//    For each year in [first_calendar_year, last_calendar_year]:
@@ -1419,11 +1482,22 @@ void IMOGENCFXInput::preload_all_climate(Gridcell& gridcell,
 			// Cache miss: load year-imogen_year climate for ALL cells.
 			store_index = last_store_index++;
 			if (store_index >= nyears) {
+				// [Step 17c (17c.0.3 B16 fix G4 enhancement, 2026-05-13):
+				//  cell_idx added to this fail message; symmetric to the
+				//  parallel enhancement at imogen_input.cpp's inner per-miss
+				//  check. See that block's comment for the full G4 rationale
+				//  + cross-references. This is the CORRECT fail-fast point
+				//  for cumulative-cache overflow.
+				//  - DKB 2026-05-13]
 				fail("IMOGENCFXInput::preload_all_climate: store_index %d >= "
-				     "nyears %d for imogen_year %d (cell (%g,%g), year_idx %d). "
-				     "Cache size insufficient; check init() nyears computation.",
+				     "nyears %d for imogen_year %d (cell (%g,%g) cell_idx=%d, "
+				     "year_idx %d). Cache size insufficient; check init() nyears "
+				     "computation. Cumulative-cache contract: nyears must be >= "
+				     "union of distinct imogen_years across all cells in the "
+				     "gridlist; see notes/STEP_17c.md §2 for B16 forensic + "
+				     "cumulative-cache design intent.",
 				     store_index, nyears, imogen_year,
-				     gridcell.get_lon(), gridcell.get_lat(), year_idx);
+				     gridcell.get_lon(), gridcell.get_lat(), cell_idx, year_idx);
 			}
 
 			const int nfound = readenv(all_lon, all_lat, imogen_year, store_index, coord_line);
