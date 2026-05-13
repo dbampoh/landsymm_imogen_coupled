@@ -316,6 +316,36 @@ compare_outputs() {
   # alternative architectural option (a2) per notes/STEP_17c.md §3.6;
   # NOT taken).
   #
+  # ===========================================================================
+  # B17(b) OPERATIONAL ACCEPTANCE (UPDATE 2026-05-13 night, session 4):
+  #
+  # Per the user-authorised provisional-acceptance decision documented in
+  # _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13 + notes/STEP_17c.md
+  # §3.8.5, the SORTED_DIFFER classification surfaces B17(b) drift cleanly
+  # but the formal Option α (tolerance-based comparison upgrade) is DEFERRED
+  # — the harness continues to controlled-fail at exit 2 on B17(b) drift.
+  # Operationally B17(b) is ACCEPTED at a provisional 2% cell-total tolerance
+  # envelope, consistent with Phase A's empirical max cell-total drift bound
+  # of 1.4% relative (per notes/STEP_17c.md §1.3.3 A.4 + §3.8.1) with ~40%
+  # headroom. Per-PFT splits in low-biomass marginal-establishment PFTs
+  # (TrIBE, TrBR, IBS) may exceed 2% individually (up to ~17-20% empirically)
+  # but are accepted under the same provisional acceptance because they
+  # reflect inherent stochastic-perturbation behaviour of the LPJ-GUESS
+  # engine, NOT a structural year_outer code-path defect.
+  #
+  # Re-evaluation hook: the provisional acceptance reactivates the formal
+  # Option α implementation OR the (β) seed-tracking dprintf root-cause
+  # investigation per notes/STEP_17c.md §3.8.4 + §3.6 IF (a) cell-total
+  # drifts exceed 2% on a real-world gridlist or NCELLS scaling beyond the
+  # 4-cell test envelope; OR (b) per-PFT splits diverge in scientifically-
+  # consequential PFT/cell combinations beyond the empirical envelope; OR
+  # (c) C3-era cluster smoke runs reveal MPI-multi-rank-specific drift
+  # not captured by 4cell xval. Until then, SORTED_DIFFER count is
+  # informational AND a controlled-fail signal — operators should inspect
+  # the count + per-file drift magnitudes against the §3.8.5 provisional
+  # tolerance and proceed at their discretion.
+  # ===========================================================================
+  #
   # Sort-key invariant: ALL .out files in this codebase have (Lon, Lat,
   # Year) as columns 1, 2, 3. Verified empirically across all 37 files
   # in the 4cell xval envelope (per Phase A.2 forensic in 17c.0.4
@@ -328,11 +358,20 @@ compare_outputs() {
   # Cross-references:
   #   - notes/STEP_17c.md §3 (B17 forensic surface)
   #   - notes/STEP_17c.md §3.3 (B17(a) characterization + emission-order
-  #     mechanism)
+  #     mechanism; CLOSED 2026-05-13 evening via this implementation)
   #   - notes/STEP_17c.md §3.6 option (a1) (recommended-fix skeleton;
   #     this implementation realizes that recommendation)
-  #   - notes/STEP_17c.md §1.3 (this commit's landing record)
-  #   - notes/FOLLOWUPS.md "Audit item B17" (status dashboard)
+  #   - notes/STEP_17c.md §1.3 (17c.0.4 landing record at commit `027d90d`)
+  #   - notes/STEP_17c.md §3.8 (reclassified-B17(b) sub-section; full
+  #     forensic + scientific interpretation + Phase A's wall on
+  #     root-cause identification)
+  #   - notes/STEP_17c.md §3.8.5 (B17(b) provisional 2% tolerance
+  #     operational acceptance; canonical record of the §4.13 decision)
+  #   - notes/FOLLOWUPS.md "Audit item B17" (status dashboard; B17(a)
+  #     CLOSED + B17(b) PROVISIONALLY ACCEPTED at 2% tolerance)
+  #   - _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13
+  #     (operational-acceptance decision narrative; user-authorised
+  #     2026-05-13 night, session 4)
   #
   # Backport classification: TRUNK-IRRELEVANT (.sh harness only;
   # cross_validate_year_outer.sh is per-fork; trunk_r13078 has no

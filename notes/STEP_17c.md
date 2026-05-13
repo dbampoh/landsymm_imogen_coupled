@@ -984,6 +984,50 @@ Phase A code-spelunking examined ALL of: (a) `gridcell.seed` initialization + ad
 
 The (α) option (tolerance-based comparison upgrade to `compare_outputs()`) does NOT require root-cause identification — it accepts the divergence as scientifically-bounded and adjusts the comparison contract to match the engine's actual stochastic-sensitivity envelope. Recommended in §1.3.9 unless there is a strong scientific or contractual reason to want true byte-equality.
 
+#### 3.8.5 Operational acceptance: provisional 2% tolerance (decided 2026-05-13 night, session 4; supersedes §1.3.9 + §3.6 formal-implementation path)
+
+After 17c.0.4 landed at commit `027d90d` (3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main`) and the user reviewed Phase A's empirical evidence (per §1.3.3 + §3.8.1 through §3.8.4 above), the operational decision for B17(b) was revised from the original §1.3.9 formal α-vs-β scoping to a **lighter-touch provisional acceptance**:
+
+> "Well I do not think we should implement anything in code for now, just simply documenting in the chat handoff that there is some divergence and we are accepting a 2% tolerance for now, but we may need to re-evaluate later. I suppose you could also include it as comment in the comparison code or something to that effect. It may be that we could come back and look at it and decide to do something about it."
+> — user, 2026-05-13 night, session 4 (canonical narrative in `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` §4.13)
+
+##### Decision summary
+
+- **No new code authored** for the formal Option α implementation as a standalone 17c.0.5 sub-phase. The harness `scripts/cross_validate_year_outer.sh::compare_outputs()` continues to controlled-fail (exit 2) on B17(b) drift in 4cell year_outer scenarios, with the 17c.0.4 SORT-THEN-DIFF NORMALIZATION block (per §1.3.4) surfacing the divergence cleanly via the SORTED_DIFFER classification.
+- **Provisional 2% tolerance accepted** as the operating envelope for B17(b) drift, consistent with Phase A's empirical max cell-total drift bound of 1.4% relative (per §1.3.3 A.4 + §3.8.1) with ~40% headroom. The provisional tolerance applies to **cell-total magnitudes** (the scientifically-meaningful aggregate); per-PFT splits in low-biomass marginal-establishment cases (TrIBE, TrBR, IBS) may exceed 2% individually (up to ~17-20% empirically per §1.3.3 A.4) but are accepted under the same provisional acceptance because they reflect inherent stochastic-perturbation behaviour of the LPJ-GUESS engine, NOT a structural year_outer code-path defect (per §3.8.3 scientific interpretation).
+- **Scope**: B17(b) is operationally acceptable for proceeding to subsequent 17c.0 PREP sub-phases AND to the C3-era cluster phases. The B17(b) drift signature (per-PFT-totals + tot_runoff in 4cell+ multi-cell scenarios; build-agnostic; .ins-agnostic; cumulative-over-time; per-cell-iteration-order-dependent) does NOT block the strategic v1.0 milestones gated on substantive 4cell year_outer working.
+
+##### Re-evaluation triggers (the formal Option α or (β) reactivates if any of these fires)
+
+The operational acceptance is **provisional**. The formal Option α implementation OR the (β) seed-tracking dprintf root-cause investigation per §3.8.4 + §3.6 reactivates as the focused next step IF:
+
+1. **Cell-total drifts exceed 2%** on a real-world gridlist or NCELLS scaling beyond the test gridlist's 4-cell envelope (e.g., during C3-era cluster smoke runs on a 480-cell or 4000-cell gridlist).
+2. **Per-PFT splits diverge in scientifically-consequential PFT/cell combinations** beyond the current empirical envelope (e.g., a dominant-biomass PFT like BNE or BINE shows >2% relative drift for a cell where it represents the majority of the total; this would suggest the stochastic-perturbation signature is propagating into ecological dynamics that matter for paper-stage analysis).
+3. **C3-era cluster smoke runs reveal MPI-multi-rank-specific drift** not captured by the 4cell single-process xval (e.g., per-rank runs show rank-0-vs-rank-N drift that exceeds the per-cell drift profile in §3.8.1; this would suggest there's an MPI-side amplification of B17(b) that the workstation single-process envelope did not surface).
+4. **Paper-stage analysis surfaces a quantitative finding sensitive to per-PFT noise** at the 0.67-17.7% magnitude (e.g., F-13 working-paper Axis 1/2/3 figures show qualitative differences that would be eliminated by closing B17(b)).
+
+If any of these triggers fires, the closure path defaults to **(α)** (~0.5-1 d harness change) unless the trigger evidence specifically points to **(β)** as more appropriate.
+
+##### Sub-phase renumbering implication
+
+Per §4.13.2 of the chat handoff, the 17c.0 PREP sub-phase ledger has two valid renumbering conventions:
+
+- **Placeholder convention**: 17c.0.5 held as a placeholder for the deferred formal Option α implementation (reactivates if a re-evaluation trigger fires); next active sub-phase = 17c.0.6 (4-xval re-verify on B15+B16+B17(a)+B17(b)-provisionally-accepted HEAD).
+- **Collapsed convention**: 17c.0.5 = next active sub-phase = 4-xval re-verify; the deferred formal Option α reactivates as a future sub-phase 17c.0.X if the re-evaluation trigger fires.
+
+The collapsed convention is operationally simpler; the placeholder convention preserves the deferred Option α as a first-class sub-phase entry for clearer audit trail. **TBD with user**: confirm renumbering convention at the start of the next sub-phase implementation.
+
+##### Documentation surface
+
+The §3.8.5 operational-acceptance decision is documented in the following surfaces (so any future reader — human or AI — sees the operational context regardless of which document they enter through):
+
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` §4.13 — canonical chat-handoff record (the decision narrative).
+- `notes/STEP_17c.md` §3.8.5 — this sub-section (the canonical forensic-record entry).
+- `scripts/cross_validate_year_outer.sh::compare_outputs()` — inline comment near the SORTED_DIFFER classification (so the harness reader sees the operational context directly without leaving the code).
+- `notes/FOLLOWUPS.md` — B17 dashboard line update reflecting the provisional acceptance.
+
+The above 3 in-tree changes (the .sh comment + this §3.8.5 + the FOLLOWUPS dashboard line) are **NOT committed in a standalone commit**; per the user's authorisation, they roll into the next work commit (whichever sub-phase that is — likely the renumbered 17c.0.5 = 4-xval re-verify per the collapsed convention OR 17c.0.6 per the placeholder convention).
+
 
 
 ### 3.7 Why B17 was not caught by 17c.0.0 forensic or 17c.0.1+17c.0.2 verification
