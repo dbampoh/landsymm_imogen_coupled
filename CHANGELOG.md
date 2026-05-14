@@ -17,6 +17,85 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-14 (early morning, session 4 continuation) — Step 17c (17c.0.5 clarification on top of `29ccc87`; **BROADEN B17(b) REACTIVATION SURFACE FROM FORCED-ONLY (§3.8.5 TRIGGER FIRING) TO FORCED + PERMITTED (PROACTIVE AT USER DISCRETION AT ANY TIME)** — 4 in-tree files modified; +N/−M LOC; ZERO source-logic change; ZERO behaviour change; pure-doc clarification across the cascade; un-tagged checkpoint above `29ccc87`)
+
+This commit is a **doc-only clarification** on top of 17c.0.5 commit
+`29ccc87` addressing a gap surfaced by the user after `29ccc87` was
+3-remote-converged: the cascade documentation across multiple surfaces
+(harness FAIL message, `EXECUTION_PLAN.md` row 17c, `notes/FOLLOWUPS.md`
+dashboard, `notes/TRUNK_R13078_BACKPORT_LEDGER.md`) had used the
+restrictive phrasing _"reactivated only on a §3.8.5 re-eval trigger"_
+when the user's verbatim 2026-05-13 night intent was permissive: _"It
+may be that we could come back and look at it and decide to do
+something about it"_ (i.e., we may revisit at our own initiative even
+absent a trigger firing).
+
+User verbatim concern (2026-05-14 early morning, session 4
+continuation):
+
+  "Looks good?: [...] Not sure. Also I hope you made it clear in
+   documentation that the tolerances (e.g., the up to 2% divergence
+   etc.) could be something we revisit and do something about later."
+
+#### What landed
+
+| Change | Site | Description | Backport |
+|---|---|---|---|
+| Inline comment block "Re-evaluation hook" sub-block (~lines 336-356) | `scripts/cross_validate_year_outer.sh` | Added new clause `(d) USER ELECTS TO PROACTIVELY REVISIT AT THEIR OWN DISCRETION even absent a trigger firing` with 4 illustrative-not-exhaustive prompts + meta-statement that triggers (a)-(c) are FORCED-REACTIVATION list, not EXCLUSIVE list | TRUNK-IRRELEVANT (.sh harness only) |
+| FAIL message at SORTED_DIFFER > 0 path (~lines 633-642) | `scripts/cross_validate_year_outer.sh` | Replaced "reactivated only on a §3.8.5 re-eval trigger" with "reactivated either on a §3.8.5 re-eval trigger firing OR proactively at user discretion at any time" + verbatim user quote inline + cross-reference to §3.8.5.5 cadence | TRUNK-IRRELEVANT (.sh harness only) |
+| §3.8.5.5 NEW 5th cadence bullet | `notes/STEP_17c.md` | "Proactive revisit at user discretion (NEW; clarification commit on top of 17c.0.5 commit `29ccc87`)" with 4 illustrative prompts + meta-statement establishing FORCED vs PERMITTED reactivation surfaces as both first-class | TRUNK-IRRELEVANT (per-fork notes) |
+| "Last updated" header line (recent 17c.0.5 entry) + B17 row in F-12 status table | `notes/FOLLOWUPS.md` | Replaced "reactivated only on §3.8.5.5 trigger" with "reactivated either on §3.8.5.5 trigger firing (FORCED reactivation) OR proactively at user discretion at any time even absent a trigger (PERMITTED reactivation)" + cross-reference to §3.8.5.5 5th-bullet | TRUNK-IRRELEVANT (per-fork notes) |
+| Row 17c entry | `EXECUTION_PLAN.md` | Replaced "reactivated only on §3.8.5.5 trigger" with "reactivated either on §3.8.5.5 trigger firing OR proactively at user discretion at any time" for cascade consistency | TRUNK-IRRELEVANT (per-fork plan) |
+| NEW step-17c-17c.0.5-clarification entry | `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | Records this clarification commit's TRUNK-IRRELEVANT classification | TRUNK-IRRELEVANT (per-fork notes) |
+| THIS NEW dated entry | `CHANGELOG.md` | The narrative you are reading | TRUNK-IRRELEVANT (per-fork changelog) |
+
+Plus 1 sibling-artifact (outside repo):
+`_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` §5.14 (NEW
+sub-section narrating the clarification end-to-end).
+
+Net code change: **ZERO** (all changes are documentation; no logic touch
+in `compare_outputs()`; no exit-code change; no harness behaviour
+change; no .cpp/.h touch).
+
+#### Verification this commit
+
+- `bash -n scripts/cross_validate_year_outer.sh` → exit 0
+- gate 5 smoke (1cell xval imogen) → exit 0; 37/37 raw BIT_EXACT;
+  0/0 NaN; banner_a=0; banner_b=5 — IDENTICAL envelope to 17c.0.5
+- gate 7 smoke (4cell xval imogen) → exit 2; 15 BIT_EXACT + 5
+  SORTED_EXACT + 17 SORTED_DIFFER; 0/0 NaN; banner_a=0; banner_b=5 —
+  IDENTICAL envelope to 17c.0.5; new FAIL message text appears verbatim
+  including user quote
+
+#### What this clarification does NOT change
+
+- §3.8.5 provisional 2% tolerance envelope: UNCHANGED
+- §3.8.5.5 four-trigger surveillance cadence: UNCHANGED (just
+  augmented with NEW 5th bullet for proactive revisit)
+- harness controlled-fail behaviour at exit 2 on B17(b) drift:
+  UNCHANGED
+- 17c.0 PREP sub-phase ledger (17c.0.6 next): UNCHANGED
+- Option α / Option β closure-path investigation: NOT reactivated
+  (this commit broadens the reactivation surface, does not fire it)
+
+#### Backport classification
+
+**TRUNK-IRRELEVANT** (doc-only + .sh-comment-only). Same rationale as
+17c.0.5 (`29ccc87`). Recorded in
+`notes/TRUNK_R13078_BACKPORT_LEDGER.md` as new step-17c-17c.0.5-
+clarification entry per user request 2026-05-14 early morning (full
+6-surface cascade extension, not the original surgical 3-surface
+clarification).
+
+#### v1.0 % done estimate
+
+Held at **~63-66%** (clarification is doc-only; no fresh substantive
+milestone landed; no envelope change). The clarification's value is in
+strengthening the operational framing for any future reader (human or
+AI) without affecting any underlying engineering state.
+
+---
+
 ### 2026-05-13 (night-late, session 4) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.5; **FULL 4-XVAL RE-VERIFY ON B15+B16+B17(a)+B17(b)-PROVISIONALLY-ACCEPTED HEAD `2771939` LANDED (gates 1-8 per user-authorised collapsed renumbering convention) + harness stale-reference cleanup post-collapsed-renumbering convention adoption** — 1 source file modified; +10/−5 LOC; ZERO source-logic change; pure stale-reference cleanup at 4 surgical sites in `scripts/cross_validate_year_outer.sh::compare_outputs()`; gate 1+2 binary sha256 byte-identical pre/post → no source change since `4d09b62` (17c.0.3 build epoch); gates 3+4 unit tests 25/25 / 162/162 PASS both builds; gates 5+6 1cell xval PASS exit 0 with 37/37 raw BIT_EXACT; gates 7+8 4cell xval CONTROLLED-FAIL exit 2 with **15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER** envelope BYTE-IDENTICAL between LOOSE (gate 7) and TIGHT (gate 8) coupling — stronger empirical confirmation than 17c.0.4 provided that B17(b) is **coupling-invariant**; un-tagged checkpoint above `2771939`)
 
 This commit lands the **17c.0.5** sub-phase of the Step 17c.0 PREP plan: full 4-xval re-verify on B15+B16+B17(a)+B17(b)-provisionally-accepted HEAD per the user-authorised **collapsed renumbering convention** (per `notes/STEP_17c.md` §3.8.5 "Sub-phase renumbering implication" sub-section; user-authorised 2026-05-13 night-late session 4). Per the collapsed convention, 17c.0.5 = full 4-xval re-verify on `2771939` HEAD (gates 1-8) confirming regression-clean status with the §3.8.5 provisional B17(b) acceptance envelope intact — REPLACING the originally-planned 17c.0.5 (α/β decision) sub-phase. The deferred formal Option α (tolerance-based comparison upgrade to `compare_outputs()`) OR Option β (seed-tracking dprintf root-cause investigation per §3.8.4) reactivates as a future sub-phase TBD only on a §3.8.5 re-evaluation trigger firing per the new §3.8.5.5 cadence.

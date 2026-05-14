@@ -340,10 +340,19 @@ compare_outputs() {
   # 4-cell test envelope; OR (b) per-PFT splits diverge in scientifically-
   # consequential PFT/cell combinations beyond the empirical envelope; OR
   # (c) C3-era cluster smoke runs reveal MPI-multi-rank-specific drift
-  # not captured by 4cell xval. Until then, SORTED_DIFFER count is
-  # informational AND a controlled-fail signal — operators should inspect
-  # the count + per-file drift magnitudes against the §3.8.5 provisional
-  # tolerance and proceed at their discretion.
+  # not captured by 4cell xval; OR (d) USER ELECTS TO PROACTIVELY REVISIT
+  # AT THEIR OWN DISCRETION even absent a trigger firing — e.g., as a
+  # focused improvement sub-phase between substantive work blocks, as
+  # paper-readiness polish, or simply because they decide they would
+  # prefer the formal closure now (per the user's verbatim 2026-05-13
+  # night directive: "It may be that we could come back and look at it
+  # and decide to do something about it"). In other words, the trigger
+  # list (a)-(c) is the FORCED-REACTIVATION list, not the EXCLUSIVE
+  # list — proactive revisit is always on the table at user discretion.
+  # Until reactivation occurs, SORTED_DIFFER count is informational AND
+  # a controlled-fail signal — operators should inspect the count +
+  # per-file drift magnitudes against the §3.8.5 provisional tolerance
+  # and proceed at their discretion.
   # ===========================================================================
   #
   # Sort-key invariant: ALL .out files in this codebase have (Lon, Lat,
@@ -484,7 +493,10 @@ compare_outputs() {
   #  + B17(b) drift) remain controlled-FAIL per the B17(b) provisional
   #  acceptance at 2% cell-total tolerance (notes/STEP_17c.md §3.8.5);
   #  formal Option α/β closure deferred to a future sub-phase TBD that
-  #  reactivates only on a §3.8.5 re-eval trigger. - DKB 2026-05-13/14]
+  #  reactivates either on a §3.8.5 re-eval trigger firing OR proactively
+  #  at user discretion at any time per §3.8.5.5 5th cadence bullet
+  #  (clarification commit on top of 17c.0.5 commit `29ccc87`). - DKB
+  #  2026-05-13/14]
   local effective_pass=$((matches + sorted_exact))
   local bit_exact_ok=0
   if [ "$effective_pass" -eq "$total" ] && [ "$total" -gt 0 ]; then
@@ -632,7 +644,10 @@ compare_outputs() {
     echo "  notes/STEP_17c.md §3 (B17(b) forensic) + §3.6 (recommended-fix skeleton)"
     echo "  + §3.8.5 (B17(b) provisionally accepted at 2% per 2026-05-13 user directive;"
     echo "    formal Option α tolerance vs Option β root-cause closure deferred to a"
-    echo "    future sub-phase TBD reactivated only on a §3.8.5 re-eval trigger)."
+    echo "    future sub-phase TBD reactivated either on a §3.8.5 re-eval trigger firing"
+    echo "    OR proactively at user discretion at any time — per user's verbatim"
+    echo "    directive 'we could come back and look at it and decide to do something"
+    echo "    about it'; see §3.8.5.5 cadence for the full reactivation surface)."
     return 2
   fi
 }

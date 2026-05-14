@@ -1933,6 +1933,39 @@ Documentation cascade also touches: `notes/STEP_17c.md` (NEW §1.4 + §1.5 landi
 
 ---
 
+### Step 17c (17c.0.5-clarification LANDED): broaden B17(b) reactivation surface from FORCED-only (§3.8.5 trigger) to FORCED + PERMITTED (proactive at user discretion at any time) — **TRUNK-IRRELEVANT** (doc-only + .sh-comment-only)
+
+**Date:** 2026-05-14 (early morning; session 4 continuation). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `29ccc87`).
+
+**Backport relevance summary:**
+- **TRUNK-IRRELEVANT (doc-only + .sh-comment-only)**: zero source-logic change; zero engine source change. The commit broadens the reactivation surface for the deferred Option α/β closure-path investigation from "FORCED-only (any of the four §3.8.5 triggers firing)" to "FORCED + PERMITTED (any §3.8.5 trigger firing OR proactive at user discretion at any time)" per the user's verbatim 2026-05-13 night directive: _"It may be that we could come back and look at it and decide to do something about it"_. The 17c.0.5 cascade documentation had used the more restrictive "reactivated only on trigger" framing; this clarification corrects that across 6 in-tree surfaces (the 3 in the original 17c.0.5 cascade plus 3 more now extended at user request 2026-05-14 early morning).
+- **No backport directive** — this commit's changes are doc-only + .sh-comment-only (no logic change; no .cpp/.h touch); nothing to backport. Documented here per user request 2026-05-14 early morning (the original 17c.0.5-clarification recommendation had been to skip the backport ledger entry as overkill for a doc-only touch-up; the user opted for full cascade consistency instead).
+
+#### Files in this commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Backport directive |
+|---|---|---|
+| `scripts/cross_validate_year_outer.sh` (~+11/−1 LOC; 2 sites) | (1) inline comment block "Re-evaluation hook" sub-block (lines ~336-356): added new clause `(d) USER ELECTS TO PROACTIVELY REVISIT AT THEIR OWN DISCRETION even absent a trigger firing` with 4 illustrative-not-exhaustive prompts + meta-statement that triggers (a)-(c) are FORCED-REACTIVATION list, not EXCLUSIVE list. (2) FAIL message at SORTED_DIFFER > 0 path (lines ~633-642): replaced "reactivated only on a §3.8.5 re-eval trigger" with "reactivated either on a §3.8.5 re-eval trigger firing OR proactively at user discretion at any time" + verbatim user quote inline + cross-reference to §3.8.5.5 cadence. | N/A — per-fork harness; not in `trunk_r13078`. |
+| `notes/STEP_17c.md` (+1 LOC NEW 5th cadence bullet in §3.8.5.5) | Added NEW 5th bullet "Proactive revisit at user discretion (NEW; clarification commit on top of 17c.0.5 commit `29ccc87`)" with 4 illustrative prompts + meta-statement establishing FORCED vs PERMITTED reactivation surfaces as both first-class. | N/A — `notes/` is per-fork. |
+| `notes/FOLLOWUPS.md` (+4/−2 LOC; 2 sites) | (1) "Last updated" header line (recent 17c.0.5 entry): replaced "reactivated only on §3.8.5.5 trigger" with "reactivated either on §3.8.5.5 trigger firing (FORCED reactivation) OR proactively at user discretion at any time even absent a trigger (PERMITTED reactivation)". (2) B17 row in F-12 status table: same replacement + cross-reference to §3.8.5.5 5th-bullet. | N/A — `notes/` is per-fork. |
+| `EXECUTION_PLAN.md` (+1/−1 LOC; row 17c) | Row 17c entry: replaced "reactivated only on §3.8.5.5 trigger" with "reactivated either on §3.8.5.5 trigger firing OR proactively at user discretion at any time" for cascade consistency with `notes/FOLLOWUPS.md` + the harness FAIL message. | N/A — per-fork plan. |
+| `CHANGELOG.md` (NEW dated entry; ~+15 LOC) | NEW entry "2026-05-14 (early morning, session 4 continuation) — Step 17c (17c.0.5 clarification): broaden B17(b) reactivation surface from FORCED-only to FORCED + PERMITTED" capturing the clarification narrative + diffstat + cross-references. | N/A — per-fork changelog. |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (THIS entry; +N LOC) | Records this clarification commit's TRUNK-IRRELEVANT classification. | N/A — `notes/` is per-fork. |
+
+Plus 1 sibling-artifact: `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` §5.14 (NEW; outside repo).
+
+#### Verification this commit
+
+Sanity check: `bash -n scripts/cross_validate_year_outer.sh` → exit 0 (bash syntax preserved). Smoke checks:
+- gate 5 (1cell xval imogen) → exit 0 / 37/37 raw BIT_EXACT / 0/0 NaN / banner_a=0 / banner_b=5 — IDENTICAL envelope to 17c.0.5
+- gate 7 (4cell xval imogen) → exit 2 / 15 BIT_EXACT + 5 SORTED_EXACT + 17 SORTED_DIFFER / 0/0 NaN / banner_a=0 / banner_b=5 — IDENTICAL envelope to 17c.0.5; new FAIL message text appears verbatim including user quote
+
+No re-run of full 4-xval gates (gates 6+8) needed since the changes are pure-doc + the per-mode-pair envelope is already established at 17c.0.5; gates 6+8 would produce IDENTICAL envelopes to gates 5+7 by the §3.8.3 coupling-invariance finding.
+
+**With this commit, the B17(b) reactivation surface is now formally broadened to include the PERMITTED-by-proactive-user-choice path** across all 6 in-tree cascade surfaces + the chat handoff. The provisional 2% tolerance + four §3.8.5 triggers + §3.8.5.5 four-cadence-bullet surveillance discipline all remain UNCHANGED; only the meta-policy framing of WHEN closure-path investigation can resume is broadened. 17c.0.6 (C2 close-out tag annotation amendment decision) remains NEXT.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):
