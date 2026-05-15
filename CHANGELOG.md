@@ -17,6 +17,53 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-15 (night, session 4 continuation) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.8; **PREP phase OFFICIAL CLOSE-OUT — 11/11 sub-phases DONE; doc-cascade-only across 6 in-tree surfaces + 1 sibling-artifact; ZERO source-code change; tagged `v0.17.8-step17c-prep-complete` post-merge; 3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main`**)
+
+This commit formally closes the **Step 17c.0 PREP phase** that began with the forensic-only 17c.0.0 entry on 2026-05-12 morning. The 11-sub-phase arc (17c.0.0 → 17c.0.1 → 17c.0.2 → 17c.0.3 → 17c.0.4 → 17c.0.4-followup → 17c.0.5 → 17c.0.5-clarification → 17c.0.6 → 17c.0.7 → **17c.0.8** this commit) spanned 4 calendar days across 4 chat sessions and closed 4 audit items (B15 + B16 + B17(a) + B17(b)) + 1 latent defect (Path α handshake-file write-path) + landed the deferred-from-C2 workstation `mpirun -np 4` mimic obligation per session-2 §17.7 + 18 LOC of TRUNK-RELEVANT N-cycle unit doc-comment clarifications. **Net `lpjguess/` source-level change in THIS commit: ZERO** (pure book-keeping).
+
+User verbatim trigger (2026-05-15 ~22:30 UTC+2):
+
+  "If you don't mind, think I want to change my mind and do the 17c.0.8
+   PREP close out now. We should discuss. So we could discuss this after
+   that or I could make a choice on this after that. ... I am leaning
+   towards [the comprehensive 6-surface scope option], as long as you do
+   it meticulously, systematically, and comprehensively per usual."
+
+#### What landed (6 in-tree surfaces + 1 sibling-artifact)
+
+1. **`notes/STEP_17c.md`** — new §1.7 17c.0.8 landing record (~150 LOC: trigger + scope + rationale + per-surface decomposition + verification plan + retrospective on the PREP arc + handoff to B19/B20/17c.1+ with 3 deferred B19 questions for session-5 opening agenda) + header date row update + Status block promotion to "✅ 17c.0 PREP COMPLETE (11/11 sub-phases landed at this commit)" + §1 PREP table 17c.0.8 row promotion to ✅ DONE + footer summary update to "🎉 PREP phase OFFICIALLY COMPLETE".
+2. **`notes/FOLLOWUPS.md`** — status dashboard top-of-file refresh (PREP-COMPLETE banner) + B19 PRIORITY: HIGH annotation (promoted to NEXT-TASK CLUSTER status) + B20 PRIORITY: HIGH annotation (paired with B19) + F-12 row update reflecting 17c.0.7 + 17c.0.8 LANDED + footer note "NEXT-TASK CLUSTER" summarizing B19+B20 + 3 deferred questions handoff cross-link.
+3. **`CHANGELOG.md`** — this entry (under [Unreleased], above the 17c.0.7 entry).
+4. **`EXECUTION_PLAN.md`** — row 17c update appending PREP-COMPLETE status + cross-checking Phase-7 estimate references B19/B20 + 17c.1+ as the post-PREP work cluster.
+5. **`notes/TRUNK_R13078_BACKPORT_LEDGER.md`** — new 17c.0.8 entry (TRUNK-IRRELEVANT-by-novelty: the `notes/` + `CHANGELOG.md` + `EXECUTION_PLAN.md` doc surface doesn't exist in `trunk_r13078`; ledger entry simply records that 17c.0.8 is bookkeeping-only and contributes ZERO eligible LOC for backport).
+6. **`_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md`** — NEW Part 8 (session-4 close-out + handoff to session 5; sibling artifact, not in-tree-canonical-doc, but co-versioned for full forensic traceability).
+
+#### Verification (doc-cascade-only)
+
+| Gate | Scope | Outcome |
+|---|---|---|
+| Build/test gates 1-4 | C++ rebuild + unit tests | **N/A** (ZERO source-code touch this commit; previously verified at 17c.0.7 commit `6695ef2` exit 0) |
+| Cross-validation gates 5-11 | 1cell + 4cell + mpirun-np-4 mimic xval | **N/A** (ZERO source-code touch this commit; previously verified at 17c.0.7 commit `6695ef2` exit 0) |
+| Documentation consistency | 6-surface visual review | ✅ all 6 surfaces consistent with each other on PREP-COMPLETE narrative + B19/B20 as next-task cluster + 3 deferred B19 questions handoff to session 5 |
+| Linting | Markdown linting on edited files | ✅ no new linter errors (pre-existing line-length advisories preserved consistent with prior commits' tolerances) |
+
+#### Backport classification
+
+**TRUNK-IRRELEVANT-by-novelty** (the entire doc surface doesn't exist in `trunk_r13078`). Captured in `notes/TRUNK_R13078_BACKPORT_LEDGER.md` 17c.0.8 entry.
+
+#### What's next
+
+- **B19** (PRIORITY: HIGH; essential ~2.5-4 d): closed-loop pipeline verification (intermediary_py end-to-end + step-13 adapter + IMOGEN Fortran engine round-trip + closed-loop validation vs legacy A/B references). 3 deferred questions to discuss at session-5 opening: Q1 (B19 sub-item (i) SPINUP/FIRSTCALL ordering), Q2 (B19-Phase 4 closed-loop validation tolerance), Q3 (B19-Phase 1 ordering revisit).
+- **B20** (PRIORITY: HIGH; recommended ~1-2 d): literature-comparison sanity check for global N2O (and optionally CH4) magnitudes from LPJG-natural-only emissions.
+- **17c.1 → 17c.4** cluster phases (~1-2 weeks SSH-iterative on KIT IMK-IFU `owl`).
+- v1.0 % done estimate at 17c.0.8 close-out: **~70-72%** (held from 17c.0.7; this commit is pure book-keeping with no fresh substantive milestone).
+
+#### Forecasting lesson reinforced (rule #9 candidate)
+
+The 11-sub-phase PREP arc surfaced 4 audit items + 1 latent defect + 18 LOC of unit-doc-comment clarifications, ALL of which were surfaced via harness-authoring + targeted verification (B15 surfaced by signal-of-life rule #8 application at 17c.0.0; B16 surfaced by 17c.0.2 4cell xval re-verify after B15 fix; B17(a)+(b) surfaced by 17c.0.3 4cell xval re-verify after B16 fix; Path α surfaced by 17c.0.7 mpirun-np-4 mimic harness's first-ever check of handshake-file content; the 18 LOC of unit doc-comment clarifications surfaced by user Q&A on Path α handshake-file content inspection). This is **rule #9 in candidate form**: *harness-authoring + targeted verification routinely surface latent defects in the system under test*. Promotion to formal rule #9 still deferred pending one more independent recurrence (likely in B19 or 17c.1+).
+
+---
+
 ### 2026-05-15 (evening, session 4 continuation) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.7; **workstation `mpirun -np 4` mimic verification of C2-core MPI machinery LANDED via NEW dedicated harness `scripts/cross_validate_mpi_4rank.sh` for all 3 coupling modes (loose, prescribed, tight) on a 4-cell × 11-yr smoke scenario + Path α handshake-file write-path defect fix at the xval harness layer (`DIR_COMMON` injection for non-loose modes; pre-fix the empty default caused `mkdir(/LPJG_main/IMOGEN/)` to fail permission-check at runtime affecting ALL prescribed/tight xval runs not just the mpirun mimic; full Path α forensic in NEW `notes/STEP_17c.md` §3.10) + 5 LOC of TRUNK-RELEVANT unit doc-comment clarifications in `lpjguess/framework/guess.h` (N2O_FIRE + N2O_SOIL + 3 sibling N-cycle flux types: N2_FIRE, NH3_SOIL, NO_SOIL — all previously had no unit comments; surfaced via user Q&A on unit verification post-Path-α-handshake-file-content-inspection) + ~8 LOC of TRUNK-IRRELEVANT-by-novelty comment-clarity cleanup in `lpjguess/modules/imogenoutput.cpp:75-79` (N2O_PER_N constant; same numerical conversion 44/28; clearer wording removing the misleading "28 g/mol N2 basis" phrasing) + NEW B19 follow-up cross-linked to existing planned steps 11/13/19; this commit; tagged `v0.17.7-step17c-mpi-4rank-mimic` post-merge; 3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main`**)
 
 This commit fulfils the **deferred-from-C2 obligation** of session-2 §17.7: a workstation `mpirun -np 4` mimic verification of the C2-core MPI machinery (`MPI_Barrier` at year boundary + `flush_year_globally_synchronized` with `MPI_Allreduce(MPI_SUM)`). The harness was authored fresh as `scripts/cross_validate_mpi_4rank.sh` (~+700 LOC including comprehensive doc block). During harness authoring, an unanticipated handshake-file write-path defect (Path α) was surfaced + fixed at the xval harness layer via `DIR_COMMON` injection.

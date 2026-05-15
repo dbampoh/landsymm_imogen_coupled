@@ -2027,6 +2027,34 @@ No re-run of full 4-xval gates (gates 6+8) needed since the changes are pure-doc
 
 ---
 
+### Step 17c (17c.0.8 LANDED): Step 17c.0 PREP phase OFFICIAL CLOSE-OUT — 11/11 sub-phases done; doc-cascade-only across 6 in-tree surfaces + 1 sibling-artifact (CHAT_HANDOFF Part 8); ZERO source-code change — **TRUNK-IRRELEVANT-by-novelty** (the entire `notes/` + `CHANGELOG.md` + `EXECUTION_PLAN.md` doc surface doesn't exist in `trunk_r13078`)
+
+**Date:** 2026-05-15 (night; session 4 continuation). **Commit hash:** _to be determined_ (this commit; tagged `v0.17.8-step17c-prep-complete` post-merge; ff-merged onto `main` from feature branch `step17c-prep-close-out` on top of the 17c.0.7 commit `6695ef2`).
+
+**Backport relevance summary:**
+- **TRUNK-IRRELEVANT-by-novelty** in entirety. Pure-bookkeeping commit formally marking Step 17c.0 PREP phase OFFICIALLY COMPLETE. The 11-sub-phase arc spanned 4 calendar days across 4 chat sessions and closed 4 audit items (B15 + B16 + B17(a) + B17(b)) + 1 latent defect (Path α handshake-file write-path) + landed the deferred-from-C2 workstation `mpirun -np 4` mimic obligation per session-2 §17.7 + 18 LOC of TRUNK-RELEVANT N-cycle unit doc-comment clarifications (already captured in the 17c.0.6 + 17c.0.7 ledger entries above). **Net `lpjguess/` source-level change in THIS commit: ZERO.**
+- **No backport directive** — this commit's changes are entirely doc-only across the per-fork `notes/` + `CHANGELOG.md` + `EXECUTION_PLAN.md` doc surface that doesn't exist in `trunk_r13078`. Documented here per the 6-surface doc-cascade convention + per the maintenance discipline at §6 (every step gets an entry, even doc-only / TRUNK-IRRELEVANT entries, for full audit-trail completeness).
+- **Substantive backport-relevant LOC contributed by the entire 17c.0 PREP arc** (cumulative; for Backport Sprint planning convenience): F5 from 17c.0.1 (~3 LOC `dprintf` + ~17 LOC doc block in `lpjguess/framework/framework.cpp`) + 18 LOC of N-cycle unit doc-comment clarifications from 17c.0.7 (5 LOC at `guess.h:1240-1257` + 6 LOC at `guess.h:3850-3855` + 13 LOC at `commonoutput.cpp:1759-1771` + small precision fixes at `imogenoutput.cpp:75-83`). Everything else (B15-B17 fixes; harness work; forensic notes) is TRUNK-IRRELEVANT-by-novelty per the per-entry classifications above.
+
+#### Files in this commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Backport directive |
+|---|---|---|
+| `notes/STEP_17c.md` (+~150 LOC; NEW §1.7 17c.0.8 landing record + header date row update + Status block promotion to "✅ 17c.0 PREP COMPLETE (11/11 sub-phases landed at this commit)" + §1 PREP table 17c.0.8 row promotion to ✅ DONE + footer summary update to "🎉 PREP phase OFFICIALLY COMPLETE" + Index entry for §1.7) | Doc cascade per the 6-surface convention; canonical landing record for the PREP-COMPLETE milestone with retrospective on the 11-sub-phase arc + handoff to B19/B20/17c.1+ + 3 deferred B19 questions for session-5 opening agenda (Q1 SPINUP/FIRSTCALL ordering + Q2 closed-loop validation tolerance + Q3 B19-Phase 1 ordering revisit). | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `notes/FOLLOWUPS.md` (+~50 LOC; status dashboard top-of-file refresh with PREP-COMPLETE banner + B19 PRIORITY: HIGH annotation promoting it to NEXT-TASK CLUSTER status + B20 PRIORITY: HIGH annotation paired with B19 + F-12 row update reflecting 17c.0.7 + 17c.0.8 LANDED + footer "NEXT-TASK CLUSTER" summary) | Doc cascade | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `CHANGELOG.md` (NEW dated entry ~+50 LOC) | NEW [Unreleased] entry "2026-05-15 (night, session 4 continuation) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.8; PREP phase OFFICIAL CLOSE-OUT)" capturing the close-out narrative + per-surface decomposition + verification + backport classification + what's-next + forecasting lesson candidate. | DOC TRUNK-IRRELEVANT (per-fork changelog) |
+| `EXECUTION_PLAN.md` (+~5 LOC; row 17c update prepending 17c.0.8 LANDED clause + cross-checking V.1 step-row references for B19/B20 next-task-cluster) | Doc cascade | DOC TRUNK-IRRELEVANT (per-fork plan) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (THIS entry; +~30 LOC) | Records this close-out commit's TRUNK-IRRELEVANT classification. Contributes ZERO eligible LOC for backport. | DOC TRUNK-IRRELEVANT (self-referential) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (NEW Part 8 ~+200 LOC; sibling-artifact, outside repo) | Session-4 close-out narrative + handoff to session 5 with 3 deferred B19 questions agenda + retrospective on the 11-sub-phase PREP arc. | N/A (sibling artifact, outside repo) |
+
+#### Verification this commit (doc-cascade-only)
+
+No build or runtime verification needed (ZERO source-code touch). Documentation consistency verified across all 6 in-tree surfaces via 6-surface visual review: PREP-COMPLETE narrative consistent + B19/B20 promotion to NEXT-TASK CLUSTER consistent + 3 deferred B19 questions handoff to session 5 consistent + tag target `v0.17.8-step17c-prep-complete` consistent. Pre-existing build state preserved from 17c.0.7 commit `6695ef2` (gates 1-11 all PASS exit 0 at that commit; no source change since).
+
+**With this commit, Step 17c.0 PREP phase is OFFICIALLY COMPLETE** — 11/11 sub-phases landed (17c.0.0 + 17c.0.1 + 17c.0.2 + 17c.0.3 + 17c.0.4 + 17c.0.4-followup + 17c.0.5 + 17c.0.5-clarification + 17c.0.6 + 17c.0.7 + 17c.0.8). **NEXT-TASK CLUSTER**: B19 (essential ~2.5-4 d closed-loop pipeline verification) + B20 (recommended ~1-2 d literature-comparison sanity check) → 17c.1 → 17c.4 cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative). v1.0 % done estimate held at ~70-72% (this commit is pure book-keeping).
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):
