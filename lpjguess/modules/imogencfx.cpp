@@ -1460,10 +1460,45 @@ void IMOGENCFXInput::preload_all_climate(Gridcell& gridcell,
 		// C1.1 erratum at commit 90401f2; verified bit-exact at sub-step
 		// 7.3.1 commit 7be595a for ImogenInput; same formula here for
 		// IMOGENCFXInput).
+		// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15):
+		//  the "verified bit-exact at sub-step 7.3.1" claim above was a
+		//  B15-style structural false positive (per notes/STEP_17c.md §0
+		//  forensic + §3.8.6 closure record); the formula is now corrected
+		//  to remove the spurious cell_idx * nyear_spinup term. - DKB]
 		int imogen_year;
 		if (is_spinup) {
+			// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15).
+			//  Symmetric application of the spinup_year_idx formula
+			//  correction at the IMOGENCFXInput preload write-side. Removed
+			//  the spurious `cell_idx * nyear_spinup` term from the
+			//  previous formula `(cell_idx * nyear_spinup + year_idx) %
+			//  NYEAR_SPINUP` so that the closed-form cache key matches the
+			//  gridcell_outer reference behavior (per-cell reset of
+			//  spinup_year_idx in IMOGENCFXInput::getgridcell() at line
+			//  1122; ALL cells use spinup imogen_years that depend ONLY on
+			//  year_idx).
+			//
+			//  IMOGENCFXInput's year_outer overrides exhibit the IDENTICAL
+			//  bug pattern as ImogenInput's because the C1.3 sub-step 7.3.2
+			//  implementation (commit 7be595a, 2026-05-10) intentionally
+			//  mirrored the ImogenInput pattern verbatim, including the
+			//  buggy formula. This is the mechanical confirmation of the
+			//  coupling-invariance finding per notes/STEP_17c.md §3.8.3:
+			//  B17(b) drift envelope is IDENTICAL between LOOSE (imogen)
+			//  and TIGHT (imogencfx) coupling because BOTH input modules
+			//  share the same bug pattern in symmetric closed-form
+			//  formulas (4 sites total: 2 in this file + 2 in
+			//  imogen_input.cpp).
+			//
+			//  See canonical forensic block at lpjguess/modules/
+			//  imogen_input.cpp preload_all_climate (~line 1199) for the
+			//  full B17(b) closure forensic — origin in notes/STEP_17a.md
+			//  §5.4 derivation premise error, latency through B15
+			//  masking, empirical fingerprint match, expected post-fix
+			//  verification envelope, and backport classification TRUNK-
+			//  IRRELEVANT-by-novelty. - DKB 2026-05-15]
 			const int spinup_year_idx_for_this =
-				(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+				year_idx % NYEAR_SPINUP;
 			imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
 		} else {
 			imogen_year = calendar_year;
@@ -1561,9 +1596,30 @@ bool IMOGENCFXInput::getclimate_for_year(Gridcell& gridcell,
 
 	int imogen_year;
 	if (is_spinup) {
+		// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15).
+		//  Symmetric application of the spinup_year_idx formula
+		//  correction at the IMOGENCFXInput read-side
+		//  (getclimate_for_year). Removed the spurious `cell_idx *
+		//  nyear_spinup` term from the previous formula `(cell_idx *
+		//  nyear_spinup + year_idx) % NYEAR_SPINUP` so that the read-side
+		//  closed-form cache key matches the write-side
+		//  (preload_all_climate at line ~1465 of this file) AND the
+		//  gridcell_outer reference behavior (per-cell reset of
+		//  spinup_year_idx in IMOGENCFXInput::getgridcell() at line 1122).
+		//
+		//  All 4 sites in this commit MUST use the IDENTICAL corrected
+		//  formula `year_idx % NYEAR_SPINUP`:
+		//    1. lpjguess/modules/imogen_input.cpp::preload_all_climate
+		//    2. lpjguess/modules/imogen_input.cpp::getclimate_for_year
+		//    3. lpjguess/modules/imogencfx.cpp::preload_all_climate
+		//    4. lpjguess/modules/imogencfx.cpp::getclimate_for_year (THIS)
+		//
+		//  See canonical forensic block at lpjguess/modules/
+		//  imogen_input.cpp preload_all_climate (~line 1199) for the
+		//  full B17(b) closure forensic. - DKB 2026-05-15]
 		const int year_idx = calendar_year - (firsthist - nyear_spinup);
 		const int spinup_year_idx_for_this =
-			(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+			year_idx % NYEAR_SPINUP;
 		imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
 	} else {
 		imogen_year = calendar_year;

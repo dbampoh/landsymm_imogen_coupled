@@ -54,15 +54,31 @@ public:
 	 *  the formula:
 	 *
 	 *      spinup_year_idx_at_(cell_idx, year_idx)
-	 *          = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+	 *          = year_idx % NYEAR_SPINUP
 	 *
 	 *  (NO +1; the existing getclimate() reads the spinup_year_idx VALUE
-	 *  BEFORE incrementing it, on day 0 of each spinup year. cell_idx is
-	 *  0-indexed in the order getgridcell returned cells; year_idx is
-	 *  0-indexed within the spinup phase. For cell C, spinup year Y, the
-	 *  cumulative spinup-year-increments before this point equals
-	 *  C * nyear_spinup + Y, and spinup_year_idx is incremented exactly
-	 *  that many times since init's 0; modulo NYEAR_SPINUP for wrap.)
+	 *  BEFORE incrementing it, on day 0 of each spinup year. year_idx is
+	 *  0-indexed within the spinup phase. The formula has NO cell_idx
+	 *  dependence because gridcell_outer mode RESETS spinup_year_idx = 0
+	 *  at the start of every cell in getgridcell() at line 880. For
+	 *  every cell C, spinup year Y, the cumulative spinup-year-
+	 *  increments WITHIN that cell before this point equals Y, and
+	 *  spinup_year_idx is incremented exactly that many times since the
+	 *  per-cell reset to 0; modulo NYEAR_SPINUP for wrap.)
+	 *
+	 *  [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15):
+	 *   the original C1.1 (commit 90401f2, 2026-05-10) derivation in
+	 *   notes/STEP_17a.md §5.4 incorrectly assumed spinup_year_idx
+	 *   "persists across cells" (verbatim §5.4 line 226 example: "Cell
+	 *   1's spinup year 0, day 0: starts from spinup_year_idx = 10
+	 *   (carried from cell 0)"), giving the formula
+	 *   (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP. That
+	 *   formula's spurious cell_idx*nyear_spinup term caused divergent
+	 *   spinup climate inputs for cell_idx >= 1 → divergent stochastic
+	 *   ecological dynamics → per-PFT-total drift envelope (audit B17(b);
+	 *   see notes/STEP_17c.md §3.8 forensic + §3.8.6 closure record).
+	 *   Corrected here per the canonical fix forensic at the
+	 *   .cpp::preload_all_climate site.]
 	 *
 	 *  Also caches per-cell ndep state (a copy of `ndep` member at
 	 *  preload time, populated by getgridcell -> ndep.getndep) so

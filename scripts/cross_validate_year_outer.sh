@@ -300,10 +300,18 @@ compare_outputs() {
   #   SORTED_EXACT  - raw differs but sorted-cmp -s succeeds (PURE B17(a);
   #                   pure row-ordering divergence; counted toward effective
   #                   PASS for the substantive-validation gate)
-  #   SORTED_DIFFER - raw differs AND sorted-cmp -s differs (B17(a) + B17(b);
-  #                   confirmed numerical drift on top of row-ordering;
-  #                   counted toward controlled-FAIL; B17(b) provisionally
-  #                   accepted at 2% per notes/STEP_17c.md §3.8.5 + §3 + §3.6)
+  #   SORTED_DIFFER - raw differs AND sorted-cmp -s differs. PRE-17c.0.6:
+  #                   indicated B17(a) + B17(b) drift (confirmed numerical
+  #                   drift on top of row-ordering; B17(b) provisionally
+  #                   accepted at 2% per notes/STEP_17c.md §3.8.5 + §3 + §3.6).
+  #                   POST-17c.0.6 (this commit and beyond; 2026-05-15):
+  #                   indicates REGRESSION because B17(b) is now MECHANICALLY
+  #                   CLOSED via the spinup_year_idx formula correction per
+  #                   notes/STEP_17c.md §3.8.6. Any SORTED_DIFFER > 0 outcome
+  #                   is now an UNEXPECTED regression rather than expected-
+  #                   drift; SHOULD trigger investigation. The controlled-
+  #                   FAIL machinery (exit 2) is preserved as a regression
+  #                   detector.
   #
   # PASS/FAIL semantics (updated): the substantive-validation gate now
   # passes when BIT_EXACT + SORTED_EXACT == total (zero SORTED_DIFFER).
@@ -317,42 +325,72 @@ compare_outputs() {
   # NOT taken).
   #
   # ===========================================================================
-  # B17(b) OPERATIONAL ACCEPTANCE (UPDATE 2026-05-13 night, session 4):
+  # B17(b) MECHANICAL CLOSURE (UPDATE 2026-05-15 early morning, session 4
+  # continuation; SUPERSEDES the 2026-05-13 night provisional acceptance
+  # block + the 2026-05-14 early morning clarification of the FORCED +
+  # PERMITTED reactivation surfaces):
   #
-  # Per the user-authorised provisional-acceptance decision documented in
-  # _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13 + notes/STEP_17c.md
-  # §3.8.5, the SORTED_DIFFER classification surfaces B17(b) drift cleanly
-  # but the formal Option α (tolerance-based comparison upgrade) is DEFERRED
-  # — the harness continues to controlled-fail at exit 2 on B17(b) drift.
-  # Operationally B17(b) is ACCEPTED at a provisional 2% cell-total tolerance
-  # envelope, consistent with Phase A's empirical max cell-total drift bound
-  # of 1.4% relative (per notes/STEP_17c.md §1.3.3 A.4 + §3.8.1) with ~40%
-  # headroom. Per-PFT splits in low-biomass marginal-establishment PFTs
-  # (TrIBE, TrBR, IBS) may exceed 2% individually (up to ~17-20% empirically)
-  # but are accepted under the same provisional acceptance because they
-  # reflect inherent stochastic-perturbation behaviour of the LPJ-GUESS
-  # engine, NOT a structural year_outer code-path defect.
+  # B17(b) is MECHANICALLY CLOSED at sub-phase 17c.0.6 (commit
+  # `step17c-b17b-investigation` ff-merged onto main; tagged
+  # `v0.17.6-step17c-b17b-closure`) via a 4-LOC surgical correction of
+  # the closed-form `spinup_year_idx` reproduction formula in
+  # `lpjguess/modules/imogen_input.cpp` + `lpjguess/modules/imogencfx.cpp`
+  # per `notes/STEP_17c.md` §3.8.6. The bug was an incorrect formula
+  # `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` derived in
+  # `notes/STEP_17a.md` §5.4 based on a false assumption that
+  # `spinup_year_idx` persists across cells in gridcell_outer mode (the
+  # actual code RESETS spinup_year_idx = 0 per cell in getgridcell()
+  # at imogen_input.cpp:880 + imogencfx.cpp:1122). The corrected
+  # formula is `year_idx % NYEAR_SPINUP` (no cell_idx term).
   #
-  # Re-evaluation hook: the provisional acceptance reactivates the formal
-  # Option α implementation OR the (β) seed-tracking dprintf root-cause
-  # investigation per notes/STEP_17c.md §3.8.4 + §3.6 IF (a) cell-total
-  # drifts exceed 2% on a real-world gridlist or NCELLS scaling beyond the
-  # 4-cell test envelope; OR (b) per-PFT splits diverge in scientifically-
-  # consequential PFT/cell combinations beyond the empirical envelope; OR
-  # (c) C3-era cluster smoke runs reveal MPI-multi-rank-specific drift
-  # not captured by 4cell xval; OR (d) USER ELECTS TO PROACTIVELY REVISIT
-  # AT THEIR OWN DISCRETION even absent a trigger firing — e.g., as a
-  # focused improvement sub-phase between substantive work blocks, as
-  # paper-readiness polish, or simply because they decide they would
-  # prefer the formal closure now (per the user's verbatim 2026-05-13
-  # night directive: "It may be that we could come back and look at it
-  # and decide to do something about it"). In other words, the trigger
-  # list (a)-(c) is the FORCED-REACTIVATION list, not the EXCLUSIVE
-  # list — proactive revisit is always on the table at user discretion.
-  # Until reactivation occurs, SORTED_DIFFER count is informational AND
-  # a controlled-fail signal — operators should inspect the count +
-  # per-file drift magnitudes against the §3.8.5 provisional tolerance
-  # and proceed at their discretion.
+  # Post-fix gates 7+8 4cell xval envelope is `15 BIT_EXACT + 22
+  # SORTED_EXACT + 0 SORTED_DIFFER + exit 0` IDENTICAL between LOOSE
+  # (gate 7) and TIGHT (gate 8) coupling — the 17 previously-
+  # SORTED_DIFFER per-PFT-total + tot_runoff files are now ALL
+  # SORTED_EXACT (data identical between modes after row-order
+  # normalization). The provisional 2% cell-total tolerance per the
+  # original §3.8.5 is RETIRED-because-no-longer-applicable. The §3.8.5.5
+  # FORCED + PERMITTED reactivation cadence is RETIRED-with-honour-of-
+  # PERMITTED-surface-FIRING-ONCE-SUCCESSFULLY (the 2026-05-14 night
+  # → 2026-05-15 early morning proactive revisit per user verbatim
+  # directive _"I would prefer that we try to see if we can resolve
+  # the issue"_ is the realisation of that surface and yielded this
+  # mechanical closure).
+  #
+  # Regression-detector hook: the SORTED_DIFFER > 0 → exit 2
+  # controlled-FAIL machinery is PRESERVED as a regression detector.
+  # Any future routine xval re-verify on this branch that produces
+  # SORTED_DIFFER > 0 indicates a REGRESSION (the formula correction
+  # was undone, something else introduced new drift, or a new
+  # ordering-sensitive defect surfaced). Investigators should compare
+  # the manifest against the canonical post-17c.0.6 envelope (15
+  # BIT_EXACT + 22 SORTED_EXACT + 0 SORTED_DIFFER) and bisect against
+  # `git log lpjguess/modules/(imogen_input|imogencfx).(cpp|h)` to
+  # find the regression. The previously-listed 4 §3.8.5 re-evaluation
+  # triggers (cell-total >2%, per-PFT in scientifically-consequential
+  # PFT/cell, C3-era cluster MPI-rank-specific drift, paper-stage
+  # finding sensitive to per-PFT noise) all RETIRE-because-no-longer-
+  # applicable since the underlying drift no longer exists.
+  #
+  # Pre-17c.0.6 historical context (preserved verbatim for forensic
+  # record of the provisional-acceptance era 2026-05-13 night through
+  # 2026-05-15 early morning):
+  #
+  # > Per the user-authorised provisional-acceptance decision documented
+  # > in _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13 +
+  # > notes/STEP_17c.md §3.8.5, the SORTED_DIFFER classification surfaces
+  # > B17(b) drift cleanly but the formal Option α (tolerance-based
+  # > comparison upgrade) is DEFERRED — the harness continues to
+  # > controlled-fail at exit 2 on B17(b) drift. Operationally B17(b)
+  # > is ACCEPTED at a provisional 2% cell-total tolerance envelope,
+  # > consistent with Phase A's empirical max cell-total drift bound of
+  # > 1.4% relative with ~40% headroom. The provisional acceptance
+  # > reactivates the formal Option α OR Option β IF (a) cell-total
+  # > drifts exceed 2% on real-world gridlist; OR (b) per-PFT splits
+  # > diverge in scientifically-consequential combinations; OR (c) C3-era
+  # > cluster smoke runs reveal MPI-rank-specific drift; OR (d) USER
+  # > ELECTS TO PROACTIVELY REVISIT (PERMITTED reactivation surface).
+  # > [SUPERSEDED at 17c.0.6 by §3.8.6 mechanical closure.]
   # ===========================================================================
   #
   # Sort-key invariant: ALL .out files in this codebase have (Lon, Lat,
@@ -375,18 +413,26 @@ compare_outputs() {
   #     forensic + scientific interpretation + Phase A's wall on
   #     root-cause identification)
   #   - notes/STEP_17c.md §3.8.5 (B17(b) provisional 2% tolerance
-  #     operational acceptance; canonical record of the §4.13 decision)
-  #   - notes/FOLLOWUPS.md "Audit item B17" (status dashboard; B17(a)
-  #     CLOSED + B17(b) PROVISIONALLY ACCEPTED at 2% tolerance)
-  #   - _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13
-  #     (operational-acceptance decision narrative; user-authorised
-  #     2026-05-13 night, session 4)
+  #     operational acceptance; canonical record of the §4.13 decision;
+  #     SUPERSEDED-BY-CLOSURE at 17c.0.6 per §3.8.6)
+  #   - notes/STEP_17c.md §3.8.5.5 (Re-evaluation cadence FORCED + PERMITTED
+  #     surfaces; SUPERSEDED-BY-CLOSURE at 17c.0.6 per §3.8.6 — PERMITTED
+  #     surface fired successfully on 2026-05-14 night → 2026-05-15)
+  #   - notes/STEP_17c.md §3.8.6 (B17(b) MECHANICAL CLOSURE record;
+  #     canonical narrative; SUPERSEDES §3.8.5 + §3.8.5.5)
+  #   - notes/FOLLOWUPS.md "Audit item B17" (status dashboard; B17(a) +
+  #     B17(b) both CLOSED at 17c.0.6)
+  #   - _chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md §4.13 + §6.1
+  #     (provisional-acceptance decision narrative + B17(b) mechanical
+  #     closure narrative; user-authorised 2026-05-13 night → 2026-05-15
+  #     early morning, session 4 + session 4 continuation)
   #
   # Backport classification: TRUNK-IRRELEVANT (.sh harness only;
   # cross_validate_year_outer.sh is per-fork; trunk_r13078 has no
   # year_outer mode and no cross-validation harness).
   #
-  # - DKB 2026-05-13
+  # - DKB 2026-05-13 (original); 2026-05-14 (PERMITTED-revisit clarification);
+  #   2026-05-15 (B17(b) MECHANICAL CLOSURE per §3.8.6)
   # =============================================================================
   local sorted_exact=0
   local sorted_differ=0
@@ -435,7 +481,9 @@ compare_outputs() {
     echo "  BIT_EXACT     (raw cmp -s passed)                              : $matches / $total"
     echo "  SORTED_EXACT  (raw differs, sorted cmp -s passes; PURE B17(a)) : $sorted_exact"
     echo "  SORTED_DIFFER (raw differs AND sorted cmp -s differs;          : $sorted_differ"
-    echo "                 B17(a) + B17(b) drift; B17(b) accepted at 2% per §3.8.5)"
+    echo "                 expected = 0 post-17c.0.6 B17(b) MECHANICAL"
+    echo "                 CLOSURE per notes/STEP_17c.md §3.8.6;"
+    echo "                 SORTED_DIFFER > 0 now indicates REGRESSION)"
     echo "  Total accounted for                                            : $((matches + sorted_exact + sorted_differ)) / $total"
   fi
 
@@ -489,14 +537,20 @@ compare_outputs() {
   #  block computed bit_exact_ok = ($mismatches == 0). Post-17c.0.4, raw
   #  mismatches that NORMALIZE to bit-equality via the sort-then-diff layer
   #  above (PURE B17(a) cases) count as semantic-byte-equal (Decision-12
-  #  equality of CONTENT, not emission order). SORTED_DIFFER files (B17(a)
-  #  + B17(b) drift) remain controlled-FAIL per the B17(b) provisional
-  #  acceptance at 2% cell-total tolerance (notes/STEP_17c.md §3.8.5);
-  #  formal Option α/β closure deferred to a future sub-phase TBD that
-  #  reactivates either on a §3.8.5 re-eval trigger firing OR proactively
-  #  at user discretion at any time per §3.8.5.5 5th cadence bullet
-  #  (clarification commit on top of 17c.0.5 commit `29ccc87`). - DKB
-  #  2026-05-13/14]
+  #  equality of CONTENT, not emission order). 2026-05-13 through 2026-05-14:
+  #  SORTED_DIFFER files (B17(a) + B17(b) drift) remained controlled-FAIL
+  #  per the B17(b) provisional acceptance at 2% cell-total tolerance
+  #  (notes/STEP_17c.md §3.8.5); formal Option α/β closure was deferred
+  #  to a future sub-phase TBD reactivated either on §3.8.5 re-eval trigger
+  #  firing OR proactively at user discretion at any time per §3.8.5.5
+  #  5th cadence bullet. 2026-05-15 (17c.0.6 B17(b) MECHANICAL CLOSURE):
+  #  the PERMITTED-revisit surface fired successfully and the B17(b) drift
+  #  was eliminated mechanically via the spinup_year_idx formula correction
+  #  per notes/STEP_17c.md §3.8.6. The effective_pass = matches +
+  #  sorted_exact semantics is preserved; SORTED_DIFFER count is now
+  #  expected to be 0 in routine xval re-verifies; SORTED_DIFFER > 0
+  #  indicates REGRESSION (per the regression-detector hook in the upstream
+  #  comment block). - DKB 2026-05-13/14/15]
   local effective_pass=$((matches + sorted_exact))
   local bit_exact_ok=0
   if [ "$effective_pass" -eq "$total" ] && [ "$total" -gt 0 ]; then
@@ -632,22 +686,33 @@ compare_outputs() {
     return 0
   else
     echo
-    echo "FAIL: $sorted_differ file(s) have B17(b) drift (raw AND sorted both differ);"
+    echo "FAIL (REGRESSION DETECTED): $sorted_differ file(s) have SORTED_DIFFER (raw AND sorted both differ);"
     echo "  $matches BIT_EXACT + $sorted_exact SORTED_EXACT (PURE B17(a)) + $sorted_differ SORTED_DIFFER"
     echo "  + $((mismatches - sorted_exact - sorted_differ)) MISSING/other = $total total."
     echo
-    echo "B17(b) is the small-magnitude (~0.5-2%) numerical drift in per-PFT-total +"
-    echo "  tot_runoff files between gridcell_outer and year_outer multi-cell runs."
-    echo "  Empirical signature: per-cell-isolated stochastic-process divergence (cell 0"
-    echo "  bit-exact in BOTH modes; cells 1+ progressively diverge in low-biomass PFTs"
-    echo "  while cell totals stay within ~1.4% relative). Closure plan in"
-    echo "  notes/STEP_17c.md §3 (B17(b) forensic) + §3.6 (recommended-fix skeleton)"
-    echo "  + §3.8.5 (B17(b) provisionally accepted at 2% per 2026-05-13 user directive;"
-    echo "    formal Option α tolerance vs Option β root-cause closure deferred to a"
-    echo "    future sub-phase TBD reactivated either on a §3.8.5 re-eval trigger firing"
-    echo "    OR proactively at user discretion at any time — per user's verbatim"
-    echo "    directive 'we could come back and look at it and decide to do something"
-    echo "    about it'; see §3.8.5.5 cadence for the full reactivation surface)."
+    echo "POST-17c.0.6 EXPECTED: SORTED_DIFFER == 0. B17(b) was MECHANICALLY CLOSED at"
+    echo "  17c.0.6 (2026-05-15) via the spinup_year_idx formula correction in"
+    echo "  lpjguess/modules/(imogen_input|imogencfx).cpp per notes/STEP_17c.md §3.8.6."
+    echo "  Any SORTED_DIFFER > 0 outcome now indicates a REGRESSION — investigate via:"
+    echo "    git log lpjguess/modules/imogen_input.{cpp,h}"
+    echo "    git log lpjguess/modules/imogencfx.{cpp,h}"
+    echo "  to identify the regressing change. Compare the manifest against the canonical"
+    echo "  post-17c.0.6 envelope (15 BIT_EXACT + 22 SORTED_EXACT + 0 SORTED_DIFFER for"
+    echo "  4cell xval; 37/37 BIT_EXACT for 1cell xval)."
+    echo
+    echo "  PRE-17c.0.6 historical context (preserved for forensic record):"
+    echo "    B17(b) was previously the small-magnitude (~0.5-2%) numerical drift in"
+    echo "    per-PFT-total + tot_runoff files between gridcell_outer and year_outer"
+    echo "    multi-cell runs, attributed to stochastic-process sensitivity per"
+    echo "    cell-iteration-order RNG slip per notes/STEP_17c.md §3.8 forensic;"
+    echo "    provisionally accepted at 2% cell-total tolerance per §3.8.5 with"
+    echo "    FORCED + PERMITTED reactivation surfaces per §3.8.5.5. The PERMITTED"
+    echo "    surface fired 2026-05-14 night when the user proactively revisited per"
+    echo "    'I would prefer that we try to see if we can resolve the issue', leading"
+    echo "    to the §3.8.6 mechanical closure 2026-05-15 early morning. The provisional-"
+    echo "    acceptance + reactivation-cadence regimes are RETIRED-by-supersession;"
+    echo "    only the regression-detector role of this controlled-FAIL machinery"
+    echo "    remains active."
     return 2
   fi
 }

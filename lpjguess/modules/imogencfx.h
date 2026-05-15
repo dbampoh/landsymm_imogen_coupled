@@ -106,15 +106,28 @@ public:
 	/// respectively. Uses the corrected spinup_year_idx state-machine
 	/// reproduction formula:
 	///
-	///   spinup_year_idx_for_this = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+	///   spinup_year_idx_for_this = year_idx % NYEAR_SPINUP
 	///
 	/// NO `+1` in the formula. The existing getclimate() reads
 	/// spinup_year_idx VALUE BEFORE incrementing it on day 0, so for
 	/// cell C, spinup year Y, the value READ equals the count of PRIOR
-	/// day-0 increments = (C * nyear_spinup + Y) modulo NYEAR_SPINUP.
-	/// (C1.1 erratum: the foundation commit's docs incorrectly had `+1`;
-	/// corrected at C1.1 commit `90401f2` and verified at sub-step 7.3.1
-	/// 4-cell PASS commit `7be595a`.)
+	/// day-0 increments WITHIN cell C = Y modulo NYEAR_SPINUP. The
+	/// formula has NO cell_idx dependence because IMOGENCFXInput::
+	/// getgridcell() RESETS spinup_year_idx = 0 at the start of every
+	/// cell (line 1122).
+	///
+	/// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15):
+	///  the previous formula `(cell_idx * nyear_spinup + year_idx) %
+	///  NYEAR_SPINUP` was based on an INCORRECT assumption that
+	///  spinup_year_idx persists across cells in gridcell_outer mode
+	///  (per notes/STEP_17a.md §5.4 derivation; the "verified at sub-
+	///  step 7.3.1 4-cell PASS" claim was a B15-style structural false
+	///  positive). The spurious cell_idx*nyear_spinup term caused
+	///  divergent spinup climate inputs for cell_idx >= 1 → per-PFT-
+	///  total drift envelope (audit B17(b); see notes/STEP_17c.md §3.8
+	///  forensic + §3.8.6 closure record). Corrected here per the
+	///  canonical fix forensic at lpjguess/modules/imogen_input.cpp
+	///  preload_all_climate. - DKB 2026-05-15]
 	void preload_all_climate(Gridcell& gridcell, int first_calendar_year, int last_calendar_year);
 
 	/// year_outer mode override: serve cached climate per (cell, year, day).

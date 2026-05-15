@@ -210,7 +210,42 @@ The year_outer block fails fast on:
 
 These are not needed for the SSP1-2.6 smoke test cross-validation. Adding support is purely additive future work; the `fail` calls give actionable fallback pointers.
 
-### 5.4 The `spinup_year_idx` state-machine finding (flagged this session) [ERRATUM applied at C1.1 implementation]
+### 5.4 The `spinup_year_idx` state-machine finding (flagged this session) [ERRATUM applied at C1.1 implementation; SUPERSEDED-BY-CORRECTION at Step 17c sub-phase 17c.0.6, 2026-05-15]
+
+> **§5.4 SUPERSEDED-BY-CORRECTION (added 2026-05-15 in Step 17c sub-phase 17c.0.6 commit; NEW ERRATUM superseding the original C1.1 erratum):** The §5.4 derivation below — specifically the premise verbatim asserted at the worked example _"Cell 1's spinup year 0, day 0: starts from `spinup_year_idx = 10` (carried from cell 0)"_ and the corresponding closed-form formula `spinup_year_idx_at_(cell_idx, year_idx) = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` — is **WRONG**. The premise that `spinup_year_idx` "persists across cells in gridcell_outer mode" is false. The actual code at `lpjguess/modules/imogen_input.cpp:880` (and symmetrically `lpjguess/modules/imogencfx.cpp:1122`) RESETS `spinup_year_idx = 0` at the start of every cell inside `getgridcell()`:
+>
+> ```cpp
+> // new gridcell ensure, we start at index one for spinup
+> spinup_year_idx = 0;
+> ```
+>
+> Therefore the gridcell_outer reference behavior is: cell c, spinup year y → `imogen_year = FIRST_SPINUP_YEAR + (y % NYEAR_SPINUP)` for ALL cells (NO cell_idx dependence). The CORRECTED closed-form formula used in the year_outer overrides at `lpjguess/modules/(imogen_input|imogencfx).cpp::(preload_all_climate|getclimate_for_year)` is:
+>
+> ```
+> spinup_year_idx_at_(cell_idx, year_idx) = year_idx % NYEAR_SPINUP    ← NO cell_idx term
+> ```
+>
+> The original §5.4 derivation's `cell_idx * nyear_spinup` term was a per-cell offset that gridcell_outer doesn't have (the per-cell reset wipes the increment history). The C1.1 implementation (commit `90401f2`, 2026-05-10) used the buggy formula at 4 symmetric closed-form sites (2 in `imogen_input.cpp` + 2 in `imogencfx.cpp`) until the bug was identified at Step 17c sub-phase 17c.0.6 (2026-05-15) and surgically corrected.
+>
+> **Audit history of B17(b)** (the audit item caused by this §5.4 erratum):
+> 1. **C1.1 introduction (`90401f2`, 2026-05-10):** Bug introduced via this §5.4 derivation. Latent because B15 (xval harness Class-1/Class-2 syntax false-positive) silently degenerated all xval Run B to gridcell_outer mode, masking the divergence as a structural false-positive PASS. The "37/37 BIT-EXACT 4-cell" result reported in the C1 close-out tag annotation (`v0.17.0-step17a-c1-year-outer-single-process`; 2026-05-10) was a B15-style false positive: Run A AND Run B both ran in gridcell_outer mode.
+> 2. **B15 fix (17c.0.1+17c.0.2, `019c9dd`, 2026-05-13):** 1cell xval gates 5+6 PASSED BIT-EXACT for the FIRST TIME with year_outer actually exercised. Bug remained masked because cell_idx=0 zeroes the spurious `cell_idx * nyear_spinup` term.
+> 3. **B16 fix (17c.0.3, `4d09b62`, 2026-05-13):** 4cell xval gates 7+8 surfaced the bug as part of B17 audit item (a + b sub-defects). B17(a) row-emission-order divergence was correctly identified and mechanically closed at 17c.0.4 (`027d90d`); B17(b) was misclassified as "stochastic-process sensitivity per cell-iteration-order RNG slip" per `notes/STEP_17c.md` §3.8 forensic because the Phase A code-spelunking at 17c.0.4 trusted this §5.4 derivation rather than independently re-deriving the formula against actual code.
+> 4. **B17(b) provisional acceptance (17c.0.4-followup, `2771939`, 2026-05-13 night):** Operationally accepted at 2% cell-total tolerance per `notes/STEP_17c.md` §3.8.5 with deferred Option α/β for closure if re-evaluation triggers fired (FORCED reactivation surface).
+> 5. **17c.0.5 + 17c.0.5-clarification (`29ccc87` + `e03ceb1`, 2026-05-13 night-late + 2026-05-14 early morning):** Full 4-xval re-verify confirmed regression-clean status with provisional envelope; reactivation surface broadened to FORCED + PERMITTED (proactive at user discretion at any time per §3.8.5.5 5th cadence bullet).
+> 6. **B17(b) MECHANICAL CLOSURE (17c.0.6, 2026-05-15 early morning):** User exercised the PERMITTED-reactivation surface; Phase A code review high-confidence-identified the §5.4 erratum as the root cause; Phase D fix authoring + 8-gate verification confirmed mechanical closure with `15 BIT_EXACT + 22 SORTED_EXACT + 0 SORTED_DIFFER` envelope on BOTH 4cell xval scenarios (gates 7+8) IDENTICAL between LOOSE and TIGHT coupling.
+>
+> **Cross-references for the canonical closure narrative:**
+> - `notes/STEP_17c.md` §3.8.6 (canonical B17(b) closure record; ~10 nested sub-sections including root-cause forensic, empirical-fingerprint-mechanical-explanation table, latency analysis, fix description, 8-gate verification, scope bounds, forecasting lesson, documentation surface, closure status)
+> - `notes/STEP_17c.md` §3.8.5 + §3.8.5.5 (provisional-acceptance + cadence sub-sections; both prepended with SUPERSEDED-BY-CLOSURE blocks pointing to §3.8.6)
+> - `lpjguess/modules/imogen_input.cpp` preload_all_climate (~line 1199; canonical inline forensic block at the fix site)
+> - `lpjguess/modules/imogen_input.cpp` getclimate_for_year (~line 1300; symmetric fix with cross-reference)
+> - `lpjguess/modules/imogencfx.cpp` preload_all_climate (~line 1466; symmetric fix with cross-reference)
+> - `lpjguess/modules/imogencfx.cpp` getclimate_for_year (~line 1601; symmetric fix with cross-reference)
+> - `lpjguess/modules/imogen_input.h` doc-block update (corrected formula + closure annotation)
+> - `lpjguess/modules/imogencfx.h` doc-block update (symmetric)
+>
+> **The §5.4 prose below is preserved verbatim for forensic record of the original (incorrect) derivation premise that caused B17(b).** Future readers should treat §5.4's derivation as historical-only and refer to `notes/STEP_17c.md` §3.8.6 for the corrected closed-form formula.
 
 The session-2 §9.5 PRNG audit established that LPJ-GUESS's `Stand.seed` + `Gridcell.seed` are per-instance + ordering-friendly, supporting bit-exact cross-validation. **This session's deeper investigation (foundation phase) found a separate ordering-sensitive state in `IMOGENCFXInput` and `ImogenInput`**: the `spinup_year_idx` class-member counter (line 220 of `imogencfx.h`; line 199 of `imogen_input.h`) **persists across cells** in gridcell_outer mode.
 

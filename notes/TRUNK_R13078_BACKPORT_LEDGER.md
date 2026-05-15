@@ -1933,9 +1933,39 @@ Documentation cascade also touches: `notes/STEP_17c.md` (NEW §1.4 + §1.5 landi
 
 ---
 
+### Step 17c (17c.0.6 LANDED): B17(b) MECHANICAL CLOSURE via 4-LOC surgical correction of the closed-form `spinup_year_idx` reproduction formula in `lpjguess/modules/imogen_input.cpp` + `lpjguess/modules/imogencfx.cpp` per new `notes/STEP_17c.md` §3.8.6 + C2 close-out tag (a)-refined annotation amendment BUNDLED — **TRUNK-IRRELEVANT-by-novelty**
+
+**Date:** 2026-05-15 (early morning; session 4 continuation). **Commit hash:** _to be determined_ (this commit; tagged `v0.17.6-step17c-b17b-closure` post-merge; ff-merged onto `main` from feature branch `step17c-b17b-investigation` on top of `e03ceb1`).
+
+**Backport relevance summary:**
+- **TRUNK-IRRELEVANT-by-novelty**: the year_outer code path + the spinup_year_idx state-machine reproduction formula are **step-17a additions** (introduced at C1.1 commit `90401f2`, 2026-05-10 + C1.3 sub-step 7.3.2 commit `7be595a`, 2026-05-10 for IMOGENCFXInput). The entire year_outer code path doesn't exist in `trunk_r13078`. The 4 source-side fix sites (2 in `imogen_input.cpp::(preload_all_climate|getclimate_for_year)` + 2 in `imogencfx.cpp::(preload_all_climate|getclimate_for_year)`) all live in step-17a-novel methods that have no analogue in trunk_r13078. Therefore the bug being fixed here did not exist in trunk_r13078 and the fix has no trunk-side analogue.
+- **No backport directive** — this commit's source-side changes (4 LOC at 4 sites) only correct a defect in step-17a-novel code that doesn't exist in trunk_r13078. Documentation cascade (notes/STEP_17c.md §3.8.6, notes/STEP_17a.md §5.4 ERRATUM, FOLLOWUPS.md, EXECUTION_PLAN.md, CHANGELOG.md, this ledger entry, scripts/cross_validate_year_outer.sh inline-comment updates, sibling chat handoff §6.1) is doc-only and inherits the TRUNK-IRRELEVANT classification.
+
+#### Files in this commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Backport directive |
+|---|---|---|
+| `lpjguess/modules/imogen_input.cpp` | 4-LOC source change at 2 sites (preload_all_climate + getclimate_for_year) replacing buggy `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` formula with `year_idx % NYEAR_SPINUP` + ~80-LOC inline canonical forensic block at preload_all_climate site + ~25-LOC cross-ref block at getclimate_for_year site | TRUNK-IRRELEVANT-by-novelty (preload_all_climate + getclimate_for_year are step-17a additions; not in trunk_r13078) |
+| `lpjguess/modules/imogencfx.cpp` | 4-LOC source change at 2 sites (symmetric) + ~30-LOC cross-ref block at preload_all_climate + ~25-LOC cross-ref block at getclimate_for_year + ~5-LOC update to existing C1.1-erratum comment | TRUNK-IRRELEVANT-by-novelty (same reason; IMOGENCFXInput's year_outer overrides are step-17a additions) |
+| `lpjguess/modules/imogen_input.h` | Doc-block formula update in preload_all_climate doc block (was `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP`; now `year_idx % NYEAR_SPINUP`) + ~25-LOC B17(b) closure annotation block | TRUNK-IRRELEVANT-by-novelty |
+| `lpjguess/modules/imogencfx.h` | Symmetric doc-block update + ~25-LOC closure annotation | TRUNK-IRRELEVANT-by-novelty |
+| `notes/STEP_17c.md` | Header dates + status block update (17c.0.6 added) + §1 sub-phase table 17c.0.6 row update + §3.8.5 + §3.8.5.5 SUPERSEDED-BY-CLOSURE blocks + NEW §3.8.6 closure record (~650 LOC; 11 nested sub-sections) + Index entry for §3.8.6 | DOC TRUNK-IRRELEVANT |
+| `notes/STEP_17a.md` | NEW §5.4 ERRATUM block at head of §5.4 marking original derivation as superseded + cross-reference to §3.8.6; §5.4 prose preserved verbatim | DOC TRUNK-IRRELEVANT |
+| `notes/FOLLOWUPS.md` | "Last updated" header refresh + B17 row → CLOSED at 17c.0.6 | DOC TRUNK-IRRELEVANT |
+| `EXECUTION_PLAN.md` | Row 17c update (17c.0.6 LANDED prepended to 17c.0.5 entry) | DOC TRUNK-IRRELEVANT |
+| `CHANGELOG.md` | NEW dated entry for 2026-05-15 documenting the 17c.0.6 mechanical-closure commit | DOC TRUNK-IRRELEVANT |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | This entry (NEW step-17c-17c.0.6-b17b-closure) | DOC TRUNK-IRRELEVANT (self-referential) |
+| `scripts/cross_validate_year_outer.sh` | Inline comment updates near SORTED_DIFFER classification + Re-evaluation hook + effective-pass + FAIL message: replace "B17(b) provisionally accepted at 2%" / "FORCED + PERMITTED reactivation" framing with "B17(b) MECHANICALLY CLOSED at 17c.0.6 via §3.8.6"; ZERO logic change (controlled-FAIL machinery preserved as regression detector) | DOC TRUNK-IRRELEVANT (.sh harness only) |
+
+#### Tag amendment (BUNDLED in this commit/push event)
+
+`v0.17.5-step17b-c2-mpi-sync` annotation amended in place at `f6c192e` per (a)-refined approach: SHA preserved; original annotation text included verbatim within the new updated message; new content adds post-B15 + post-B17(a) + post-B17(b)-mechanical-closure verification status reflecting that B17(b) was MECHANICALLY CLOSED at 17c.0.6 (not "PROVISIONALLY ACCEPTED at 2%" as the original C2-era annotation had it). The tag amendment is reflected in the new tag `v0.17.6-step17c-b17b-closure` cut at this commit's HEAD post-merge as the marker of the 17c.0.6 milestone.
+
+---
+
 ### Step 17c (17c.0.5-clarification LANDED): broaden B17(b) reactivation surface from FORCED-only (§3.8.5 trigger) to FORCED + PERMITTED (proactive at user discretion at any time) — **TRUNK-IRRELEVANT** (doc-only + .sh-comment-only)
 
-**Date:** 2026-05-14 (early morning; session 4 continuation). **Commit hash:** _to be determined_ (this commit; un-tagged checkpoint on top of `29ccc87`).
+**Date:** 2026-05-14 (early morning; session 4 continuation). **Commit hash:** `e03ceb1` (3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main`; un-tagged checkpoint on top of `29ccc87`).
 
 **Backport relevance summary:**
 - **TRUNK-IRRELEVANT (doc-only + .sh-comment-only)**: zero source-logic change; zero engine source change. The commit broadens the reactivation surface for the deferred Option α/β closure-path investigation from "FORCED-only (any of the four §3.8.5 triggers firing)" to "FORCED + PERMITTED (any §3.8.5 trigger firing OR proactive at user discretion at any time)" per the user's verbatim 2026-05-13 night directive: _"It may be that we could come back and look at it and decide to do something about it"_. The 17c.0.5 cascade documentation had used the more restrictive "reactivated only on trigger" framing; this clarification corrects that across 6 in-tree surfaces (the 3 in the original 17c.0.5 cascade plus 3 more now extended at user request 2026-05-14 early morning).

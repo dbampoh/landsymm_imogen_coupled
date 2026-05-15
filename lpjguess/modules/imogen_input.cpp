@@ -1197,8 +1197,125 @@ void ImogenInput::preload_all_climate(Gridcell& gridcell,
 		// state-machine progression.
 		int imogen_year;
 		if (is_spinup) {
+			// [Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.6) — B17(b)
+			//  CLOSURE FIX (landed 2026-05-15, session 4 continuation;
+			//  PROACTIVE REVISIT exercised per notes/STEP_17c.md §3.8.5.5 5th
+			//  cadence bullet PERMITTED-reactivation surface, locked in via
+			//  17c.0.5-clarification commit e03ceb1).
+			//
+			//  THIS IS THE CANONICAL FORENSIC SITE for the B17(b) closure;
+			//  the symmetric 3 sites (this file's getclimate_for_year line
+			//  ~1296; imogencfx.cpp lines ~1465 + ~1565) carry shorter
+			//  cross-references back to this block to avoid duplication.
+			//
+			//  The previous formula was:
+			//      const int spinup_year_idx_for_this =
+			//          (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+			//  derived in notes/STEP_17a.md §5.4 (lines 215-245) at C1.1
+			//  introduction (commit 90401f2, 2026-05-10) based on the
+			//  INCORRECT premise that spinup_year_idx persists across cells
+			//  in gridcell_outer mode (per §5.4 line 226 verbatim: "Cell 1's
+			//  spinup year 0, day 0: starts from spinup_year_idx = 10
+			//  (carried from cell 0)"). The actual code at THIS file's
+			//  getgridcell() line 880 — and symmetrically imogencfx.cpp's
+			//  getgridcell() line 1122 — RESETS spinup_year_idx = 0 at the
+			//  start of every cell:
+			//      // new gridcell ensure, we start at index one for spinup
+			//      spinup_year_idx = 0;
+			//  Therefore the gridcell_outer reference behavior is: cell c,
+			//  spinup year y → imogen_year = FIRST_SPINUP_YEAR + (y %
+			//  NYEAR_SPINUP) for ALL cells (NO cell_idx dependence).
+			//
+			//  The previous formula's spurious `cell_idx * nyear_spinup`
+			//  term introduced a per-cell offset that gridcell_outer doesn't
+			//  have, causing cell c (c >= 1) in year_outer mode to use
+			//  spinup imogen_years shifted by c*nyear_spinup positions
+			//  relative to gridcell_outer. For nyear_spinup=2 +
+			//  4-cell xval (cells 0..3) this produced: cell 0 imogen
+			//  spinup years {1801, 1802} (matches gridcell_outer; cell_idx=0
+			//  zeroes the offset → cell 0 BIT-EXACT in all 17 affected
+			//  files); cell 1 {1803, 1804} (gridcell_outer used {1801,
+			//  1802}); cell 2 {1805, 1806}; cell 3 {1807, 1808}. The shift-
+			//  by-c*nyear_spinup pattern explains the empirical "cells 1, 2,
+			//  3 progressively diverge with cell_idx" localizer per
+			//  notes/STEP_17c.md §3.8.1 + §1.3.3 A.6.
+			//
+			//  Mechanism propagation: divergent spinup climate → divergent
+			//  vegetation state at end of spinup → divergent stochastic
+			//  ecological dynamics during historical years (PFT
+			//  establishment via randpoisson + fire/mortality via randfrac;
+			//  per §3.8.3 scientific interpretation) → cumulative drift in
+			//  per-PFT-total .out files (lai, cmass, anpp, cflux, cpool,
+			//  fpc, agpp, nflux, nmass, nuptake, nsources, nlitter, ngases,
+			//  cton_leaf, clitter, aaet) + tot_runoff. Per-LC summed files
+			//  (npool/anpp/cflux/cpool/nflux × cropland/natural/pasture; 15
+			//  files) UNAFFECTED because total biomass within each
+			//  landcover is approximately conserved across the spinup
+			//  perturbation; only the inter-PFT distribution differs.
+			//
+			//  Latency: bug latent since C1.1 (commit 90401f2, 2026-05-10).
+			//  Evaded detection through entire C1+C2 era because audit item
+			//  B15 (xval harness Class-1/Class-2 syntax false-positive;
+			//  closed 2026-05-13 at commit 019c9dd) silently degenerated
+			//  ALL xval Run B to gridcell_outer mode. The "37/37 BIT-EXACT
+			//  4-cell" result reported in the C1 close-out tag annotation
+			//  (v0.17.0-step17a-c1-year-outer-single-process; 2026-05-10)
+			//  and in notes/STEP_17a.md §6.2 + CHANGELOG + FOLLOWUPS +
+			//  TRUNK_R13078_BACKPORT_LEDGER as "empirically validated for
+			//  BOTH input modules across BOTH single-cell + multi-cell"
+			//  was a B15-style structural false positive: Run A AND Run B
+			//  both ran in gridcell_outer mode, producing identical output
+			//  trivially without ever exercising the year_outer code path.
+			//
+			//  After B15 was fixed at 17c.0.1+17c.0.2 (commit 019c9dd,
+			//  2026-05-13), 1cell xval gates 5+6 PASSED BIT-EXACT for the
+			//  FIRST TIME with year_outer actually exercised. They passed
+			//  because for cell_idx=0 the buggy formula
+			//  (0 * nyear_spinup + year_idx) % NYEAR_SPINUP reduces to
+			//  year_idx % NYEAR_SPINUP — coincidentally matching the
+			//  correct formula. The bug only manifests for cell_idx >= 1,
+			//  which is why gates 7+8 (4cell) were the first place it
+			//  surfaced (as B17(a) row-emission-order divergence + B17(b)
+			//  per-PFT-total drift). B17(a) was closed at 17c.0.4 via
+			//  harness sort-then-diff (.sh-only); B17(b) was reclassified
+			//  in §3.8 forensic + provisionally accepted at 2% tolerance
+			//  via 17c.0.4-followup §3.8.5 (commit 2771939). 17c.0.6 (this
+			//  fix) supersedes the provisional acceptance with mechanical
+			//  closure.
+			//
+			//  Verification expected post-fix: gates 7+8 4cell xval rc=0
+			//  with envelope 15 BIT_EXACT + 22 SORTED_EXACT + 0
+			//  SORTED_DIFFER (the 17 formerly-SORTED_DIFFER files become
+			//  SORTED_EXACT — content matches but row-emission-order still
+			//  cell-major vs year-major per B17(a)'s remaining harness-side
+			//  normalization). 1cell xval gates 5+6 unchanged (already
+			//  BIT-EXACT pre-fix because cell_idx=0 zeroes the buggy
+			//  offset).
+			//
+			//  Backport classification (notes/TRUNK_R13078_BACKPORT_LEDGER
+			//  .md): TRUNK-IRRELEVANT-by-novelty. preload_all_climate +
+			//  getclimate_for_year + the spinup_year_idx state-machine
+			//  reproduction formula are step-17a additions; the entire
+			//  year_outer code path doesn't exist in trunk_r13078. There
+			//  is nothing to backport.
+			//
+			//  Cross-references:
+			//  - notes/STEP_17c.md §3.8.6 (NEW; B17(b) closure record)
+			//  - notes/STEP_17c.md §3.8 (B17(b) forensic; PROVISIONAL
+			//    ACCEPTANCE superseded by §3.8.6 closure)
+			//  - notes/STEP_17c.md §3.8.5 + §3.8.5.5 (provisional
+			//    acceptance + cadence; both retired upon closure)
+			//  - notes/STEP_17a.md §5.4 (the original derivation; now
+			//    ERRATUM-superseded by §3.8.6)
+			//  - lpjguess/modules/imogen_input.cpp:880 (the per-cell
+			//    reset of spinup_year_idx that the original derivation
+			//    missed)
+			//  - lpjguess/modules/imogencfx.cpp:1122 (symmetric per-cell
+			//    reset)
+			//  - notes/FOLLOWUPS.md F-12 row + B17 status (CLOSED)
+			//  - DKB 2026-05-15]
 			const int spinup_year_idx_for_this =
-				(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+				year_idx % NYEAR_SPINUP;
 			imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
 		} else {
 			imogen_year = calendar_year;
@@ -1295,9 +1412,30 @@ bool ImogenInput::getclimate_for_year(Gridcell& gridcell,
 
 	int imogen_year;
 	if (is_spinup) {
+		// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15).
+		//  Symmetric application of the spinup_year_idx formula correction
+		//  on the read-side (getclimate_for_year). Removed the spurious
+		//  `cell_idx * nyear_spinup` term from the previous formula
+		//  `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` so that
+		//  the closed-form cache key computation matches the gridcell_outer
+		//  reference behavior (per-cell reset of spinup_year_idx in
+		//  getgridcell() at line 880; ALL cells use spinup imogen_years
+		//  that depend ONLY on year_idx).
+		//
+		//  Both write-side (preload_all_climate above at line ~1199) and
+		//  read-side (here) MUST use the IDENTICAL formula or the cache
+		//  key won't match between the two paths. Both sites are corrected
+		//  in this commit.
+		//
+		//  See canonical forensic block at preload_all_climate above
+		//  (~line 1199) for the full B17(b) closure forensic — origin in
+		//  notes/STEP_17a.md §5.4 derivation premise error, latency
+		//  through B15 masking, empirical fingerprint match, expected
+		//  post-fix verification envelope, and backport classification
+		//  TRUNK-IRRELEVANT-by-novelty. - DKB 2026-05-15]
 		const int year_idx = calendar_year - (firsthist - nyear_spinup);
 		const int spinup_year_idx_for_this =
-			(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP;
+			year_idx % NYEAR_SPINUP;
 		imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx_for_this;
 	} else {
 		imogen_year = calendar_year;

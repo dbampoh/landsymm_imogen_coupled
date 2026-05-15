@@ -17,6 +17,96 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 In progress per `EXECUTION_PLAN.md` Part V steps 0-19. See
 README.md "Roadmap" for the milestone schedule.
 
+### 2026-05-15 (early morning, session 4 continuation) — Step 17c (F-12 sub-milestone C3 PREP sub-phase 17c.0.6; **B17(b) MECHANICAL CLOSURE LANDED via 4-LOC surgical correction of the closed-form `spinup_year_idx` reproduction formula in `lpjguess/modules/imogen_input.cpp` + `lpjguess/modules/imogencfx.cpp` per new `notes/STEP_17c.md` §3.8.6, EXERCISING the §3.8.5.5 5th cadence bullet PERMITTED-reactivation surface introduced just hours earlier at 17c.0.5-clarification commit `e03ceb1` + C2 close-out tag (a)-refined annotation amendment BUNDLED in same commit/push event** — 11 in-tree files modified + 1 sibling artifact; +~1100/−~50 LOC across the cascade; 4-LOC source-affecting in `imogen_input.cpp` + `imogencfx.cpp` formula sites; ~150-LOC inline forensic doc-comment expansion at 4 fix sites + 2 .h header doc-block updates + the rest is documentation cascade; tagged `v0.17.6-step17c-b17b-closure` post-merge; 3-remote-converged at `origin/main`/`kit/main`/`helmholtz/main`; CSed onto `main` via fast-forward merge of feature branch `step17c-b17b-investigation`)
+
+This commit lands the **17c.0.6 sub-phase** of the Step 17c.0 PREP plan: B17(b) MECHANICAL CLOSURE via the spinup_year_idx formula correction, exercising the PERMITTED-reactivation surface introduced at 17c.0.5-clarification (commit `e03ceb1`, 2026-05-14 early morning) just hours earlier. The user authorised proactive revisit of B17(b) per the verbatim 2026-05-14 night directive _"I would prefer that we try to see if we can resolve the issue"_ and the 2026-05-15 ~01:44 UTC+2 verbatim directive _"Your recommended path sounds good to me"_, exercising the §3.8.5.5 5th cadence bullet PERMITTED-reactivation surface as designed. Bundled in same commit/push event: C2 close-out tag (a)-refined annotation amendment (`v0.17.5-step17b-c2-mpi-sync` annotation rewritten in place at `f6c192e` to reflect post-B15 + post-B17(a) + post-B17(b)-mechanical-closure verification status; SHA `f6c192e` preserved per (a) approach; original annotation text preserved within the new updated message for forensic completeness).
+
+User verbatim trigger (2026-05-14 night, session 4 continuation):
+
+  "rather than the recommended deferral, I think I would prefer that
+   we try to see if we can resolve the issue — at least examine the
+   various H4(a, b, c) options to see if any of them prove useful
+   solutions — what do you think about that?"
+
+User verbatim authorization (2026-05-15 ~01:44 UTC+2):
+
+  "Your recommended path sounds good to me. If the changes we
+   implement improve things by closing the divergence gap, then we
+   know it is a fixable issue and not just stochastic processes in
+   the model causing the divergences for which we implemented
+   tolerances."
+
+#### Root cause
+
+The closed-form `spinup_year_idx` reproduction formula `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` derived in `notes/STEP_17a.md` §5.4 at C1.1 introduction commit `90401f2` (2026-05-10) was based on a **false assumption** that `spinup_year_idx` persists across cells in gridcell_outer mode. The actual code at `lpjguess/modules/imogen_input.cpp:880` (and symmetrically `lpjguess/modules/imogencfx.cpp:1122`) RESETS `spinup_year_idx = 0` at the start of every cell inside `getgridcell()`. Therefore the gridcell_outer reference behavior is: cell c, spinup year y → `imogen_year = FIRST_SPINUP_YEAR + (y % NYEAR_SPINUP)` for ALL cells (NO cell_idx dependence). The §5.4 derivation's spurious `cell_idx * nyear_spinup` term introduced a per-cell offset that gridcell_outer doesn't have, causing cell c (c >= 1) in year_outer to use spinup imogen_years shifted by c*nyear_spinup positions relative to gridcell_outer. Cell 0 was bit-exact pre-fix because cell_idx=0 zeroes the spurious term (also the reason 1cell xval false-positive-PASSED through the entire 17c.0.1+ era).
+
+#### What landed (mechanical fix)
+
+The fix replaces `(cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP` with `year_idx % NYEAR_SPINUP` at FOUR symmetric sites:
+
+| # | File | Function | Side |
+|---|---|---|---|
+| 1 | `lpjguess/modules/imogen_input.cpp` | `ImogenInput::preload_all_climate` | write-side (cache populator); CANONICAL inline forensic block (~80 LOC) |
+| 2 | `lpjguess/modules/imogen_input.cpp` | `ImogenInput::getclimate_for_year` | read-side (cache consumer); cross-ref block (~25 LOC) |
+| 3 | `lpjguess/modules/imogencfx.cpp` | `IMOGENCFXInput::preload_all_climate` | write-side; cross-ref block (~30 LOC) |
+| 4 | `lpjguess/modules/imogencfx.cpp` | `IMOGENCFXInput::getclimate_for_year` | read-side; cross-ref block (~25 LOC) |
+
+Plus 2 header doc-block updates: `lpjguess/modules/imogen_input.h` (formula corrected in `preload_all_climate` doc block + B17(b) closure annotation block ~25 LOC) + `lpjguess/modules/imogencfx.h` (symmetric update).
+
+#### Verification (8-gate)
+
+| Gate | Scope | Pre-fix outcome (per §1.5 baseline) | Post-fix outcome (this commit) |
+|---|---|---|---|
+| 1 | `lpjguess/build/` rebuild (single-process) | NO-OP (binary sha256 stable) | ✅ exit 0; both .cpp recompiled; `guess` + `runtests` re-linked |
+| 2 | `lpjguess/build_mpi/` rebuild (MPI) | NO-OP (binary sha256 stable) | ✅ exit 0; both .cpp recompiled; both binaries re-linked |
+| 3 | `build/runtests` unit suite | 162/162 / 25 cases PASS | ✅ 162/162 / 25 cases PASS |
+| 4 | `build_mpi/runtests` unit suite | 162/162 / 25 cases PASS | ✅ 162/162 / 25 cases PASS |
+| 5 | `1cell imogen` xval | 37/37 BIT_EXACT exit 0 | ✅ 37/37 BIT_EXACT exit 0; banner_a=0 banner_b=5; NaN 0/0 |
+| 6 | `1cell imogencfx` xval | 37/37 BIT_EXACT exit 0 | ✅ 37/37 BIT_EXACT exit 0; banner_a=0 banner_b=5; NaN 0/0 |
+| **7** | **`4cell imogen` xval** | **15 BIT + 5 SORTED + 17 DIFFER + exit 2** (CONTROLLED-FAIL within §3.8.5 envelope) | ✅ **`15 BIT + 22 SORTED + 0 DIFFER + exit 0`**; banner_a=0 banner_b=5; NaN 0/0 |
+| **8** | **`4cell imogencfx` xval** | **15 BIT + 5 SORTED + 17 DIFFER + exit 2** (IDENTICAL envelope to gate 7) | ✅ **`15 BIT + 22 SORTED + 0 DIFFER + exit 0`** IDENTICAL envelope to gate 7 |
+
+The post-fix gate 7+8 envelope IDENTICALITY between LOOSE and TIGHT coupling mechanically confirms the §3.8.3 "coupling-invariance of B17(b)" empirical observation arose from the IDENTICAL bug pattern existing in BOTH input modules' closed-form formula sites (4 sites total: 2 in each .cpp), and the IDENTICAL fix yields the IDENTICAL closure outcome. The 17 previously-SORTED_DIFFER per-PFT-total + tot_runoff files are now ALL SORTED_EXACT (data identical between modes after row-order normalization); the residual difference is pure B17(a) row-emission-order which is the documented harness-side normalization, NOT model-state divergence.
+
+#### Status changes
+
+| Item | Pre-this-commit | Post-this-commit |
+|---|---|---|
+| **B17(a)** | CLOSED at 17c.0.4 (`027d90d`) | CLOSED (preserved) |
+| **B17(b)** | RECLASSIFIED + PROVISIONALLY ACCEPTED at 2% per §3.8.5; FORCED + PERMITTED reactivation surfaces per §3.8.5.5 | **MECHANICALLY CLOSED at 17c.0.6 (this commit) per new §3.8.6** |
+| **Combined audit B17** | PARTIALLY CLOSED (a closed; b provisionally accepted) | **CLOSED at 17c.0.6** |
+| **§3.8.5 provisional 2% tolerance** | ACTIVE | RETIRED-because-no-longer-applicable |
+| **§3.8.5.5 FORCED + PERMITTED reactivation cadence** | ACTIVE | RETIRED-with-honour-of-PERMITTED-surface-FIRING-ONCE-SUCCESSFULLY |
+| **Deferred-future-sub-phase-TBD** (Option α/β slot) | DEFERRED | RETIRED-SUPERSEDED at 17c.0.6 |
+| **C2 close-out tag `v0.17.5-step17b-c2-mpi-sync`** | ANNOTATION REFLECTS PRE-B15 ERA | ANNOTATION REWRITTEN IN PLACE per (a) approach (SHA preserved; original text included) |
+
+#### Backport classification
+
+**TRUNK-IRRELEVANT-by-novelty.** The year_outer code path + the spinup_year_idx state-machine reproduction formula are step-17a additions; the entire year_outer code path doesn't exist in `trunk_r13078`. There is nothing to backport. The .cpp/.h source changes + harness/notes/changelog/etc. doc cascade all collapse to TRUNK-IRRELEVANT. `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step-17c-17c.0.6-b17b-closure entry captures this.
+
+#### Forecasting lesson (candidate operational heuristic rule #9)
+
+When a forensic note (`notes/STEP_*.md`) contains a derivation that is materially relied upon by source-side code (e.g., closed-form state-machine reproduction formulas), an audit that re-checks the SOURCE CODE against the DERIVATION should be a standard step in any subsequent forensic deep-dive, NOT just a check of the source code against itself. **Trusted-input audits are independent-input audits.** Per `notes/STEP_17c.md` §3.8.6.9 — promotion to formal rule #9 deferred pending recurrence.
+
+#### v1.0 % done
+
+Revised UP to **~67-70%** (B17(b) mechanical closure is a meaningful substantive milestone — moves the 4cell year_outer envelope from "controlled-FAIL within 2% tolerance" to "BIT-EXACT after row-order normalization", strengthening the foundation for C3-era cluster work).
+
+#### Cross-references
+
+- `notes/STEP_17c.md` §3.8.6 (canonical closure record; ~10 nested sub-sections)
+- `notes/STEP_17c.md` §3.8.5 + §3.8.5.5 (provisional-acceptance + cadence sub-sections; both prepended with SUPERSEDED-BY-CLOSURE blocks pointing to §3.8.6)
+- `notes/STEP_17a.md` §5.4 ERRATUM block (NEW; marks original derivation as superseded by §3.8.6)
+- `notes/FOLLOWUPS.md` "Last updated" header refresh + B17 row → CLOSED
+- `EXECUTION_PLAN.md` row 17c update
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` NEW step-17c-17c.0.6-b17b-closure entry
+- `scripts/cross_validate_year_outer.sh` inline-comment updates (ZERO logic change; controlled-FAIL machinery preserved as regression detector)
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` NEW §6.1 (sibling artifact)
+- `lpjguess/modules/imogen_input.cpp` preload_all_climate (canonical inline forensic block at fix site)
+- `lpjguess/modules/imogen_input.cpp` getclimate_for_year (symmetric fix)
+- `lpjguess/modules/imogencfx.cpp` preload_all_climate (symmetric fix)
+- `lpjguess/modules/imogencfx.cpp` getclimate_for_year (symmetric fix)
+
 ### 2026-05-14 (early morning, session 4 continuation) — Step 17c (17c.0.5 clarification on top of `29ccc87`; **BROADEN B17(b) REACTIVATION SURFACE FROM FORCED-ONLY (§3.8.5 TRIGGER FIRING) TO FORCED + PERMITTED (PROACTIVE AT USER DISCRETION AT ANY TIME)** — 4 in-tree files modified; +N/−M LOC; ZERO source-logic change; ZERO behaviour change; pure-doc clarification across the cascade; un-tagged checkpoint above `29ccc87`)
 
 This commit is a **doc-only clarification** on top of 17c.0.5 commit
