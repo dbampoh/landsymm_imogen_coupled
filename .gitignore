@@ -102,6 +102,13 @@ runs/*/Common-directory/
 #  by re-running the mimic test. - DKB 2026-05-08]
 runs/*/parallel_work/
 
+# [Step 17c.0.7: workstation mpirun -np 4 mimic xval harness
+#  (scripts/cross_validate_mpi_4rank.sh) produces per-mode <mode>_<size>_runs/
+#  subdirs at runs/<SSP>/parallel_work_xval_mpi/. All regenerable by re-running
+#  the harness. Distinct from runs/<SSP>/parallel_work/ (Step 16) so the two
+#  artifact families don't collide. - DKB 2026-05-15]
+runs/*/parallel_work_xval_mpi/
+
 # [Step 16: cluster MPI build at lpjguess/build_mpi/ produced by
 #  scripts/cluster/make_guess.sh --mpi. Regenerable from source. - DKB 2026-05-08]
 lpjguess/build_mpi/

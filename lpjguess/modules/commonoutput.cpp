@@ -1756,6 +1756,18 @@ void CommonOutput::outannual(Gridcell& gridcell) {
 		}
 	}
 
+	// ngases.out output unit convention: kgN/ha/yr (i.e., mass-of-N basis,
+	// per hectare, per year). The * M2_PER_HA factor (where M2_PER_HA = 1E4
+	// per guessmath.h:34) converts the internal accumulator unit kgN/m2/yr
+	// (per Fluxes::N2O_FIRE/N2O_SOIL/NO_SOIL/NH3_SOIL/NOx_*/N2_* doc-comments
+	// at guess.h:1240-1257) to the per-hectare output unit. NOTE: NO mass-of-N
+	// to mass-of-molecule conversion is applied here -- in particular, the
+	// N2O_fire/N2O_soil columns are kgN/ha/yr (NOT kgN2O/ha/yr); to convert
+	// those columns to kg-N2O-molecules/ha/yr multiply by 44/28 (= N2O_PER_N
+	// per imogenoutput.cpp:84). This is in contrast to the IMOGEN handshake
+	// file imogen_lpjg_ch4_n2o_flux.txt, which reads the same raw kgN/m2/yr
+	// accumulator but applies both N2O_PER_N and a kg->Tg conversion to emit
+	// global TgN2O/yr (mass-of-N2O-molecules basis); see imogenoutput.cpp:283-285.
 	outlimit(out,out_ngases, flux_NH3_fire   * M2_PER_HA);
 	outlimit(out,out_ngases, flux_NH3_soil   * M2_PER_HA);
 	outlimit(out,out_ngases, flux_NOx_fire   * M2_PER_HA);

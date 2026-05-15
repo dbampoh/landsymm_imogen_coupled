@@ -72,10 +72,21 @@ static const double GRID_RES_DEG = 0.5;
 /// Molar-mass conversion: CH4 (16 g/mol) per CH4-C (12 g/mol).
 static const double CH4_PER_CH4C = 16.0 / 12.0;
 
-/// Molar-mass conversion: N2O (44 g/mol) per N (28 g/mol N2 basis = 14 g/mol N
-/// times 2 N atoms in N2O, hence 14 * 2 / 28 = 1; corrected: N2O contains 2 N
-/// atoms, so 1 mol N2O has 28 g of N. Therefore 1 kgN -> kgN2O multiplier =
-/// 44/28).
+/// Molar-mass conversion: kg N2O (molecule mass) per kg N (atom mass) when
+/// the N atoms reside inside N2O molecules. N2O has 2 N atoms per molecule
+/// (molecular formula N=N=O), so 1 mol of N2O contains 2 mol of N atoms,
+/// i.e. 28 g of N (= 2 x 14). One mole of N2O weighs 44 g. Therefore the
+/// conversion factor from kgN-as-N2O (the LPJG soil/fire N-cycle budget
+/// convention; see Fluxes::N2O_FIRE + Fluxes::N2O_SOIL doc-comments at
+/// guess.h:1240/1251 -- doc-comment start lines for ENUMs at lines 1243/1256
+/// -- and the soil.N2O_mass pool doc-comment at guess.h:3850-3855) to kg of
+/// N2O molecules is 44/28 = 1.5714... Cross-ref: this is the kgN -> kgN2O
+/// conversion applied at flush_year() before the * 1e-9 kg -> Tg unit
+/// conversion for imogen_lpjg_ch4_n2o_flux.txt. NOTE: the ngases.out N2O_fire
+/// + N2O_soil columns are emitted in kgN/ha/yr (mass-of-N basis, NOT
+/// mass-of-N2O-molecules basis -- see commonoutput.cpp:1759-1771 inline-
+/// comment block); applying N2O_PER_N is what distinguishes the IMOGEN
+/// handshake's TgN2O/yr output from the ngases.out kgN/ha/yr output.
 static const double N2O_PER_N = 44.0 / 28.0;
 
 // =============================================================================

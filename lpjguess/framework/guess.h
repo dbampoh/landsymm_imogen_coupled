@@ -1237,16 +1237,22 @@ public:
 		NH3_FIRE,
 		/// NOx flux to atmosphere from fire
 		NOx_FIRE,
-		/// N2O flux to atmosphere from fire
+		/// N2O flux to atmosphere from fire (kgN/m2; mass-of-N basis -- the N
+		/// atoms inside the N2O molecules, NOT the N2O molecule mass; multiply
+		/// by 44/28 to convert to kgN2O/m2).
 		N2O_FIRE,
-		/// N2 flux to atmosphere from fire
+		/// N2 flux to atmosphere from fire (kgN/m2; mass-of-N basis).
 		N2_FIRE,
 		//---- Soil N transformation -----
-		/// NH3 flux from soil (ntransform)
+		/// NH3 flux from soil (ntransform) (kgN/m2; mass-of-N basis).
 		NH3_SOIL,
-		/// NO flux from soil (ntransform)
+		/// NO flux from soil (ntransform) (kgN/m2; mass-of-N basis).
 		NO_SOIL,
-		/// N2O flux in soil (ntransform)
+		/// N2O flux in soil (ntransform) (kgN/m2; mass-of-N basis -- the N
+		/// atoms inside the N2O molecules, NOT the N2O molecule mass; sourced
+		/// from soil.N2O_mass_d + soil.N2O_mass_w which are part of the soil
+		/// N-pool budget per ntransform.cpp:93; multiply by 44/28 to convert
+		/// to kgN2O/m2).
 		N2O_SOIL,
 		/// N2 flux from soil (ntransform)
 		N2_SOIL,
@@ -3837,14 +3843,19 @@ public:
 	double NO2_mass;
 	double NO2_mass_w;
 	double NO2_mass_d;
-	/// soil NO mass in pool (kgN/m2)
-	double NO_mass;
-	double NO_mass_w;
-	double NO_mass_d;
-	/// soil NO mass in pool (kgN/m2)
-	double N2O_mass;
-	double N2O_mass_w;
-	double N2O_mass_d;
+		/// soil NO mass in pool (kgN/m2)
+		double NO_mass;
+		double NO_mass_w;
+		double NO_mass_d;
+		/// soil N2O mass in pool (kgN/m2; mass-of-N basis -- i.e., kg of the
+		/// N atoms residing inside N2O molecules, NOT kg of the N2O molecules
+		/// themselves; multiply by 44/28 to convert to kg-N2O-molecules/m2.
+		/// Cross-ref: see Fluxes::N2O_FIRE/N2O_SOIL doc-comments at
+		/// guess.h:1240/1251 and the ntransform.cpp:93 N-pool conservation
+		/// budget where this pool participates).
+		double N2O_mass;
+		double N2O_mass_w;
+		double N2O_mass_d;
 	/// soil N2 mass in pool (kgN/m2)
 	double N2_mass;
 
