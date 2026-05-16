@@ -82,11 +82,28 @@ COMPONENT_A = [
     ('component_a_anthropogenic/rcmip_substitution/rcmip_comparison2_plotting.py',    'plotting',   'A: RCMIP comparison 2 (full totals)'),
 ]
 
+# [B28 fix 2026-05-16: COMPONENT_B order corrected so that
+#  lpjg_combined_and_fair_processing.py runs BEFORE lpjg_historical_plotting.py.
+#  ROOT CAUSE: lpjg_historical_plotting.py:162 reads lpjg_ch4_combined_annual.csv
+#  and needs the 14-column schema (Year + Wetland_TgCH4 + IFW_*best/lo/hi +
+#  Combined_*best/lo/hi + DCC_*best/lo/hi + CombinedDCC_*best/lo/hi). ONLY
+#  lpjg_combined_and_fair_processing.py writes that full 14-col schema (at
+#  line 108). lpjg_historical_processing.py SECTION 5 (lines 296-322) writes
+#  a SIMPLER 8-column variant (NO DCC columns; predates GMB 2025 DCC machinery)
+#  to the same path — that schema divergence is tracked as B29 audit item for
+#  future cleanup. Reordering here restores the documented design intent (per
+#  combined_and_fair_processing.py docstring: "This standalone helper exists
+#  for fast iteration on plot logic without re-streaming the large .gz
+#  inputs"). The helper's 14-col write OVERWRITES the simpler 8-col file
+#  produced by historical_processing SECTION 5 before the plotter consumes
+#  it. Discovered during B19 Phase 1 reproducibility re-run when the
+#  from-scratch run failed at step 30/43 with KeyError: 'CombinedDCC_TgCH4_best'.
+#  Bug is pre-existing in version_A's identical copy of run_all.py too. -DKB]
 COMPONENT_B = [
     ('component_b_natural/historical/lpjg_historical_processing.py',   'processing', 'B historical: LPJ-GUESS streaming 1901-2020'),
+    ('component_b_natural/full_trajectory/lpjg_combined_and_fair_processing.py', 'processing', 'B: combined CH4 + FAIR-ERF baseline (B28: must run BEFORE historical_plotting; overwrites simpler 8-col file from historical_processing SECTION 5 with full 14-col DCC schema)'),
     ('component_b_natural/historical/lpjg_historical_plotting.py',     'plotting',   'B historical: LPJ-GUESS 4-panel plot'),
     ('component_b_natural/scenarios/lpjg_scenario_processing.py',      'processing', 'B scenarios: LPJ-GUESS streaming 2021-2100'),
-    ('component_b_natural/full_trajectory/lpjg_combined_and_fair_processing.py', 'processing', 'B: combined CH4 + FAIR-ERF baseline'),
     ('component_b_natural/full_trajectory/lpjg_historical_scenario_plotting.py', 'plotting',   'B: 1901-2100 full-trajectory plot'),
 ]
 
