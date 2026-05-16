@@ -339,24 +339,66 @@ void ImogenOutput::flush_year(int year) {
 	// =========================================================================
 	{
 		const int next_year = year + 1;
-		// SPINUP / KEEPRUNNING / FIRSTCALL flags: in v1.0 we conservatively
-		// flag every year as non-spinup, keep-running, not-first-call so the
-		// IMOGEN engine just advances year-by-year. For genuine spin-up phase
-		// detection we'd need the first-historic-year and run-end year; that
-		// would be reading from FIRSTHISTYEAR / IYEND ins parameters which
-		// requires plumbing through the ins-file which is out of step-8 scope.
-		// The IMOGEN-side polling loop's FIRSTCALL handling is fine with
-		// FIRSTCALL=FALSE for year 2+ since the F-4 fix at step 7 makes the
-		// first-call special case not needed.
+		// =====================================================================
+		// [Step B19 Phase 0 (sub-item (i) closure) — 2026-05-16: SPINUP /
+		//  KEEPRUNNING / FIRSTCALL flags now read DYNAMICALLY from the
+		//  IMOGENConfig state-machine instead of hardcoded FALSE/TRUE/FALSE.
+		//
+		//  Why the original hardcoding was wrong (latent until B19):
+		//    The original hardcoding (committed at step 8 `a543e9d` 2026-05-06)
+		//    rationalised SPINUP=FALSE + FIRSTCALL=FALSE as "v1.0 conservative;
+		//    plumbing through the ins-file is out of step-8 scope". That
+		//    rationale was stale even at step-8 close-out: steps 7+8 landed
+		//    back-to-back and step 8 actually wired the full IMOGENConfig
+		//    plumbing for YEAR1 / IYEND / SPINUP / KEEPRUNNING / FIRSTCALL
+		//    (declare_parameter calls at imogencfx.cpp:265-270; namespace
+		//    declarations at parameters.h:560-565 + parameters.cpp:308-313).
+		//    The dynamic state machine lives at climatemodel.cpp:1181-1199
+		//    (updateImogenControlData) — flipping SPINUP→FALSE at YEAR1==1901,
+		//    FIRSTCALL→FALSE at IYEND>1900, KEEPRUNNING→FALSE at YEAR1==2100.
+		//    The Fortran engine reads imogen_lpjg.txt per-iteration via
+		//    SETTIN_LPJG (imogen_lpjg.f:447-448, 1865-1922) and USES SPINUP
+		//    / FIRSTCALL substantively: CO2 evolution gate (line 482-484
+		//    INCLUDE_CO2 + C_EMISSIONS), CO2_PPMV reset gate (line 520-522),
+		//    CO2.dat write logic (line 876), VARYEAR climate-variability
+		//    reset (line 461-463). Writing the wrong values produces
+		//    substantive engine-behaviour drift vs the design intent.
+		//
+		//  Why this bug was dormant in v1.0: F-10 architectural deadlock in
+		//    single-process mode means the engine never consumes a
+		//    LPJG-written imogen_lpjg.txt — only the bootstrap (per
+		//    scripts/run_coupled.sh:317-326) is ever read. The bug surfaces
+		//    only once F-12 deadlock-resolution lands, which is B19's surface.
+		//    Hence the Phase-0-BEFORE-Phase-4 ordering per notes/B19.md §8
+		//    Q1=BEFORE decision; see notes/B19.md §2 for the full Phase 0
+		//    investigation + decision narrative + Phase 0 landing record
+		//    at §2.5.
+		//
+		//  IMOGENConfig::* state authority: updateImogenControlData() at
+		//    climatemodel.cpp:1181-1199 is the SINGLE authoritative source
+		//    for SPINUP / KEEPRUNNING / FIRSTCALL state. It is called at
+		//    climatemodel.cpp:1172 inside the engine's IYEAR loop (per
+		//    engine iteration). The C++ side maintains the state across
+		//    iterations; we mirror it directly into imogen_lpjg.txt here
+		//    so the Fortran engine's per-iteration SETTIN_LPJG read picks
+		//    up the next-year-correct values.
+		//
+		//  - DKB 2026-05-16]
+		// =====================================================================
+		dprintf("[ImogenOutput] flush_year(%d): next_year=%d SPINUP=%s KEEPRUNNING=%s FIRSTCALL=%s\n",
+		        year, next_year,
+		        IMOGENConfig::SPINUP      ? "TRUE" : "FALSE",
+		        IMOGENConfig::KEEPRUNNING ? "TRUE" : "FALSE",
+		        IMOGENConfig::FIRSTCALL   ? "TRUE" : "FALSE");
 		std::ofstream f(handshake_dir + "imogen_lpjg.txt",
 		                std::ios::out | std::ios::trunc);
 		if (f.is_open()) {
 			f << "YEAR1 "      << next_year << " !IN First year of the numerical experiment\n";
 			f << "IYEND "      << next_year << " !IN Stop year of the ENTIRE run\n";
 			f << "YEAR1_LPJG " << next_year << " !IN First year of the whole LPJ-GUESS simulation\n";
-			f << "SPINUP FALSE !IN Are we in the spin-up phase of LPJ-GUESS?\n";
-			f << "KEEPRUNNING TRUE !IN control flag to keep imogen running\n";
-			f << "FIRSTCALL FALSE !IN Is this the very first call to IMOGEN from LPJ-GUESS\n";
+			f << "SPINUP "      << (IMOGENConfig::SPINUP      ? "TRUE" : "FALSE") << " !IN Are we in the spin-up phase of LPJ-GUESS?\n";
+			f << "KEEPRUNNING " << (IMOGENConfig::KEEPRUNNING ? "TRUE" : "FALSE") << " !IN control flag to keep imogen running\n";
+			f << "FIRSTCALL "   << (IMOGENConfig::FIRSTCALL   ? "TRUE" : "FALSE") << " !IN Is this the very first call to IMOGEN from LPJ-GUESS\n";
 		} else {
 			dprintf("[ImogenOutput] WARNING: could not open %simogen_lpjg.txt\n",
 			        handshake_dir.c_str());
