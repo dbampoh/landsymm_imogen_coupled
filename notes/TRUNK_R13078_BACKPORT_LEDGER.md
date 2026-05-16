@@ -2055,6 +2055,45 @@ No build or runtime verification needed (ZERO source-code touch). Documentation 
 
 ---
 
+### B19 (Phase 0 commit `d9c90d5` + Phase 1 INTERIM commit `4c83561` + Phase 1 CLOSE commit `9c7417c` + this catch-up doc-cascade commit): closed-loop coupled-pipeline verification — Phase 0 SPINUP/FIRSTCALL hardcoding fix + Phase 1 intermediary_py + step-13 adapter reproducibility PASS-with-bonus + B28 orchestrator-order bug fix + 5 NEW audit items filed (B28+B29+B30+B31+B32+B33) — **MIXED: B19 Phase 0 fix is TRUNK-IRRELEVANT-by-novelty (`lpjguess/modules/imogenoutput.cpp` is novel to the rebuild; doesn't exist in `trunk_r13078`); B28 fix is TRUNK-IRRELEVANT-by-novelty (`intermediary_py/` is novel to the rebuild); B19 Phase 1 doc cascade is TRUNK-IRRELEVANT-by-novelty (per-fork notes); B33 includes ONE TRUNK-RELEVANT sub-item (~5-LOC Fortran-side defensive warning at `imogen/code/imogen_lpjg.f:565-566` — deferred to B33's actual landing window which is recommended B19 Phase 2)**
+
+**Date span:** 2026-05-16 morning through 2026-05-16 evening (session 5; single calendar day; 3 substantive commits + 1 catch-up doc-cascade commit). **Commit hashes:** `d9c90d5` (B19 Phase 0; 2026-05-16 morning) + `4c83561` (B19 Phase 1 INTERIM = B28 orchestrator-order fix; 2026-05-16 afternoon) + `9c7417c` (B19 Phase 1 CLOSE; 2026-05-16 evening) + this catch-up commit (3-surface catch-up cascade; ZERO source change). All on working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote converged at `origin/b19-pipeline-verification`/`kit/b19-pipeline-verification`/`helmholtz/b19-pipeline-verification`.
+
+**Catch-up rationale**: B19 Phase 0 + Phase 1 INTERIM + Phase 1 CLOSE each used a lighter 3-file cascade (canonical doc + `notes/FOLLOWUPS.md` + any source code) instead of the full 6-surface cascade convention established since 17c.0.0 (canonical doc + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `_chat_artifacts/CHAT_HANDOFF` sibling). The under-cascade was an oversight, surfaced by user check-in at 2026-05-16 ~22:42 UTC+2 after the Phase 1 CLOSE commit's 3-remote push. This catch-up commit closes the 3-surface gap (`CHANGELOG.md` + `EXECUTION_PLAN.md` + this ledger) in a single bundled commit; the CHAT_HANDOFF sibling-artifact is deferred to next session boundary OR B19 Phase 5 close-out, whichever comes first.
+
+**Backport relevance summary (cumulative across all 3 substantive B19 commits + this catch-up):**
+
+- **B19 Phase 0 (`d9c90d5`)**: +54/-12 LOC in `lpjguess/modules/imogenoutput.cpp:341-401` (3 substantive LOC corrupting hardcoded `SPINUP=true, FIRSTCALL=true` ofstream writes to read `IMOGENConfig::*` state dynamically via `climatemodel.cpp:1181-1199 updateImogenControlData()`'s state machine + ~45-LOC inline-comment forensic rewrite + 5-LOC dprintf observability). **TRUNK-IRRELEVANT-by-novelty**: `lpjguess/modules/imogenoutput.cpp` is novel to the rebuild (introduced at step 8 commit `a543e9d` 2026-05-06 for the LPJG-to-IMOGEN handshake-file writer); does not exist in `trunk_r13078`. ZERO eligible LOC contributed for backport.
+- **B19 Phase 1 INTERIM (`4c83561`)**: +18/-1 LOC in `intermediary_py/imogen_ghg_controller/run_all.py` (B28 orchestrator-order bug fix: re-ordered `COMPONENT_B` to move `lpjg_combined_and_fair_processing.py` from position 4 to position 2 — must run BEFORE `lpjg_historical_plotting.py` to populate `CombinedDCC_TgCH4_best` column the plotter requires; full forensic in `notes/B19.md` §3.4.1). **TRUNK-IRRELEVANT-by-novelty**: `intermediary_py/` is novel to the rebuild (Python pipeline added at step 10 + 11 + 13; entirely novel). ZERO eligible LOC contributed for backport.
+- **B19 Phase 1 CLOSE (`9c7417c`)**: pure doc cascade (`notes/B19.md` +95/-10 LOC + `notes/FOLLOWUPS.md` +10/-1 LOC + 7 PNG reverts in `intermediary_py/.../src/`); ZERO C++ or Fortran source change. **TRUNK-IRRELEVANT-by-novelty**: `notes/B19.md` + `notes/FOLLOWUPS.md` are per-fork notes; `intermediary_py/` PNG paths are novel; none exist in `trunk_r13078`. ZERO eligible LOC contributed for backport.
+- **This catch-up commit**: pure doc cascade across `CHANGELOG.md` + `EXECUTION_PLAN.md` + this ledger entry. ZERO source change. **TRUNK-IRRELEVANT-by-novelty**: the entire per-fork doc surface doesn't exist in `trunk_r13078`. ZERO eligible LOC contributed for backport.
+
+**Forward-look (filed at this commit; not landed yet)**: 3 NEW audit items B31 + B32 + B33 surfaced during the user-driven double-counting investigation at Phase 1 CLOSE (full forensic in `notes/B19.md` §3.4.2.3 + §3.4.2.4):
+- **B31** (launcher backbone auto-rewrite + runtime banner): MEDIUM severity; ~1-2 h; TRUNK-IRRELEVANT-by-novelty in entirety (`scripts/run_coupled.sh` + `runs/<SCEN>/imogen_intermediary.ins` are per-fork launcher + config; do not exist in `trunk_r13078`); recommended landing window B19 Phase 2. Will get its own ledger entry at its actual landing commit.
+- **B32** (`docs/scientific_framework.md` §1.5 natural-flux mutual-exclusion invariant doc): LOW severity; ~1 h; TRUNK-IRRELEVANT-by-novelty in entirety (`docs/scientific_framework.md` is per-fork; novel). Recommended landing window B19 Phase 5 close-out. Will get its own ledger entry at its actual landing commit.
+- **B33** (Option C POSIX-path robustness): MEDIUM severity; ~1 h; **PARTIALLY-TRUNK-RELEVANT** — sub-items (a) `.ins` relative paths + (b) launcher pre-flight check are TRUNK-IRRELEVANT-by-novelty; sub-item (c) `imogen/code/imogen_lpjg.f:565-566` defensive runtime warning (~5 LOC at the engine-side `OPEN(63, FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_FLUX)` site) **IS TRUNK-RELEVANT** if the Fortran engine source `imogen/code/imogen_lpjg.f` ships in `trunk_r13078`. Recommended landing window B19 Phase 2 (alongside B31). At B33's actual landing commit, the (c) sub-item should be re-verified for trunk applicability + backported per the same discipline as B10's symmetric Fortran fix (per the B10 entry at 2026-05-11 night).
+
+#### Files in this catch-up commit (all TRUNK-IRRELEVANT)
+
+| File | Change | Backport directive |
+|---|---|---|
+| `CHANGELOG.md` (NEW dated entry ~+90 LOC) | NEW [Unreleased] entry "2026-05-16 (full day; session 5) — B19 Phase 0 + Phase 1 INTERIM + Phase 1 CLOSE landing combined" capturing the full B19 Phase 0 + B28 + Phase 1 reproducibility + double-counting investigation + B31/B32/B33 filing narrative across the 4 commits. | DOC TRUNK-IRRELEVANT (per-fork changelog) |
+| `EXECUTION_PLAN.md` (+~15 LOC; row 17c B19-status prepend) | Row 17c update prepending B19-status note (Phase 0 ✅ + Phase 1 ✅ + Phase 2 NEXT) + cross-references to `notes/B19.md` §2.5 + §3.4.1 + §3.4.2 + V.1 step-row references for Phase 2 + Phase 3 + Phase 4 + Phase 5. | DOC TRUNK-IRRELEVANT (per-fork plan) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (THIS entry; +~80 LOC) | Records the B19 Phase 0 + Phase 1 INTERIM + Phase 1 CLOSE + this catch-up commits' classifications (all TRUNK-IRRELEVANT-by-novelty). Contributes ZERO eligible LOC for backport. Forward-looks B31 + B32 + B33 (with the B33(c) Fortran sub-item flagged as TRUNK-RELEVANT for backport at its eventual landing window). | DOC TRUNK-IRRELEVANT (self-referential) |
+
+#### Verification this catch-up commit (doc-cascade-only)
+
+No build or runtime verification needed (ZERO source-code touch in this catch-up). Documentation consistency verified via 3-surface visual review:
+- `CHANGELOG.md` new entry consistent with `notes/B19.md` §2.5 (Phase 0) + §3.4.1 (Phase 1 INTERIM) + §3.4.2 (Phase 1 CLOSE) + `notes/FOLLOWUPS.md` top-of-dashboard B19 Phase 1 entry
+- `EXECUTION_PLAN.md` row 17c B19-status prepend consistent with `notes/B19.md` Index + §11 Phase progress table
+- This ledger entry consistent with `notes/B19.md` §3.4.2.8 backport classification + `notes/B19.md` §3.4.2.4 B31/B32/B33 audit item descriptions
+
+Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean rebuild + 162/162 unit tests both builds at Phase 0 commit; no source change in `4c83561` Phase 1 INTERIM that affects `lpjguess/` or `imogen/code/`; no source change in `9c7417c` Phase 1 CLOSE; no source change in this catch-up).
+
+**Discipline note**: going forward (Phase 2 + Phase 3 + Phase 4 + Phase 5), each B19 sub-phase commit should match the 17c.0.X 6-surface cascade convention from its initial commit, not retroactively. The under-cascade pattern at Phase 0 + Phase 1 is closed at this catch-up commit and should not recur.
+
+---
+
 ## 4. Backport Sprint plan (executes after step 19's verification)
 
 1. **Setup** (~1 hour):
