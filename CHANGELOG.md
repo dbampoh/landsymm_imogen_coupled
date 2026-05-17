@@ -14,7 +14,80 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
-### 2026-05-17 (noon, session 5 continuation) — B19 Phase 2 Commit 2 of 3 LANDED — B33 sub-item (a) `.ins` Option C inline-comment strengthening; ZERO behavioral impact harness-verified — **1 documentation commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+### 2026-05-17 (afternoon, session 5 continuation) — B19 Phase 2 Commit 3 of 3 LANDED — B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145 LOC); the only TRUNK-RELEVANT piece of Phase 2 + first eligible-for-backport B19 LOC; 11 X-gates X0-X10 PASS; B33 audit item now fully ✅ CLOSED across all 3 sub-items — **1 source-code commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+
+This commit lands B19 Phase 2 Commit 3 of 3 per the user-approved Q3 = three-commits design. Closes B33 audit item fully (sub-items (a)+(b)+(c) all ✅) and contributes the first eligible-for-backport B19 LOC (per the LEDGER step 17b precedent: `imogen/code/imogen_lpjg.f` is canonical Huntingford-Cox engine source shipped with both `LandSyMM_LPJ-GUESS/` and `trunk_r13078/`). The 3-layer defense-in-depth against the "loose-masquerading-as-tight" POSIX path-concat footgun (canonical forensic at `COUPLED_MODEL_INVESTIGATION.md §3.7`; originating defect in the predecessor's setup) is now wired in across all entry points; a future "loose-masquerading-as-tight" failure mode requires deliberate, multi-step, well-informed disabling of every safety layer.
+
+**Per-commit narrative** (B19 Phase 2 Commit 3; final source-code commit of Phase 2; Phase 2 close-out pure-doc commit next):
+
+1. **B33 sub-item (c) ✅ CLOSED at this commit** — `imogen/code/imogen_lpjg.f` +145/-0 LOC (pure addition; pre 4555 → post 4700 LOC). Two structural additions:
+   - **NEW helper subroutine** `WARN_POSIX_CONCAT_COLLAPSE(PARAM_NAME, RESOLVED_PATH)` at EOF (after the `QSAT` final subroutine; new line 4584). ~125 LOC including a 53-LOC `C`-comment docblock that explains: (a) the POSIX-concat footgun mechanic with explicit `/A/B + /abs/path → /abs/path` arithmetic; (b) the 3-layer defense-in-depth (B31(a) auto-rewrite + B33(b) launcher pre-flight + this); (c) the call-site scope reduction rationale (4 risky sites only, not the maximal 5+2=7 forecast in the Commit 2 `.ins` comment block); (d) the warn-only-not-abort rationale.
+   - **4 CALL sites** at the risky concat sites (the sites using the user-supplied `FILE_LPJG_*` variables rather than literal filenames):
+     - L425 INQUIRE `FILE_LPJG_FLUX` (3 s polling loop)
+     - L432 INQUIRE `FILE_LPJG_CH4_N2O_FLUX` (polling loop, inside `IF(NONCO2_EMISSIONS)`)
+     - L631 OPEN(63) `FILE_LPJG_FLUX` (per-iteration read in the LPJG-flux-consuming block)
+     - L648 OPEN(64) `FILE_LPJG_CH4_N2O_FLUX` (per-iteration read inside `IF(NONCO2_EMISSIONS_LPJG)`)
+
+2. **Predicate**: `IF (INDEX(RESOLVED_PATH, '/IMOGEN//') .EQ. 0) RETURN`. The `/IMOGEN//` substring is the unambiguous signature of an absolute-path concat: when `FILE_LPJG_FLUX="/abs/path"`, the engine builds `<DIR_COMMON>/LPJG_main/IMOGEN//abs/path` where the `//` is exactly where POSIX collapse will follow. Non-pathological resolved paths return silently (zero overhead).
+
+3. **Per-parameter SAVE'd guards** (`WARNED_FLUX`, `WARNED_CH4`): the polling-loop INQUIRE fires every 3 s via `SLEEP(3)`; without per-parameter one-shot guards the engine stdout would flood with identical warnings. With them, each parameter warns at most once per engine lifetime — clean diagnostic + zero log spam.
+
+4. **Warn-only NOT abort**: the launcher's pre-flight check (B33(b) at Commit 1) is the authoritative abort point. This layer-3 defense exists for the case where the engine is launched **outside** the launcher (e.g., a manual `./imogen_lpjg` invocation with a hand-edited `.ins`, or a downstream consumer that bypasses the launcher entirely). Aborting at the engine layer for a config error caught upstream would be too aggressive.
+
+5. **Scope of wrapping (4 sites, not 7)**: the Commit 2 `.ins` comment block forecasted "per-call runtime warning at the 5 INQUIRE sites + 2 OPEN sites if the resolved path looks suspicious". This implementation rightfully scopes down to the 4 **risky** sites. The 3 INQUIRE sites at L411-418 + the OPEN(65,...`'done'`) at L654 + the two SETTIN_LPJG OPEN(82,...) sites at L1884/L1924 use **literal filenames** (`'done'`, `'error'`, `'imogen_lpjg.txt'`) which cannot carry the abs-path footgun (a literal can never start with `/`). Wrapping them adds zero defensive value and ~25 LOC of code bloat. The helper subroutine docblock documents this scope reduction explicitly.
+
+6. **11 verification gates X0-X10 ALL PASS** (per the rule-#10 verification-integrity discipline; 3rd clean operating datapoint):
+   - **X0** Static syntax (`gfortran -c -ffixed-line-length-132 -O imogen_lpjg.f nonco2.f` → compile clean exit 0) ✅
+   - **X1** Zero NEW warnings (`gfortran -Wall ... 2>&1 | grep -iE 'warn_posix|warned_flux|warned_ch4|b33'` → empty grep; all `-Wall` warnings are pre-existing unrelated to this commit: `REAL→INT` conversion + unused-dummy-arg in `qsat`/`regrid`/etc.) ✅
+   - **X2** Symbol present (`nm imogen_lpjg | grep warn_posix_concat_collapse_` → `00000000000084dc T warn_posix_concat_collapse_`) ✅
+   - **X3** ABI sanity (22 public Fortran symbols total; 1 new = `warn_posix_concat_collapse_`; 21 pre-existing all still `T`) ✅
+   - **X4** Binary size delta (pre 137832 → post 142112 = +4280 bytes / +3.1%) ✅
+   - **X5** Source LOC delta (pre 4555 → post 4700 = +145 LOC; matches design budget) ✅
+   - **X6** TEST 1 (FLUX pathological): helper warns on `'/IMOGEN//abs/flux.txt'` with FLUX param ✅
+   - **X7** TEST 2 (FLUX clean): helper silent on `'/IMOGEN/flux.txt'` (no `//`) with FLUX param ✅
+   - **X8** TEST 3 (CH4 pathological): helper warns on `'/IMOGEN//abs/ch4.txt'` with CH4 param ✅
+   - **X9** TEST 4 (FLUX 2nd-call): helper silent (suppressed by `WARNED_FLUX` SAVE guard) ✅
+   - **X10** TEST 5 (CH4 2nd-call): helper silent (suppressed by `WARNED_CH4` SAVE guard) ✅
+   - **Gate-aggregate**: exactly 2 warning blocks emitted across 5 test cases (`grep -c 'B33(c) POSIX-concat collapse detected' /tmp/b19_phase2_c3_warn_test.log` → 2; expected 2) ✅
+   - **Audit artifacts preserved**: `_chat_artifacts/b19_phase2_c3_warn_helper_extract_2026-05-17.f` (5236 bytes; extracted helper for standalone link) + `_chat_artifacts/b19_phase2_c3_warn_test_driver_2026-05-17.f` (1936 bytes; standalone driver with 5 test cases) + `_chat_artifacts/b19_phase2_c3_warn_test_2026-05-17.log` (2167 bytes; captured stdout)
+
+7. **Audit-item state transitions at this commit**:
+   - **B33 sub-item (c)**: ⏳ OPEN → ✅ **CLOSED**
+   - **B33 overall**: 🔧 PARTIAL → ✅ **CLOSED** (all 3 sub-items now ✅)
+   - **B31** + **A3** + **B29** + **B30** + **B32**: unchanged
+
+**Net source-code change this commit**: +145 / -0 = +145 LOC in 1 file (`imogen/code/imogen_lpjg.f`). ZERO `lpjguess/` source change; ZERO `intermediary_py/` source change; ZERO `scripts/` source change; ZERO `runs/` source change.
+
+**Backport classification**: **PARTIALLY TRUNK-RELEVANT**. The +145 LOC at `imogen/code/imogen_lpjg.f` is **the first eligible-for-backport B19 contribution** — per the LEDGER step 17b precedent (B10 Fortran writer fix at +121 LOC), the standalone Fortran engine source is canonical Huntingford-Cox code shipped with both `LandSyMM_LPJ-GUESS/` and `trunk_r13078/`. The Backport Sprint must locate `trunk_r13078`'s copy of `imogen/code/imogen_lpjg.f` (likely at the same path or `version_A/.../trunk/trunk_r13078/imogen/code/imogen_lpjg.f`) and apply the same change: insert `WARN_POSIX_CONCAT_COLLAPSE` at EOF + 4 CALL sites at the corresponding INQUIRE/OPEN sites (line numbers may differ in trunk; locate by `INQUIRE(FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_FLUX` pattern). All 6 doc-cascade surfaces are per-fork (TRUNK-IRRELEVANT). **Cumulative B19 eligible-for-backport state: +145 LOC** (entirely from this commit; Commits 1+2 were both TRUNK-IRRELEVANT-by-novelty).
+
+**Process learning** (reinforcement, not new): the verification-integrity discipline established at Commit 1 (after the verification-fabrication incident) is operating cleanly at Commit 3 — this is the **3rd clean operating datapoint** (Commit 1 = correction; Commit 2 = clean; Commit 3 = clean). Gates X0-X10 were authored BEFORE the documentation claims were written; claims cite concrete artifacts (file paths, log file path, sha1, command invocations); the standalone Fortran driver is preserved in `_chat_artifacts/` as auditable evidence. Rule #10 candidate (formalization at B19 Phase 5 close-out) is now well-justified by 3 independent operating instances. Cross-referenced from `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` Part 10c.
+
+**Materiality**: this commit closes B33 fully. The 3-layer defense-in-depth against the "loose-masquerading-as-tight" footgun is now wired in across all entry points:
+1. **Launcher-layer auto-rewrite** (B31(a) at Commit 1): launcher writes Option C with bare relative filenames whenever `--coupling-mode tight` is invoked.
+2. **Launcher-layer pre-flight abort** (B33(b) at Commit 1): launcher aborts BEFORE engine launch if `coupling_mode "tight"` + active `FILE_LPJG_*` starts with `/`.
+3. **Engine-layer runtime warning** (B33(c) at this commit): engine itself catches the residual case where it's launched outside the launcher.
+
+A future maintainer cannot accidentally re-introduce the predecessor's defect: they would have to deliberately disable the launcher's auto-rewrite (rare), override the pre-flight (explicit user action), AND ignore the engine-side warning (visible in stdout). The defense-in-depth thus provides 3 independent failure-stop layers vs the 0 that existed pre-B19 Phase 2.
+
+**v1.0 % done estimate revised UP to ~74-76%** (Commit 3 closes B33 fully + lands first eligible-for-backport B19 LOC; modest milestone forward from Commit 2's held estimate of ~73-75%).
+
+**NEXT**: Phase 2 close-out commit (~15-20 min: pure-doc 5-surface cascade summarizing all 3 Phase 2 commits + final B33 state + Phase 2 PASS verdict + Phase 3 opening-agenda confirmation). Then Phase 3 IMOGEN engine round-trip workstation smoke (~2-4 h estimated effort).
+
+**6-surface in-tree cascade + 1 sibling artifact + 3 audit artifacts**:
+ - `imogen/code/imogen_lpjg.f` +145/-0 (the only source-code touch; **TRUNK-RELEVANT — first eligible-for-backport B19 LOC**)
+ - `notes/B19.md` §4.4.3 NEW landing record + header status update + §11 row update + tail note (~+150 LOC)
+ - `notes/FOLLOWUPS.md` (top-of-dashboard entry + B33 row sub-item (c) ✅ CLOSED + B33 overall ✅ CLOSED) (~+6 / -3)
+ - `CHANGELOG.md` NEW dated entry (this entry; ~+55 LOC)
+ - `EXECUTION_PLAN.md` row 17c B19-status prepend for Commit 3 (~+3 / -1)
+ - `notes/TRUNK_R13078_BACKPORT_LEDGER.md` NEW B19 Phase 2 Commit 3 sub-entry (first eligible-for-backport B19 LOC + per-surface table + Backport Sprint addendum; ~+35 LOC)
+ - `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` NEW Part 10c (sibling artifact; outside `lpj-guess_imogen_landsymm` repo)
+ - `_chat_artifacts/b19_phase2_c3_warn_helper_extract_2026-05-17.f` + `b19_phase2_c3_warn_test_driver_2026-05-17.f` + `b19_phase2_c3_warn_test_2026-05-17.log` (3 audit artifacts; sibling; outside repo)
+
+**Landing record**: `notes/B19.md` §4.4.3 + `CHANGELOG.md` 2026-05-17 afternoon entry above + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` B19 Phase 2 Commit 3 sub-entry.
+
+---
+
+### 2026-05-17 (noon, session 5 continuation) — B19 Phase 2 Commit 2 of 3 LANDED — B33 sub-item (a) `.ins` Option C inline-comment strengthening; ZERO behavioral impact harness-verified — **1 documentation commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converged at `53e19f5`; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 This commit lands B19 Phase 2 Commit 2 of 3 per the user-approved Q3 = three-commits design. Pure-documentation hardening at `runs/SSP1-2.6/imogen_intermediary.ins` Option C block, scoped strictly to that block (Options A + B comments adequately mention POSIX-concat already; no scope creep). The expanded comment block now serves as the canonical maintainer-facing statement of the POSIX-concat constraint that gave rise to the predecessor's "loose-masquerading-as-tight" defect.
 

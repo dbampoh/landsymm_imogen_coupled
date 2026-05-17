@@ -2094,7 +2094,55 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 Phase 2 Commit 2 of 3 (this commit, 2026-05-17 noon session 5): B33 sub-item (a) `.ins` Option C inline-comment strengthening; ZERO behavioral impact harness-verified — **TRUNK-IRRELEVANT-by-novelty in entirety** (`runs/SSP1-2.6/imogen_intermediary.ins` is per-fork run config — the `runs/SSP1-2.6/` directory was created during the unified rebuild's run-setup arc and is absent from `trunk_r13078` which has only the source-code tree; all 5 doc-cascade surfaces are per-fork; 1 sibling artifact + 2 audit artifacts are outside-repo). **ZERO eligible LOC contributed for backport at this commit. (B33 sub-item (c) in upcoming Commit 3 remains the only TRUNK-RELEVANT piece of Phase 2 work, landing ~10-15 LOC at `imogen/code/imogen_lpjg.f` lines 411-425 + 619-632.)**
+### B19 Phase 2 Commit 3 of 3 (this commit, 2026-05-17 afternoon session 5): B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145/-0 LOC) — **PARTIALLY TRUNK-RELEVANT: the +145 LOC at `imogen/code/imogen_lpjg.f` is the FIRST eligible-for-backport B19 contribution** (per the step 17b B10 precedent that established the standalone Fortran engine source is canonical Huntingford-Cox code shared with `trunk_r13078/`). All 6 doc-cascade surfaces are per-fork (TRUNK-IRRELEVANT). 1 sibling artifact + 3 audit artifacts are outside-repo. **+145 eligible LOC contributed for backport at this commit; cumulative B19 backport state is now +145 LOC** (all from this commit; Commits 1+2 contributed ZERO eligible LOC).
+
+**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `53e19f5` (Phase 2 Commit 2).
+
+**What changed at the source-code surface**:
+
+`imogen/code/imogen_lpjg.f` (+145/-0 LOC, pure addition; pre 4555 → post 4700 LOC):
+1. **NEW helper subroutine** `WARN_POSIX_CONCAT_COLLAPSE(PARAM_NAME, RESOLVED_PATH)` at EOF (line 4584+; after the `QSAT` final subroutine). ~125 LOC including a 53-LOC `C`-comment docblock that explains the POSIX-concat footgun mechanic, the 3-layer defense-in-depth (B31(a) + B33(b) + this), the call-site scope reduction rationale (4 risky sites only — see "Scope of wrapping" sub-section in the docblock), and the warn-only-not-abort rationale.
+2. **4 CALL sites** at the risky concat sites (the sites using user-supplied `FILE_LPJG_*` variables rather than literal filenames):
+   - L425 INQUIRE `FILE_LPJG_FLUX` (3 s polling loop)
+   - L432 INQUIRE `FILE_LPJG_CH4_N2O_FLUX` (polling loop, inside `IF(NONCO2_EMISSIONS)`)
+   - L631 OPEN(63) `FILE_LPJG_FLUX` (per-iteration read)
+   - L648 OPEN(64) `FILE_LPJG_CH4_N2O_FLUX` (per-iteration read inside `IF(NONCO2_EMISSIONS_LPJG)`)
+
+Predicate: `IF (INDEX(RESOLVED_PATH, '/IMOGEN//') .EQ. 0) RETURN` — silent zero-overhead no-op for non-pathological resolved paths. Per-parameter SAVE'd guards (`WARNED_FLUX`, `WARNED_CH4`) prevent polling-loop log spam (each parameter warns at most once per engine lifetime).
+
+**Per-surface backport classification (this commit only):**
+
+| Surface | Δ (LOC) | Rationale | Backport |
+|---|---|---|---|
+| `imogen/code/imogen_lpjg.f` | **+145 / 0** | **Canonical Huntingford-Cox standalone Fortran IMOGEN engine source. Per LEDGER step 17b precedent (B10 Fortran writer fix at +121 LOC), this file is shipped with both `LandSyMM_LPJ-GUESS/` (our active dev base) AND `trunk_r13078/` (under `version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Integrations/trunk/trunk_r13078/imogen/code/imogen_lpjg.f` or equivalent path). The helper subroutine + 4 CALL sites are pure-additive, layered cleanly atop the existing engine code, with no semantic interaction with B10 or any other prior Fortran change. The predicate is conservative (only fires on unambiguous `/IMOGEN//` signature); the SAVE'd guards prevent log spam; the warn-only-not-abort policy means even an over-firing edge case can't break a trunk_r13078 run.** | **TRUNK-RELEVANT** — Backport Sprint must replicate. |
+| `notes/B19.md` (§4.4.3 NEW) | +~150 / -5 | Per-fork landing-record notes file (`notes/B19.md` introduced at B19 anchor commit `5a8b247` 2026-05-15; doesn't exist in `trunk_r13078`). | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `notes/FOLLOWUPS.md` | +~6 / -3 | Per-fork follow-ups + audit-trail file; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `CHANGELOG.md` | +~55 / 0 | Per-fork changelog; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork changelog) |
+| `EXECUTION_PLAN.md` | +~3 / -1 | Per-fork plan; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork plan) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (THIS entry) | +~35 / 0 | Self-referential per-fork ledger. | DOC TRUNK-IRRELEVANT (self-referential) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (Part 10c) | +~80 / 0 | Sibling artifact at parent-directory level; outside `lpj-guess_imogen_landsymm` repo proper. | N/A (sibling artifact) |
+| `_chat_artifacts/b19_phase2_c3_warn_helper_extract_2026-05-17.f` + `b19_phase2_c3_warn_test_driver_2026-05-17.f` + `b19_phase2_c3_warn_test_2026-05-17.log` (3 audit files) | +~9 KB | Sibling artifacts (extracted helper for standalone link + standalone 5-test driver + captured stdout from gates X6-X10). | N/A (sibling artifacts) |
+
+**Cumulative B19 backport state after this commit:** **+145 eligible LOC** (entirely from this commit; Phase 0 + Phase 1 INTERIM + Phase 1 CLOSE + catch-up + Phase 2 Commit 1 + Phase 2 Commit 2 all contributed ZERO eligible LOC). Significant transition: B19's contribution to the Backport Sprint scope is now non-zero.
+
+**Backport Sprint addendum (for the future Backport Sprint that replicates rebuild changes into `trunk_r13078`)**:
+
+1. **Locate** `trunk_r13078`'s copy of `imogen/code/imogen_lpjg.f`. Per LEDGER policy §1.1 + the B10 entry's verification, the file should exist at the same relative path or under `version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Integrations/trunk/trunk_r13078/imogen/code/imogen_lpjg.f`. If absent, this entry is N/A and can be skipped (same fallback as B10's directive).
+2. **Apply the change**:
+   - Insert `SUBROUTINE WARN_POSIX_CONCAT_COLLAPSE(PARAM_NAME, RESOLVED_PATH) ... END` at end-of-file (after the trunk's final subroutine, which is likely `QSAT` but may be different). Use the helper from `_chat_artifacts/b19_phase2_c3_warn_helper_extract_2026-05-17.f` as the canonical source.
+   - Insert 4 `CALL WARN_POSIX_CONCAT_COLLAPSE(...)` invocations at the 4 corresponding INQUIRE/OPEN sites. Locate by the pattern `INQUIRE(FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_FLUX` (the variable arg distinguishes risky sites from literal-filename sites). Line numbers in trunk may differ from our 425/432/631/648.
+3. **Verify** via the same 11 X-gates X0-X10 used here. The standalone driver at `_chat_artifacts/b19_phase2_c3_warn_test_driver_2026-05-17.f` is re-usable for X6-X10 verification against the trunk-side helper (just re-link against the trunk's helper).
+4. **Risk profile**: ZERO. The change is pure-additive at EOF + 4 CALL sites with a conservative predicate + warn-only policy. No risk of breaking existing trunk behavior. Even an over-firing edge case can't cause a run failure (the warning just appears in stdout).
+
+**Cross-reference to B10 precedent**: this is the second Fortran-engine backport-relevant B-item (after B10 at step 17b commit `3c00428`, +121 LOC). The Backport Sprint should handle B10 + B33(c) together since they live in the same file.
+
+**Process learning** (reinforcement of rule-#10 candidate first proposed at Commit 1; **3rd clean operating datapoint**): the verification-integrity discipline (gates X0-X10 authored BEFORE doc claims; claims cite concrete artifacts; standalone harness preserved) operated cleanly. Promotion to formal rule #10 at B19 Phase 5 close-out is well-justified.
+
+**What remains in B19 Phase 2**: Phase 2 close-out commit (pure-doc 5-surface cascade summarizing all 3 commits + final B33 ✅ state + Phase 2 PASS verdict + Phase 3 opening-agenda confirmation; ~15-20 min; TRUNK-IRRELEVANT).
+
+---
+
+### B19 Phase 2 Commit 2 of 3 (commit `53e19f5`, 2026-05-17 noon session 5; 3-remote-converged): B33 sub-item (a) `.ins` Option C inline-comment strengthening; ZERO behavioral impact harness-verified — **TRUNK-IRRELEVANT-by-novelty in entirety** (`runs/SSP1-2.6/imogen_intermediary.ins` is per-fork run config — the `runs/SSP1-2.6/` directory was created during the unified rebuild's run-setup arc and is absent from `trunk_r13078` which has only the source-code tree; all 5 doc-cascade surfaces are per-fork; 1 sibling artifact + 2 audit artifacts are outside-repo). **ZERO eligible LOC contributed for backport at this commit. (B33 sub-item (c) in Phase 2 Commit 3 above is the only TRUNK-RELEVANT piece of Phase 2 work, landing +145 LOC at `imogen/code/imogen_lpjg.f`.)**
 
 **Date:** 2026-05-17 noon (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `d7a0673` (Phase 2 Commit 1).
 

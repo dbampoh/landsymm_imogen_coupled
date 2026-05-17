@@ -419,10 +419,20 @@ C  INQUIRE inside the polling loop below.]
 
         INQUIRE(FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
      &    FILE_LPJG_FLUX,EXIST=RUNFLUX_EXIST,OPENED=RUNFLUX_OPEN)
+C [B33 sub-item (c) defensive runtime check; B19 Phase 2 Commit 3
+C  2026-05-17. SAVE'd one-shot per param so the 3 s polling loop
+C  doesn't flood stdout. See WARN_POSIX_CONCAT_COLLAPSE EOF docblock.]
+        CALL WARN_POSIX_CONCAT_COLLAPSE('FILE_LPJG_FLUX (INQUIRE)',
+     &    TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
+     &    TRIM(FILE_LPJG_FLUX))
 
         IF(NONCO2_EMISSIONS) THEN
           INQUIRE(FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
      &      FILE_LPJG_CH4_N2O_FLUX,EXIST=RUNNONCO2FLUX_EXIST,OPENED=RUNNONCO2FLUX_OPEN)
+          CALL WARN_POSIX_CONCAT_COLLAPSE(
+     &      'FILE_LPJG_CH4_N2O_FLUX (INQUIRE)',
+     &      TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
+     &      TRIM(FILE_LPJG_CH4_N2O_FLUX))
         ENDIF
 C        Print all the variable values to check them before the loop exits
         PRINT *, "RUNNOW_EXIST =", RUNNOW_EXIST
@@ -616,6 +626,11 @@ C in a file of CO2 concentrations for "Hydrology 20th Century" simulatio
 C Get land emissions/uptake from LPJ-GUESS - TP 13.07.15
         IF(C_EMISSIONS.AND.INCLUDE_CO2.AND.ANOM.AND.ANLG.AND.
      &   LAND_FEED.AND.LPJG_CFLUX) THEN
+C [B33 sub-item (c) defensive runtime check; B19 Phase 2 Commit 3
+C  2026-05-17. Once-per-engine-lifetime SAVE'd guard inside helper.]
+          CALL WARN_POSIX_CONCAT_COLLAPSE('FILE_LPJG_FLUX (OPEN 63)',
+     &      TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
+     &      TRIM(FILE_LPJG_FLUX))
           OPEN(63,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
      &      FILE_LPJG_FLUX)
           DO N=1,NYR_LPJG_FLUX
@@ -628,6 +643,12 @@ C Get land emissions/uptake from LPJ-GUESS - TP 13.07.15
 
           !Get non-CO2 GHG emissions as well if necessary
           IF(NONCO2_EMISSIONS_LPJG) THEN
+C [B33 sub-item (c) defensive runtime check; B19 Phase 2 Commit 3
+C  2026-05-17. Once-per-engine-lifetime SAVE'd guard inside helper.]
+            CALL WARN_POSIX_CONCAT_COLLAPSE(
+     &        'FILE_LPJG_CH4_N2O_FLUX (OPEN 64)',
+     &        TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
+     &        TRIM(FILE_LPJG_CH4_N2O_FLUX))
             OPEN(64,FILE=TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//
      &        FILE_LPJG_CH4_N2O_FLUX)
             DO N=1,NYR_LPJG_FLUX
@@ -4551,5 +4572,129 @@ C  generating O(GB) of unused output. The PAUSE halted non-interactive
 C  runs at the first QSAT call. See EXECUTION_PLAN.md V.1 step 2 and
 C  COUPLED_MODEL_INVESTIGATION.md section 8.1 bugs C10/C11.]
 C
+      RETURN
+      END
+
+!----------------------------------------------------------------------
+! WARN_POSIX_CONCAT_COLLAPSE -- defensive runtime check for the
+! "loose-masquerading-as-tight" POSIX path-concat footgun.
+! Added at B19 Phase 2 Commit 3 (B33 sub-item (c)); 2026-05-17. -- DKB
+!----------------------------------------------------------------------
+
+      SUBROUTINE WARN_POSIX_CONCAT_COLLAPSE(PARAM_NAME, RESOLVED_PATH)
+
+C [B33 sub-item (c) defensive runtime check; B19 Phase 2 Commit 3,
+C  2026-05-17. Detects the "loose-masquerading-as-tight" POSIX
+C  path-concat footgun documented in COUPLED_MODEL_INVESTIGATION.md
+C  §3.7. When a .ins file places an absolute path in FILE_LPJG_FLUX
+C  or FILE_LPJG_CH4_N2O_FLUX (e.g. "/home/me/flux.txt"), the engine
+C  concat
+C      TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_*
+C  produces a string like "<DIR_COMMON>/LPJG_main/IMOGEN//abs/path".
+C  POSIX collapses the leading "//" and the absolute portion takes
+C  precedence -- the engine silently reads /abs/path INSTEAD OF the
+C  LPJG live handshake file at <DIR_COMMON>/LPJG_main/IMOGEN/. The
+C  unambiguous pathological signature is the substring "/IMOGEN//"
+C  in the resolved (pre-collapse) path string. This subroutine fires
+C  a one-shot runtime warning (does NOT abort) when that signature
+C  is observed.
+C
+C  Three-layer defense-in-depth (this is layer 3):
+C    1. scripts/run_coupled.sh step 4.5 auto-rewrite (B31(a) at B19
+C       Phase 2 Commit 1) -- writes Option C with bare relative
+C       filenames whenever --coupling-mode tight is invoked.
+C    2. scripts/run_coupled.sh step 4.5 pre-flight (B33(b) at B19
+C       Phase 2 Commit 1) -- aborts BEFORE engine launch if
+C       coupling_mode "tight" + active FILE_LPJG_* starts with "/.
+C    3. THIS Fortran defensive PRINT at runtime (B33(c) at B19 Phase
+C       2 Commit 3 = this commit) -- catches the residual case
+C       where the engine is launched WITHOUT going through the
+C       launcher (e.g. a manual `./imogen_lpjg` invocation with a
+C       hand-edited .ins, or a downstream consumer that bypasses
+C       the launcher entirely).
+C
+C  Scope of wrapping: 4 call sites at lines ~420, ~427, ~624, ~636
+C  (the 2 INQUIRE sites for FILE_LPJG_FLUX + FILE_LPJG_CH4_N2O_FLUX
+C  in the polling loop + the 2 OPEN sites for the same variables in
+C  the once-per-year read block). The OTHER 3 INQUIRE sites at
+C  lines 411-418 + the OPEN(65,...'done') at line ~654 + the two
+C  SETTIN_LPJG OPEN(82,...) sites at lines ~1884/~1924 use LITERAL
+C  filenames ('done', 'error', 'imogen_lpjg.txt') which cannot
+C  carry the abs-path footgun, so wrapping them would add zero
+C  defensive value. The .ins comment block in runs/<SCEN>/
+C  imogen_intermediary.ins Option C section forecasts the MAXIMAL
+C  call-site enumeration ("5 INQUIRE + 2 OPEN sites"); this
+C  implementation rightfully scopes down to the 4 risky sites.
+C
+C  Warn-only (does NOT abort): the intent is to surface the silent
+C  failure mode in the engine stdout so a maintainer running the
+C  engine directly notices it. Aborting at the engine layer would
+C  be too aggressive since the launcher's pre-flight (layer 2) is
+C  the authoritative abort point. The polling-loop INQUIRE fires
+C  every 3 s via SLEEP(3); per-parameter SAVE'd guards
+C  (WARNED_FLUX, WARNED_CH4) ensure the warning fires AT MOST ONCE
+C  per parameter per engine lifetime. -- DKB]
+C
+      IMPLICIT NONE
+      CHARACTER*(*) PARAM_NAME
+      CHARACTER*(*) RESOLVED_PATH
+
+      LOGICAL WARNED_FLUX
+      LOGICAL WARNED_CH4
+      SAVE WARNED_FLUX
+      SAVE WARNED_CH4
+      DATA WARNED_FLUX /.FALSE./
+      DATA WARNED_CH4  /.FALSE./
+
+      IF (INDEX(RESOLVED_PATH, '/IMOGEN//') .EQ. 0) RETURN
+
+C One-shot per-parameter dispatch (CH4_N2O vs FLUX); harmless if
+C  PARAM_NAME doesn't match either keyword (silent return).
+      IF (INDEX(PARAM_NAME, 'CH4') .GT. 0) THEN
+        IF (WARNED_CH4) RETURN
+        WARNED_CH4 = .TRUE.
+      ELSE IF (INDEX(PARAM_NAME, 'FLUX') .GT. 0) THEN
+        IF (WARNED_FLUX) RETURN
+        WARNED_FLUX = .TRUE.
+      ELSE
+        RETURN
+      ENDIF
+
+      WRITE(6,'(A)') ' '
+      WRITE(6,'(A)')
+     &  '*** WARNING [B33(c) POSIX-concat collapse detected] ***'
+      WRITE(6,'(A,A)') '    Parameter: ', TRIM(PARAM_NAME)
+      WRITE(6,'(A,A)') '    Resolved:  ', TRIM(RESOLVED_PATH)
+      WRITE(6,'(A)')
+     &  '    The substring "/IMOGEN//" in the resolved path means'
+      WRITE(6,'(A)')
+     &  '    an absolute path was concatenated with the prefix'
+      WRITE(6,'(A)')
+     &  '    <DIR_COMMON>/LPJG_main/IMOGEN/. POSIX collapses "//"'
+      WRITE(6,'(A)')
+     &  '    and the abs path takes precedence -- the engine reads'
+      WRITE(6,'(A)')
+     &  '    /abs/path directly, NOT the LPJG live handshake file.'
+      WRITE(6,'(A)')
+     &  '    See COUPLED_MODEL_INVESTIGATION.md section 3.7 + the'
+      WRITE(6,'(A)')
+     &  '    OPTION C comment block in runs/<SCEN>/'
+      WRITE(6,'(A)')
+     &  '    imogen_intermediary.ins for context. Use BARE relative'
+      WRITE(6,'(A)')
+     &  '    filenames (no leading "/", no "./", no dir component)'
+      WRITE(6,'(A)')
+     &  '    in the .ins Option C block. The scripts/run_coupled.sh'
+      WRITE(6,'(A)')
+     &  '    launcher would normally auto-rewrite + pre-flight-'
+      WRITE(6,'(A)')
+     &  '    abort this; seeing this warning means the engine was'
+      WRITE(6,'(A)')
+     &  '    launched OUTSIDE the launcher. [B33(c) B19 Phase 2'
+      WRITE(6,'(A)')
+     &  '    Commit 3, 2026-05-17, DKB]'
+      WRITE(6,'(A)') ' '
+      CALL FLUSH(6)
+
       RETURN
       END
