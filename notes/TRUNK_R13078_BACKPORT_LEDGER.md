@@ -2094,9 +2094,36 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 Phase 2 Commit 3 of 3 (this commit, 2026-05-17 afternoon session 5): B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145/-0 LOC) — **PARTIALLY TRUNK-RELEVANT: the +145 LOC at `imogen/code/imogen_lpjg.f` is the FIRST eligible-for-backport B19 contribution** (per the step 17b B10 precedent that established the standalone Fortran engine source is canonical Huntingford-Cox code shared with `trunk_r13078/`). All 6 doc-cascade surfaces are per-fork (TRUNK-IRRELEVANT). 1 sibling artifact + 3 audit artifacts are outside-repo. **+145 eligible LOC contributed for backport at this commit; cumulative B19 backport state is now +145 LOC** (all from this commit; Commits 1+2 contributed ZERO eligible LOC).
+### B19 Phase 2 close-out (this commit, 2026-05-17 afternoon session 5): pure-doc 5-surface cascade summarising the 3 Phase 2 source-code commits — **TRUNK-IRRELEVANT-by-novelty in entirety** (no source-code change at this commit; all 5 doc-cascade surfaces are per-fork; 1 sibling artifact is outside-repo). **ZERO eligible LOC contributed for backport at this commit.**
 
-**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `53e19f5` (Phase 2 Commit 2).
+**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `6862d03` (Phase 2 Commit 3).
+
+**What changed at the source-code surface**: ZERO. Pure-doc commit. Cumulative B19 source-code surface across Phase 2 (Commits 1+2+3, excluding this close-out) was: `scripts/run_coupled.sh` (~+135/-10 at Commit 1; TRUNK-IRRELEVANT) + `runs/SSP1-2.6/imogen_intermediary.ins` (+47/-6 at Commit 2; TRUNK-IRRELEVANT) + `imogen/code/imogen_lpjg.f` (+145/-0 at Commit 3; **TRUNK-RELEVANT — first eligible-for-backport B19 LOC**).
+
+**Per-surface backport classification (this commit only):**
+
+| Surface | Δ (LOC) | Rationale | Backport |
+|---|---|---|---|
+| `notes/B19.md` (§0 header flip + §4.4.4 NEW + §11 row flip + tail) | +~150 / -5 | Per-fork landing-record notes file (`notes/B19.md` introduced at B19 anchor commit `5a8b247` 2026-05-15; doesn't exist in `trunk_r13078`). | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `notes/FOLLOWUPS.md` (NEW top-of-dashboard + B19 row update) | +~10 / -3 | Per-fork follow-ups + audit-trail file; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork notes) |
+| `CHANGELOG.md` (NEW Phase 2 close-out entry) | +~40 / -1 | Per-fork changelog; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork changelog) |
+| `EXECUTION_PLAN.md` (row 17c prepend) | +~3 / -1 | Per-fork plan; doesn't exist in `trunk_r13078`. | DOC TRUNK-IRRELEVANT (per-fork plan) |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (THIS entry) | +~20 / 0 | Self-referential per-fork ledger. | DOC TRUNK-IRRELEVANT (self-referential) |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (Part 10d) | +~80 / 0 | Sibling artifact at parent-directory level; outside `lpj-guess_imogen_landsymm` repo proper. | N/A (sibling artifact) |
+
+**Cumulative B19 backport state after this commit:** **+145 eligible LOC** (unchanged from Commit 3; this close-out commit is pure-doc and adds ZERO eligible LOC). All +145 LOC are at `imogen/code/imogen_lpjg.f` from Commit 3 (the `WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites).
+
+**Backport Sprint addendum (for the future Backport Sprint that replicates rebuild changes into `trunk_r13078`)**: no new directive at this commit. The B33(c) backport directive from Commit 3 (which see, immediately below) remains the authoritative + only directive for B19 Phase 2's Backport Sprint scope. The Backport Sprint should handle B10 (the +121 LOC writer fix from step 17b) and B33(c) (+145 LOC from Commit 3) together since they live in the same canonical engine source file (`imogen/code/imogen_lpjg.f`).
+
+**Process learning**: rule-#10 verification-integrity discipline (3 consecutive clean operating datapoints at Commits 1+2+3) is now well-justified for promotion to formal rule #10 at B19 Phase 5 close-out. This pure-doc close-out commit does not itself introduce a verification gate beyond cascade-integrity (verified at the commit-preparation step).
+
+**What remains in B19 Phase 2**: NOTHING. Phase 2 is now ✅ DONE with this commit. Next operational surface is **Phase 3 (IMOGEN engine round-trip workstation smoke; ~30-60 min wall + ~15-30 min analysis = ~1-1.5 h; acceptance gates B1-B6 per `notes/B19.md` §5)**.
+
+---
+
+### B19 Phase 2 Commit 3 of 3 (commit `6862d03`, 2026-05-17 afternoon session 5; 3-remote-converged): B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145/-0 LOC) — **PARTIALLY TRUNK-RELEVANT: the +145 LOC at `imogen/code/imogen_lpjg.f` is the FIRST eligible-for-backport B19 contribution** (per the step 17b B10 precedent that established the standalone Fortran engine source is canonical Huntingford-Cox code shared with `trunk_r13078/`). All 6 doc-cascade surfaces are per-fork (TRUNK-IRRELEVANT). 1 sibling artifact + 3 audit artifacts are outside-repo. **+145 eligible LOC contributed for backport at this commit; cumulative B19 backport state is now +145 LOC** (all from this commit; Commits 1+2 contributed ZERO eligible LOC).
+
+**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converged at `6862d03`). **Commit hash:** `6862d03`. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `53e19f5` (Phase 2 Commit 2).
 
 **What changed at the source-code surface**:
 

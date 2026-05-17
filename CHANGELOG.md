@@ -14,7 +14,43 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
-### 2026-05-17 (afternoon, session 5 continuation) — B19 Phase 2 Commit 3 of 3 LANDED — B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145 LOC); the only TRUNK-RELEVANT piece of Phase 2 + first eligible-for-backport B19 LOC; 11 X-gates X0-X10 PASS; B33 audit item now fully ✅ CLOSED across all 3 sub-items — **1 source-code commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+### 2026-05-17 (afternoon, session 5 continuation) — B19 Phase 2 ✅ DONE — close-out pure-doc commit (5-surface cascade summarising the 3 Phase 2 source-code commits + Phase 2 PASS verdict + Phase 3 opening-agenda confirmation at `notes/B19.md` §4.4.4) — **1 documentation commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+
+**Scope of this commit**: pure-doc 5-surface cascade aggregating the outcomes of B19 Phase 2's 3 source-code commits (Commit 1 `d7a0673` B31 launcher + B33(b) pre-flight + A3 bootstrap; Commit 2 `53e19f5` B33(a) `.ins` Option C comment; Commit 3 `6862d03` B33(c) Fortran defensive `PRINT *`) + flipping `notes/B19.md` §0 header status from "Phase 2 IN-PROGRESS" → "Phase 2 ✅ DONE" + flipping §11 status table row + confirming Phase 3 opening agenda. **ZERO source-code changes** at this commit. **Cumulative Phase 2 source-code delta** (Commits 1+2+3, excluding this close-out): 3 source files modified (`scripts/run_coupled.sh`, `runs/SSP1-2.6/imogen_intermediary.ins`, `imogen/code/imogen_lpjg.f`); +~327/-~16 LOC total; of which **+145 LOC are eligible-for-backport** (Commit 3's `imogen_lpjg.f` change); the other +~182 LOC are TRUNK-IRRELEVANT-by-novelty (launcher + .ins are downstream-only surfaces).
+
+**Phase 2 acceptance verdict — PASS**: A1-A6 acceptance gates (per `notes/B19.md` §4.1) all PASS at Commit 1; A3 sub-finding (SPINUP/FIRSTCALL/bootstrap-marker inconsistency) discovered during A1-A6 + fixed at Commit 1 via B31 sub-item (c); B31 + B33 + A3 audit items all ✅ CLOSED; 37 process gates total (A1-A6 + V0-V12 + W0-W6 + X0-X10 = 6+13+7+11) all PASS across the 3 commits.
+
+**3-layer defense-in-depth against the "loose-masquerading-as-tight" POSIX-concat footgun** (canonical forensic at `COUPLED_MODEL_INVESTIGATION.md` §3.7) is now fully wired in across all entry points to the IMOGEN engine: (1) launcher-layer auto-rewrite of `.ins` Option C → loose-coupling absolute-path triplet (B31(a) at Commit 1); (2) launcher-layer pre-flight abort on absolute path in tight-coupling mode (B33(b) at Commit 1); (3) engine-layer runtime `PRINT *` warning with per-parameter SAVE guards (B33(c) at Commit 3). 3 independent failure-stop layers vs the 0 that existed pre-B19 Phase 2.
+
+**Audit-item state matrix at Phase 2 close**: B31 ✅ CLOSED (at Commit 1); B33 sub-items (a)+(b)+(c) all ✅ CLOSED; B33 overall ✅ CLOSED; A3 ✅ CLOSED (at Commit 1); B29 + B30 + B32 unchanged (deferred per B19 audit-debt strategy; B32 scheduled for Phase 5).
+
+**Process learning — rule-#10 verification-integrity discipline** is now well-justified by 3 consecutive clean operating datapoints: Datapoint 1 = Commit 1 (rule-#10 violation caught + corrected mid-cascade; rule formally proposed); Datapoint 2 = Commit 2 (rule applied prospectively + clean execution); Datapoint 3 = Commit 3 (rule applied prospectively + clean execution; standalone Fortran driver authored + executed BEFORE the verification table was written). Promotion to formal rule #10 scheduled for B19 Phase 5 close-out per the established sequence. Proposed canonical statement (per Commit 3's commit message): _"Any verification-gate table in a landing record MUST cite a concrete artifact (file path, log line, sha1, command invocation) for each gate's PASS/FAIL outcome, OR explicitly mark the gate as NOT-YET-EXECUTED. Gates should be authored and executed BEFORE the documentation claims are written, not after."_
+
+**Cumulative B19 backport-debt state at Phase 2 close** (per `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 B19 group): **+145 LOC eligible-for-backport** — all from Commit 3's `imogen/code/imogen_lpjg.f` change. The Backport Sprint at B19 Phase 5 should handle B10 (the +121 LOC writer fix from step 17b) and B33(c) (+145 LOC from Commit 3) together since they live in the same canonical engine source file. Risk profile for both: ZERO (B10 = additive-only writer; B33(c) = additive-only + warn-only with conservative predicate).
+
+**Phase 3 opening-agenda confirmation** (per `notes/B19.md` §5; ACTIVE NEXT after this commit, ~30-60 min wall + ~15-30 min analysis = ~1-1.5 h):
+
+1. **Pre-flight**: `rm -rf runs/SSP1-2.6/Common-directory/IMOGEN/output/` (clear stale per-year output per `run_coupled.sh:336` pattern).
+2. **Smoke run**: `scripts/run_coupled.sh --backbone intermediary-py --coupling-mode prescribed --scenario SSP1-2.6 --smoke` end-to-end; capture log.
+3. **Acceptance gates B1-B6**: B1 = exit 0; B2 = handshake-file line counts non-zero; B3 = per-year IMOGEN output dirs created; B4 = `CO2.dat` has 8+ columns (CH4 + N2O cols 7+8 present per LandSyMM_LPJ-GUESS extension); B5 = no NaN/Inf/nan in any output `.dat`; B6 = log scan clean.
+4. **Phase 3 commit**: landing record at `notes/B19.md` §5.4 + optional log artefact under `_chat_artifacts/b19_phase3_smoke_run/`.
+
+**v1.0 % done estimate revised UP to ~77-79%** (from ~74-76% held at Commit 3; Phase 2 close is a small but real operational milestone closing the longest individual phase of B19 by audit-item count).
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (pure-doc; no source-code change; the 5 doc surfaces are all downstream-only). Cumulative B19 backport classification unchanged from Commit 3 (PARTIALLY TRUNK-RELEVANT; +145 LOC eligible).
+
+**5-file in-tree cascade at this commit + 1 sibling-artifact** (NO source-code touch + NO test-harness artifacts since pure-doc):
+
+- `notes/B19.md` — header status flip + NEW §4.4.4 close-out subsection (~+150 LOC) + §11 row Phase 2 flip + tail timestamp
+- `notes/FOLLOWUPS.md` — NEW top-of-dashboard entry + B19 row update reflecting Phase 2 ✅ DONE + Phase 3 ACTIVE NEXT
+- `CHANGELOG.md` — this entry
+- `EXECUTION_PLAN.md` — row 17c B19-status prepend for Phase 2 close
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` — NEW B19 Phase 2 close-out sub-entry (TRUNK-IRRELEVANT pure-doc; aggregates cumulative B19 backport state = +145 LOC eligible-for-backport)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` — NEW Part 10d (Phase 2 close + Phase 3 opening preview)
+
+**Files** (5 in-tree + 1 sibling): `notes/B19.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md`.
+
+### 2026-05-17 (afternoon, session 5 continuation) — B19 Phase 2 Commit 3 of 3 LANDED — B33 sub-item (c) Fortran defensive `PRINT *` at `imogen/code/imogen_lpjg.f` (+145 LOC); the only TRUNK-RELEVANT piece of Phase 2 + first eligible-for-backport B19 LOC; 11 X-gates X0-X10 PASS; B33 audit item now fully ✅ CLOSED across all 3 sub-items — **1 source-code commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converged at `6862d03`; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 This commit lands B19 Phase 2 Commit 3 of 3 per the user-approved Q3 = three-commits design. Closes B33 audit item fully (sub-items (a)+(b)+(c) all ✅) and contributes the first eligible-for-backport B19 LOC (per the LEDGER step 17b precedent: `imogen/code/imogen_lpjg.f` is canonical Huntingford-Cox engine source shipped with both `LandSyMM_LPJ-GUESS/` and `trunk_r13078/`). The 3-layer defense-in-depth against the "loose-masquerading-as-tight" POSIX path-concat footgun (canonical forensic at `COUPLED_MODEL_INVESTIGATION.md §3.7`; originating defect in the predecessor's setup) is now wired in across all entry points; a future "loose-masquerading-as-tight" failure mode requires deliberate, multi-step, well-informed disabling of every safety layer.
 
