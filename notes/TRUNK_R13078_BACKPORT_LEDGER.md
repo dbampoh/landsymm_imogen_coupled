@@ -2094,9 +2094,46 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 Phase 2 close-out (this commit, 2026-05-17 afternoon session 5): pure-doc 5-surface cascade summarising the 3 Phase 2 source-code commits — **TRUNK-IRRELEVANT-by-novelty in entirety** (no source-code change at this commit; all 5 doc-cascade surfaces are per-fork; 1 sibling artifact is outside-repo). **ZERO eligible LOC contributed for backport at this commit.**
+### B19 Phase 3 close (this commit, 2026-05-17 evening session 5): pure-doc 5-surface cascade landing the IMOGEN engine round-trip workstation smoke verification outcome (engine round-trip empirically validated end-to-end at 32 years 1871-1902; F-10 case-α deadlock confirmed at year 32 as expected; B3+B4+B5+B6 strict PASS; B1+B2 PARTIAL-FAIL under AMENDED §5.1.1 criteria; 3 NEW audit items B34+B35+B36 filed; rule-#10 verification-integrity discipline operating cleanly at 4 consecutive datapoints including the most challenging "partially-failing empirical case") — **TRUNK-IRRELEVANT-by-novelty in entirety** (no source-code change at this commit; all 5 in-tree doc-cascade surfaces are per-fork; 1 sibling artifact + 3 audit artefacts are outside-repo). **ZERO eligible LOC contributed for backport at this commit.**
 
-**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `6862d03` (Phase 2 Commit 3).
+**Date:** 2026-05-17 evening (session 5; single commit; 3-remote-converge pending). **Commit hash:** TBD at commit time. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `170039e` (Phase 2 close-out).
+
+**What this entry covers**: the Phase 3 landing commit's per-surface backport classification + the cumulative B19 backport-debt state at Phase 3 close. Phase 3 was a pure-doc commit landing the engine round-trip verification evidence — no source-code touch.
+
+**Per-surface backport classification at this commit**:
+
+| Surface | LOC | Why TRUNK-IRRELEVANT | Verdict |
+|---|---|---|---|
+| `notes/B19.md` (§0 header status flip + NEW §5.1.1 amendment + NEW §5.4.1 landing record + §11 row Phase 3 flip + tail timestamp) | +~250 / -~3 | Per-fork notes; doesn't exist in `trunk_r13078` | DOC TRUNK-IRRELEVANT |
+| `notes/FOLLOWUPS.md` (NEW top-of-dashboard entry with prior preserved + B19 dashboard row update + 3 NEW audit-item rows B34+B35+B36) | +~30 / -~3 | Per-fork notes; doesn't exist in `trunk_r13078` | DOC TRUNK-IRRELEVANT |
+| `CHANGELOG.md` (NEW dated [Unreleased] entry) | +~70 / 0 | Per-fork changelog; doesn't exist in `trunk_r13078` | DOC TRUNK-IRRELEVANT |
+| `EXECUTION_PLAN.md` (row 17c B19-status prepend for Phase 3 close) | +~3 / -~1 | Per-fork plan; doesn't exist in `trunk_r13078` | DOC TRUNK-IRRELEVANT |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry) | +~20 / 0 | Per-fork ledger; doesn't exist in `trunk_r13078` | DOC TRUNK-IRRELEVANT |
+| _sibling_ `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` (NEW Part 10e) | +~150 / 0 | Sibling artifact outside repo | N/A (sibling) |
+| _audit_ `_chat_artifacts/b19_phase3_smoke_run/post_run_state_2026-05-17.txt` | +367 / 0 | Sibling audit artifact outside repo | N/A (sibling) |
+| _audit_ `_chat_artifacts/b19_phase3_smoke_run/acceptance_evaluation_2026-05-17.md` | +~155 / 0 | Sibling audit artifact outside repo | N/A (sibling) |
+| _audit_ `_chat_artifacts/b19_phase3_smoke_run/launcher_static_iiasa_2026-05-17.log` | +37,013 / 0 | Sibling audit artifact outside repo (Run B full log) | N/A (sibling) |
+| **TOTALS (in-tree)** | **+~373 / -~7** | **all DOC TRUNK-IRRELEVANT** | **0 eligible LOC** |
+
+**Cumulative B19 backport state through Phase 3 close**: **+145 LOC eligible-for-backport** — unchanged from Phase 2 Commit 3 (`6862d03`). All +145 LOC are in `imogen/code/imogen_lpjg.f` (the `WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites). Phase 3 contributes ZERO eligible LOC since it is pure-doc.
+
+**Backport Sprint planning update**: the Backport Sprint at B19 Phase 5 should still handle B10 (+121 LOC from step 17b at `0b3a8c9`) and B33(c) (+145 LOC from Phase 2 Commit 3 at `6862d03`) together since both touch `imogen/code/imogen_lpjg.f`. Risk profile for both: ZERO (B10 = additive-only writer; B33(c) = additive-only + warn-only with conservative predicate `INDEX(RESOLVED_PATH, '/IMOGEN//') .EQ. 0`). Phase 3 verification empirically validated that B33(c) does not produce spurious warnings in normal operation (Run B `grep -c 'B33(c) POSIX-concat collapse detected' logs/run_coupled_SSP1-2.6_20260517_162617.log` = 0); B33(c)'s conservative predicate is empirically demonstrated to discriminate pathological from normal paths correctly.
+
+**NEW audit items filed at this commit (forward-look; not landed yet)**:
+
+- **B34** (year-range mismatch: smoke config 1871-1872 vs `intermediary-py` outputs 1900-2100; MEDIUM severity; recommended landing window = B19 Phase 5 close-out or post-B19 cleanup; possibly TRUNK-RELEVANT if fix touches engine source, but more likely TRUNK-IRRELEVANT since the affected surfaces are `intermediary_py/` + `scripts/run_coupled.sh` + `runs/SSP1-2.6/` smoke config which are all per-fork). NO LOC contributed at this commit; future-LOC contribution depends on chosen option (α extend intermediary_py ~3 h; β adjust smoke year range ~30 min; γ doc-only ~1 h).
+- **B35** (cosmetic launcher skip-message bug: hardcoded `backbone=static-iiasa` text even when `intermediary-py` is passed; LOW severity; trivial fix bundled with any future `scripts/run_coupled.sh` revision; TRUNK-IRRELEVANT since launcher is per-fork). NO LOC contributed at this commit; future-LOC contribution ~5-10 LOC sed-style.
+- **B36** (audit Fortran IMOGEN at `imogen/code/imogen_lpjg.f` for hardcoded background-emission constants or default-dataset fallbacks; cross-check against `intermediary_py` outputs to confirm no overlap/double-counting via embedded defaults; user-raised + reasonable; MEDIUM severity; recommended local v1 verification window between B19 close-out and 17c.1+ cluster phases; **possibly TRUNK-RELEVANT** if the audit surfaces any source-code fix needed at `imogen/code/imogen_lpjg.f` since that file is canonical Huntingford-Cox code shared with `trunk_r13078`; if audit confirms no defect, TRUNK-IRRELEVANT-by-finding). NO LOC contributed at this commit; future-LOC contribution depends on audit outcome (~0 LOC if no-defect; ~20-50 LOC if defect found requiring backport-eligible fix).
+
+**Process learning at this commit**: rule-#10 verification-integrity discipline operating cleanly at 4 consecutive datapoints (Phase 2 Commits 1+2+3 + this Phase 3 landing) — the 4th datapoint is the most challenging yet because the empirical outcome partially disagreed with the original §5.1 acceptance criteria. Rather than silently move the goalposts to claim PASS, the §5.1 criteria are AMENDED at `notes/B19.md` §5.1.1 to document the honest v1.0 capability surfaced by the verification; original criteria preserved for forensic value. The §5.4.1 landing record cites concrete artifacts (`_chat_artifacts/b19_phase3_smoke_run/post_run_state_2026-05-17.txt` line ranges) for each B1-B6 verdict per the rule #10 evidence-citation requirement. Promotion to formal rule #10 remains scheduled for B19 Phase 5 close-out; the 4 consecutive clean datapoints demonstrate the rule scales beyond clean-PASS scenarios.
+
+**What remains in B19 Phase 3**: NOTHING. Phase 3 is now ⚠️ PARTIAL-PASS DONE with this commit (engine-side scope satisfied; F-10 case-α deadlock confirmed as pre-existing limitation outside B19 scope). Next operational surface is **Phase 4 (closed-loop validation vs legacy A/B per `notes/B19.md` §6; ~2-6 h depending on outcome; defer-to-empirics + mixed-fallback tolerance per Q2; Stage 4a no-gate empirical drift envelope + Stage 4b tolerance lock-in)**.
+
+---
+
+### B19 Phase 2 close-out (commit `170039e`, 2026-05-17 afternoon session 5; 3-remote-converged): pure-doc 5-surface cascade summarising the 3 Phase 2 source-code commits — **TRUNK-IRRELEVANT-by-novelty in entirety** (no source-code change at this commit; all 5 doc-cascade surfaces are per-fork; 1 sibling artifact is outside-repo). **ZERO eligible LOC contributed for backport at this commit.**
+
+**Date:** 2026-05-17 afternoon (session 5; single commit; 3-remote-converged at `170039e`). **Commit hash:** `170039e`. On working branch `b19-pipeline-verification` off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; parent commit `6862d03` (Phase 2 Commit 3).
 
 **What changed at the source-code surface**: ZERO. Pure-doc commit. Cumulative B19 source-code surface across Phase 2 (Commits 1+2+3, excluding this close-out) was: `scripts/run_coupled.sh` (~+135/-10 at Commit 1; TRUNK-IRRELEVANT) + `runs/SSP1-2.6/imogen_intermediary.ins` (+47/-6 at Commit 2; TRUNK-IRRELEVANT) + `imogen/code/imogen_lpjg.f` (+145/-0 at Commit 3; **TRUNK-RELEVANT — first eligible-for-backport B19 LOC**).
 
