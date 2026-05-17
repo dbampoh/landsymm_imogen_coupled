@@ -14,7 +14,57 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
-### 2026-05-16/17 (night, session 5 continuation) — B19 Phase 2 Commit 1 of 3 LANDED — A1-A6 verification all PASS + B31 launcher backbone-aware refactor + B33 sub-item (b) launcher pre-flight + A3 bootstrap consistency fix BUNDLED — **1 source-code commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+### 2026-05-17 (noon, session 5 continuation) — B19 Phase 2 Commit 2 of 3 LANDED — B33 sub-item (a) `.ins` Option C inline-comment strengthening; ZERO behavioral impact harness-verified — **1 documentation commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+
+This commit lands B19 Phase 2 Commit 2 of 3 per the user-approved Q3 = three-commits design. Pure-documentation hardening at `runs/SSP1-2.6/imogen_intermediary.ins` Option C block, scoped strictly to that block (Options A + B comments adequately mention POSIX-concat already; no scope creep). The expanded comment block now serves as the canonical maintainer-facing statement of the POSIX-concat constraint that gave rise to the predecessor's "loose-masquerading-as-tight" defect.
+
+**Per-commit narrative** (B19 Phase 2 Commit 2; B33 sub-item (c) Fortran defensive PRINT deferred to Commit 3):
+
+1. **B33 sub-item (a) ✅ CLOSED at this commit** — `runs/SSP1-2.6/imogen_intermediary.ins` Option C block (lines 191-200 → expanded; +47/-6 LOC = +41 net). The expanded block now covers 5 elements:
+   - **Engine source-site citations**: explicit references to the 5 INQUIRE sites at `imogen_lpjg.f:411-425` (polling loop for `done`, `error`, `imogen_lpjg.txt`, `FILE_LPJG_FLUX`, `FILE_LPJG_CH4_N2O_FLUX`) + the 2 OPEN sites at `:619-632` (per-iteration `READ` of `FILE_LPJG_FLUX` + `FILE_LPJG_CH4_N2O_FLUX`). All 7 sites use the same concat pattern `TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_FLUX`.
+   - **POSIX-concat collapse mechanic spelled out**: "`/A/B` + `/abs/path` → `/abs/path`" with explicit statement of the leading `//`-collapse and abs-path-precedence rule. The Option A + Option B comments (lines 156-189) mention "POSIX path-concat collapse" only in passing; the Option C block is now the canonical statement.
+   - **"Loose-masquerading-as-tight" footgun label**: explicit cross-reference to `COUPLED_MODEL_INVESTIGATION.md §3.7` as the canonical forensic narrative.
+   - **3-layer defense-in-depth wired in**: documents auto-rewrite (B31(a) at Commit 1) + launcher pre-flight (B33(b) at Commit 1) + Fortran defensive PRINT (B33(c) at Commit 3 next). Future maintainers see the full safety picture rather than discovering pieces individually.
+   - **Maintainer directive**: if a static reference file is needed (not LIVE handshake), use Option A or Option B with `coupling_mode "prescribed"` — NOT Option C with an abs-path.
+
+2. **ZERO behavioral impact harness-verified**: per the rule-#10 verification-integrity discipline adopted at Commit 1 (after the verification-fabrication incident), a standalone dry-run harness was authored extracting the launcher's step-4.5 `toggle_ins_line` + case-statement + post-toggle `verify_one_active` predicate verbatim from `scripts/run_coupled.sh`, applying them to BOTH the pre-edit baseline (`git show d7a0673:.../imogen_intermediary.ins`) AND the post-edit working tree for each of the 5 (mode, backbone) tuples, and diffing the active-parameter-line content (line-numbers stripped) between baseline + modified. ALL 5+1 gates PASS:
+   - **W0** (pre-toggle baseline-vs-modified active-line content; line-nums stripped): IDENTICAL ✓
+   - **W1** (post-toggle `prescribed + static-iiasa`): active-line content IDENTICAL between baseline + modified ✓
+   - **W2** (post-toggle `prescribed + intermediary-py`): IDENTICAL ✓
+   - **W3** (post-toggle `tight + static-iiasa`): IDENTICAL ✓
+   - **W4** (post-toggle `tight + intermediary-py`): IDENTICAL ✓
+   - **W5** (loose-mode no-op): .ins UNCHANGED (loose branch correctly skips) ✓
+   - **W6** (post-toggle sha1 of `prescribed, static-iiasa`): baseline sha1 `e4e25ae3d7b9a6e63758e0a8c47623b5c0de3ede` (matches Commit 1's V5 idempotency sha1 — independent cross-verification that the harness reproduces the launcher's behavior deterministically across commits); modified sha1 `dbe1e01ba72374f632ceeb5f79e427c5f2beab6e` (differs by comment-block delta only; engine-relevant payload identical per W1-W5)
+   - Harness + run-log persisted as audit artifacts at `_chat_artifacts/b19_phase2_c2_zero_behavior_check_harness_2026-05-17.sh` (8708 bytes) + `_chat_artifacts/b19_phase2_c2_zero_behavior_check_2026-05-17.log` (1195 bytes).
+
+3. **Audit-item state transitions at this commit**:
+   - **B33 sub-item (a)**: ⏳ OPEN → ✅ **CLOSED**
+   - **B33 sub-item (c)**: ⏳ OPEN → ⏳ OPEN (deferred to Commit 3 per Q3)
+   - **B33 overall**: 🔧 PARTIAL (sub-item (b) closed at Commit 1) → 🔧 PARTIAL (sub-items (a)+(b) closed at this commit; (c) remains)
+
+**Net source-code change this commit**: +47 / -6 = +41 LOC in 1 file (`runs/SSP1-2.6/imogen_intermediary.ins`). All content is comment-only; ZERO active-line touch. ZERO `lpjguess/` source change; ZERO `imogen/code/` source change; ZERO `intermediary_py/` source change; ZERO `scripts/` source change.
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit. `runs/SSP1-2.6/imogen_intermediary.ins` is per-fork (the `runs/SSP1-2.6/` directory was created during the unified rebuild's run-setup arc; absent from `trunk_r13078` which has only the source-code tree). All 5 doc-cascade surfaces are per-fork. ZERO eligible LOC contributed for backport at this commit. **B33 sub-item (c) in upcoming Commit 3 remains the only TRUNK-RELEVANT piece of Phase 2 work.**
+
+**Process learning** (reinforcement, not new): the verification-integrity discipline established at Commit 1 (after the verification-fabrication incident) is operating correctly at Commit 2. The W0-W6 gates were authored BEFORE the documentation claims were written; the documentation claims cite the harness + log paths + the sha1 cross-check; the dry-run harness is preserved in `_chat_artifacts/` as the auditable evidence. Rule #10 candidate (formalization at B19 Phase 5 close-out) now has a second clean datapoint demonstrating it works.
+
+**v1.0 % done estimate held at ~73-75%** (Commit 2 is pure-doc hardening — defense-against-future-edits + maintainer-facing canonical statement; no fresh substantive milestone). **NEXT**: Commit 3 (~30-45 min: B33 sub-item (c) — Fortran defensive `PRINT *` at 5 INQUIRE + 2 OPEN sites in `imogen/code/imogen_lpjg.f`; the only TRUNK-RELEVANT piece of Phase 2; eligible LOC will be recorded for Backport Sprint) → Phase 2 close (pure-doc commit summarizing all 3 commits + final B33 state + Phase 2 PASS verdict + Phase 3 opening agenda) → Phase 3 IMOGEN engine round-trip workstation smoke.
+
+**6-surface in-tree cascade + 1 sibling artifact + 2 audit artifacts**:
+ - `runs/SSP1-2.6/imogen_intermediary.ins` +47/-6 (the only "source"-code touch; comment-only)
+ - `notes/B19.md` §4.4.2 NEW landing record + header status update + §11 row update + tail note (~+75 LOC)
+ - `notes/FOLLOWUPS.md` (top-of-dashboard entry + B33 row sub-item (a) ✅ CLOSED) (~+6 / -3)
+ - `CHANGELOG.md` NEW dated entry (this entry; ~+50 LOC)
+ - `EXECUTION_PLAN.md` row 17c B19-status prepend for Commit 2 (~+3 / -1)
+ - `notes/TRUNK_R13078_BACKPORT_LEDGER.md` NEW B19 Phase 2 Commit 2 sub-entry (~+18 LOC)
+ - `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` NEW Part 10b (sibling artifact; outside `lpj-guess_imogen_landsymm` repo)
+ - `_chat_artifacts/b19_phase2_c2_zero_behavior_check_*_2026-05-17.{sh,log}` (2 audit artifacts; sibling; outside repo)
+
+**Landing record**: `notes/B19.md` §4.4.2 + `CHANGELOG.md` 2026-05-17 noon entry above + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` B19 Phase 2 Commit 2 sub-entry.
+
+---
+
+### 2026-05-16/17 (night, session 5 continuation) — B19 Phase 2 Commit 1 of 3 LANDED — A1-A6 verification all PASS + B31 launcher backbone-aware refactor + B33 sub-item (b) launcher pre-flight + A3 bootstrap consistency fix BUNDLED — **1 source-code commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converged at `d7a0673`; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 This commit lands B19 Phase 2 Commit 1 of 3 per the user-approved Q3 = three-commits design (Q1 + Q2 + Q3 + Q4 approval at 2026-05-16 ~23:50 UTC+2 + 2026-05-17 ~00:00 UTC+2). Scope: A1-A6 verification gates per `notes/B19.md` §4.1 + B31 launcher backbone-aware `.ins` auto-rewrite + B33 sub-item (b) launcher pre-flight check + A3 bootstrap consistency fix (folded into B31 per Q1).
 

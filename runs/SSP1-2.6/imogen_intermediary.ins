@@ -189,12 +189,53 @@ FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/lands
 !! ALSO change: NYR_EMISS = 201, NYR_LPJG_FLUX = 201, YEAR1 = 1900
 
 ! ----------------------------------------------------------------------------
-! OPTION C (real tight coupling; un-testable in v1.0) -- relative filenames
-! so engine concat resolves to <DIR_COMMON>/LPJG_main/IMOGEN/<filename>
-! (where step 8's imogenoutput writer emits). Causes the F-10 architectural
-! deadlock in single-process mode (engine polls for LPJG-supplied files;
-! LPJG can't supply until init() returns; init() can't return until engine
-! finishes). Resolution at F-12 (multi-pass / two-process design).
+! OPTION C (real tight coupling; un-testable in v1.0 single-process) -- BARE
+! relative filenames (no leading "/", no "./" prefix, no directory component)
+! so the engine's POSIX path concatenation at
+!     imogen_lpjg.f:411-425  (INQUIRE polling loop; 5 sites)
+!     imogen_lpjg.f:619-632  (OPEN read sites for FILE_LPJG_FLUX +
+!                             FILE_LPJG_CH4_N2O_FLUX)
+! of the form
+!     TRIM(ADJUSTL(DIR_COMMON))//'/LPJG_main/IMOGEN/'//FILE_LPJG_FLUX
+! resolves CORRECTLY to <DIR_COMMON>/LPJG_main/IMOGEN/<filename> where the
+! step-8 imogenoutput writer + the d9c90d5 Phase 0 fix emit the per-year
+! handshake files. Causes the F-10 architectural deadlock in single-process
+! mode (engine polls for LPJG-supplied files; LPJG can't supply until init()
+! returns; init() can't return until engine finishes). Resolution at F-12
+! (multi-pass / two-process design).
+!
+! [B33 sub-item (a) hardening 2026-05-17: MAINTAINER-CRITICAL constraint --
+!  Option C entries MUST use BARE relative filenames. The Fortran POSIX-
+!  concat above collapses on absolute paths -- "/A/B" + "/abs/path" yields
+!  "/abs/path" (the leading "//" collapses to "/" and the absolute portion
+!  takes precedence over the relative prefix). This silently bypasses the
+!  LPJG live handshake at <DIR_COMMON>/LPJG_main/IMOGEN/ and reads the
+!  abs-path file as if it were a static reference -- the
+!  "loose-masquerading-as-tight" footgun documented in
+!  COUPLED_MODEL_INVESTIGATION.md §3.7 (canonical forensic; the originating
+!  defect in the predecessor's setup). The same collapse occurs at all 5
+!  INQUIRE sites at lines 411-425 + both OPEN sites at lines 619-632.
+!
+!  Defense-in-depth now wired in (NONE existed pre-B19 Phase 2):
+!    - Auto-rewrite (B31 sub-item (a) at scripts/run_coupled.sh step 4.5
+!      via content-based sed toggles): the launcher writes Option C with
+!      the correct bare relative form whenever --coupling-mode tight is
+!      invoked, regardless of the prior state of this file.
+!    - Launcher pre-flight (B33 sub-item (b) in scripts/run_coupled.sh
+!      step 4.5): if coupling_mode "tight" is set AND active FILE_LPJG_FLUX
+!      or FILE_LPJG_CH4_N2O_FLUX starts with `"/`, the launcher aborts with
+!      an explicit error message + reference to this §3.7 footgun + path
+!      to the backup at logs/imogen_intermediary.ins.bak.<timestamp>.
+!    - Fortran defensive PRINT (B33 sub-item (c); landing immediately at
+!      B19 Phase 2 Commit 3 next): per-call runtime warning at the 5
+!      INQUIRE sites + 2 OPEN sites if the resolved path looks suspicious
+!      (e.g., the resolved path starts with "//" or contains "/IMOGEN//").
+!
+!  If you need to use a static reference file (not a LIVE handshake), use
+!  Option A (predecessor's CMIP6 static IIASA reference) or Option B (the
+!  intermediary_py-derived adapter outputs) above -- both are designed for
+!  absolute paths via the same POSIX-concat collapse and REQUIRE
+!  coupling_mode "prescribed". -- DKB]
 ! ----------------------------------------------------------------------------
 !FILE_LPJG_FLUX          "imogen_lpjg_flux.txt"
 !FILE_LPJG_CH4_N2O_FLUX  "imogen_lpjg_ch4_n2o_flux.txt"
