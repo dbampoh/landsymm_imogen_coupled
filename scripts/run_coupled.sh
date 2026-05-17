@@ -214,6 +214,21 @@ echo "    CH4 / N2O        : Tg-of-gas/yr; 1 Mt = 1 Tg by mass identity"
 echo "    Year indexing    : LPJG year N flux drives IMOGEN year N+1 climate (IYEAR-1 lookup)"
 echo "    Cell area        : Earth radius 6371 km; 0.5 deg x 0.5 deg grid; spherical"
 echo
+# [B31 sub-item (b) 2026-05-16: explicit NATURAL flux source banner so launcher
+#  output unambiguously reports the active LPJ-GUESS<->IMOGEN handshake config.
+#  The source is determined deterministically from (COUPLING_MODE, BACKBONE) and
+#  the auto-rewrite at step 4.5 below makes the .ins file consistent with this.
+#  See notes/B19.md §3.4.2.4 + COUPLED_MODEL_INVESTIGATION.md §2.3+§3.7. -DKB]
+case "${COUPLING_MODE}-${BACKBONE}" in
+  prescribed-static-iiasa)   NATURAL_LABEL="static CMIP6 natural reference (Option A; v1.0 default)" ;;
+  prescribed-intermediary-py)NATURAL_LABEL="intermediary_py-derived (Option B; adapter outputs from runs/${SCENARIO}/inputs/)" ;;
+  tight-static-iiasa)        NATURAL_LABEL="LIVE LPJG handshake (Option C; F-10 deadlock applies in v1.0 single-process)" ;;
+  tight-intermediary-py)     NATURAL_LABEL="LIVE LPJG handshake (Option C; F-10 deadlock applies in v1.0 single-process)" ;;
+  loose-*)                   NATURAL_LABEL="loose-mode static climate library (handshake bypassed entirely)" ;;
+  *)                         NATURAL_LABEL="(unrecognized; check --coupling-mode + --backbone)" ;;
+esac
+echo "  NATURAL flux source: ${NATURAL_LABEL}"
+echo
 echo "  Paths:"
 echo "    ROOT          : ${ROOT}"
 echo "    Run dir       : ${RUN_DIR}"
@@ -311,23 +326,164 @@ fi
 # main loop hasn't started (init() hasn't returned). So we pre-populate
 # these as bootstrap files. After F-12 multi-pass design, this becomes
 # unnecessary (the orchestrator will manage handshake state).
+#
+# [B19 Phase 2 / B31 sub-item (c) 2026-05-16: bootstrap now ALWAYS-OVERWRITES
+#  (was: only-if-absent), and SPINUP is computed dynamically to match the
+#  climatemodel.cpp:1181-1199 state-machine semantics that the d9c90d5 Phase 0
+#  fix wired into the per-iteration writer at imogenoutput.cpp:399-401.
+#  Before this fix the bootstrap hardcoded SPINUP=FALSE, which (a) disagreed
+#  with the d9c90d5 dynamic semantics for any YEAR1<1901, and (b) could never
+#  be auto-corrected on re-run because of the if-not-exist guard. Now: bootstrap
+#  is always re-written; SPINUP follows the state machine. For smoke + production
+#  v1.0 configs (both have YEAR1=1871) this means SPINUP=TRUE on first iteration.
+#  v1.1 audit (B34? — not yet filed): make YEAR1_BOOT / IYEND_BOOT parameterizable
+#  for non-1871 start years. -DKB]
 _info "[4/7] Bootstrapping LPJG_main/IMOGEN/ handshake dir..."
 HSHAKE_DIR="${RUN_DIR}/Common-directory/LPJG_main/IMOGEN"
 mkdir -p "${HSHAKE_DIR}"
-if [ ! -f "${HSHAKE_DIR}/imogen_lpjg.txt" ]; then
-  cat > "${HSHAKE_DIR}/imogen_lpjg.txt" <<EOF
-YEAR1 1871 !IN First year of the numerical experiment
-IYEND 1872 !IN Stop year of the ENTIRE run
-YEAR1_LPJG 1871 !IN First year of the whole LPJ-GUESS simulation
-SPINUP FALSE !IN Are we in the spin-up phase of LPJ-GUESS?
+
+YEAR1_BOOT=1871
+IYEND_BOOT=1872
+if [ "${YEAR1_BOOT}" -lt 1901 ]; then SPINUP_BOOT="TRUE"; else SPINUP_BOOT="FALSE"; fi
+if [ "${IYEND_BOOT}" -gt 1900 ]; then FIRSTCALL_BOOT="FALSE"; else FIRSTCALL_BOOT="TRUE"; fi
+# Bootstrap == "this is the very first call from LPJG"; FIRSTCALL_BOOT is TRUE
+# by definition regardless of IYEND-derived state-machine semantics that apply
+# starting on iteration 2. Per imogen_lpjg.f:447-448, the Fortran engine reads
+# FIRSTCALL on every iteration; the d9c90d5 writer sets the per-iteration value
+# from IMOGENConfig::FIRSTCALL which is initialised TRUE and flipped FALSE at
+# climatemodel.cpp:1193 after IYEND>1900. So the bootstrap FIRSTCALL=TRUE is
+# correct seed for iteration 1; iteration 2+ gets per-iteration values from
+# the LPJG-side step-8 writer.
+FIRSTCALL_BOOT="TRUE"
+cat > "${HSHAKE_DIR}/imogen_lpjg.txt" <<EOF
+YEAR1 ${YEAR1_BOOT} !IN First year of the numerical experiment
+IYEND ${IYEND_BOOT} !IN Stop year of the ENTIRE run
+YEAR1_LPJG ${YEAR1_BOOT} !IN First year of the whole LPJ-GUESS simulation
+SPINUP ${SPINUP_BOOT} !IN Are we in the spin-up phase of LPJ-GUESS?
 KEEPRUNNING TRUE !IN control flag to keep imogen running
-FIRSTCALL TRUE !IN Is this the very first call to IMOGEN from LPJ-GUESS
+FIRSTCALL ${FIRSTCALL_BOOT} !IN Is this the very first call to IMOGEN from LPJ-GUESS
 EOF
-fi
 if [ ! -f "${HSHAKE_DIR}/done" ]; then
   echo "bootstrap" > "${HSHAKE_DIR}/done"
 fi
-_ok "[4/7] Bootstrap files: ${HSHAKE_DIR}/{imogen_lpjg.txt, done}"
+_ok "[4/7] Bootstrap files written: ${HSHAKE_DIR}/{imogen_lpjg.txt, done} (SPINUP=${SPINUP_BOOT}, FIRSTCALL=${FIRSTCALL_BOOT}, KEEPRUNNING=TRUE)"
+
+# =============================================================================
+# Step 4.5: Auto-rewrite imogen_intermediary.ins per (COUPLING_MODE, BACKBONE)
+# =============================================================================
+# [B19 Phase 2 / B31 sub-items (a)+(b) + B33 sub-item (b) 2026-05-16:
+#  surfaced by user-driven double-counting investigation at Phase 1 CLOSE
+#  (notes/B19.md §3.4.2). The .ins file has 3 NATURAL-flux Option blocks
+#  (A=static CMIP6 ref, B=intermediary_py-derived adapter outputs, C=relative
+#  paths for LIVE LPJG handshake) + 2 ANTHRO-emission Option blocks (A=DKB
+#  reference files, B=intermediary_py-derived adapter outputs). Pre-B31 the
+#  launcher accepted --coupling-mode + --backbone flags but did NOT rewrite
+#  the .ins to match -- user had to manually un-comment the correct block.
+#  Silent mis-config risk: user could think they're running intermediary-py
+#  but IMOGEN still reads Option-A CMIP6 reference.
+#
+#  Also wraps B33 sub-item (b) pre-flight: if coupling_mode "tight" is set
+#  but FILE_LPJG_FLUX uses an absolute path, abort with explicit error.
+#
+#  Strategy: content-based sed toggles (NOT line-number-based). Each parameter
+#  line is uniquely identifiable by its distinctive path content. Backup of
+#  .ins written to logs/ for audit + manual revert. Idempotent: re-running
+#  with same flags produces same .ins (no-op detected via diff vs current).
+#
+#  Cross-refs: notes/B19.md §3.4.2.4 (B31+B32+B33 audit-item descriptions),
+#  COUPLED_MODEL_INVESTIGATION.md §2.3 + §3.7 (no-double-counting + POSIX
+#  footgun), runs/SSP1-2.6/imogen_intermediary.ins lines 156-201. -DKB]
+
+_info "[4.5] Auto-rewrite imogen_intermediary.ins per (coupling_mode=${COUPLING_MODE}, backbone=${BACKBONE})..."
+
+INS_FILE="${RUN_DIR}/imogen_intermediary.ins"
+if [ ! -f "${INS_FILE}" ]; then
+  _err "Cannot auto-rewrite: ${INS_FILE} not found."
+  exit 1
+fi
+
+INS_BAK="${LOG_DIR}/$(basename "${INS_FILE}").bak.$(date '+%Y%m%d_%H%M%S')"
+cp "${INS_FILE}" "${INS_BAK}"
+
+# Determine target Option codes for NATURAL flux + ANTHRO emissions per (mode,backbone).
+# NATURAL_TARGET: A|B|C|SKIP   ANTHRO_TARGET: A|B|SKIP
+case "${COUPLING_MODE}-${BACKBONE}" in
+  prescribed-static-iiasa)    NATURAL_TARGET="A"; ANTHRO_TARGET="A" ;;
+  prescribed-intermediary-py) NATURAL_TARGET="B"; ANTHRO_TARGET="B" ;;
+  tight-static-iiasa)         NATURAL_TARGET="C"; ANTHRO_TARGET="A" ;;
+  tight-intermediary-py)      NATURAL_TARGET="C"; ANTHRO_TARGET="B" ;;
+  loose-*)                    NATURAL_TARGET="SKIP"; ANTHRO_TARGET="SKIP" ;;
+  *)                          _err "Unrecognized (mode,backbone) tuple: (${COUPLING_MODE}, ${BACKBONE})"; exit 2 ;;
+esac
+
+if [ "${NATURAL_TARGET}" = "SKIP" ]; then
+  _info "  loose mode: skipping .ins auto-rewrite (loose bypasses LPJG handshake entirely)"
+else
+  # toggle_ins_line FILE REGEX active|commented
+  # NB: patterns contain '/' (path separators), so we use '#' as the sed address
+  # delimiter via the POSIX \Xpattern\X form. None of our patterns contain '#'.
+  toggle_ins_line() {
+    local f="$1" pat="$2" want="$3"
+    if [ "${want}" = "active" ]; then
+      sed -i -E "\\#${pat}# { s/^!+[[:space:]]*// }" "${f}"
+    else
+      sed -i -E "\\#${pat}# { /^[[:space:]]*!/!s/^/!/ }" "${f}"
+    fi
+  }
+
+  # NATURAL Option A: CMIP6 static reference natural fluxes (distinctive content)
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_FLUX.*co2_pg_emissions_natural'         $( [ "${NATURAL_TARGET}" = "A" ] && echo active || echo commented )
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_CH4_N2O_FLUX.*ch4_n2o_annual_historical_natural' $( [ "${NATURAL_TARGET}" = "A" ] && echo active || echo commented )
+
+  # NATURAL Option B: intermediary_py-derived adapter outputs (distinctive runs/<SSP>/inputs/imogen_lpjg_*.txt)
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_FLUX.*runs/[^/]+/inputs/imogen_lpjg_flux\.txt' $( [ "${NATURAL_TARGET}" = "B" ] && echo active || echo commented )
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_CH4_N2O_FLUX.*runs/[^/]+/inputs/imogen_lpjg_ch4_n2o_flux\.txt' $( [ "${NATURAL_TARGET}" = "B" ] && echo active || echo commented )
+
+  # NATURAL Option C: relative paths -> LIVE LPJG handshake (short bare filename, no /)
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_FLUX[[:space:]]+"imogen_lpjg_flux\.txt"'         $( [ "${NATURAL_TARGET}" = "C" ] && echo active || echo commented )
+  toggle_ins_line "${INS_FILE}" 'FILE_LPJG_CH4_N2O_FLUX[[:space:]]+"imogen_lpjg_ch4_n2o_flux\.txt"' $( [ "${NATURAL_TARGET}" = "C" ] && echo active || echo commented )
+
+  # ANTHRO Option A: DKB_dataset_totals defaults (relative paths; NEVER abs-path footgun for anthro)
+  toggle_ins_line "${INS_FILE}" 'FILE_SCEN_EMITS.*DKB_dataset_totals/co2_emissions_annual_historical' $( [ "${ANTHRO_TARGET}" = "A" ] && echo active || echo commented )
+  toggle_ins_line "${INS_FILE}" 'FILE_CH4_N2O_EMITS.*DKB_dataset_totals/ch4_n2o_annual_historical'   $( [ "${ANTHRO_TARGET}" = "A" ] && echo active || echo commented )
+
+  # ANTHRO Option B: intermediary_py-derived adapter outputs
+  toggle_ins_line "${INS_FILE}" 'FILE_SCEN_EMITS.*runs/[^/]+/inputs/co2_anthro_emissions\.txt'        $( [ "${ANTHRO_TARGET}" = "B" ] && echo active || echo commented )
+  toggle_ins_line "${INS_FILE}" 'FILE_CH4_N2O_EMITS.*runs/[^/]+/inputs/ch4_n2o_anthro_emissions\.txt' $( [ "${ANTHRO_TARGET}" = "B" ] && echo active || echo commented )
+
+  # Also sync the engine-side coupling_mode line itself to match the launcher arg.
+  sed -i -E "s/^coupling_mode[[:space:]]+\"[a-z]+\"/coupling_mode       \"${COUPLING_MODE}\"/" "${INS_FILE}"
+
+  # Verify exactly 1 active FILE_LPJG_FLUX + 1 active FILE_LPJG_CH4_N2O_FLUX + 1 active FILE_SCEN_EMITS + 1 active FILE_CH4_N2O_EMITS
+  for p in FILE_LPJG_FLUX FILE_LPJG_CH4_N2O_FLUX FILE_SCEN_EMITS FILE_CH4_N2O_EMITS; do
+    n=$(grep -cE "^${p}[[:space:]]+" "${INS_FILE}" || true)
+    if [ "${n}" -ne 1 ]; then
+      _err "Post-rewrite verification FAILED: expected 1 active ${p} line; got ${n}"
+      _err "  Backup at ${INS_BAK}; revert via: cp '${INS_BAK}' '${INS_FILE}'"
+      exit 1
+    fi
+  done
+
+  # B33 sub-item (b) pre-flight: in tight mode, FILE_LPJG_FLUX must NOT be absolute
+  # (the engine's path-concat at imogen_lpjg.f:619-620 collapses absolute paths
+  # and bypasses the LPJG live handshake -- "loose-masquerading-as-tight" footgun
+  # per COUPLED_MODEL_INVESTIGATION.md §3.7).
+  if [ "${COUPLING_MODE}" = "tight" ]; then
+    abs_flux=$(grep -E "^FILE_LPJG_FLUX[[:space:]]+\"/" "${INS_FILE}" || true)
+    abs_ch4n2o=$(grep -E "^FILE_LPJG_CH4_N2O_FLUX[[:space:]]+\"/" "${INS_FILE}" || true)
+    if [ -n "${abs_flux}" ] || [ -n "${abs_ch4n2o}" ]; then
+      _err "B33 pre-flight FAILED: coupling_mode tight set but FILE_LPJG_FLUX/FILE_LPJG_CH4_N2O_FLUX use absolute path."
+      _err "  Absolute paths collapse via POSIX path-concat (imogen_lpjg.f:619-620) and bypass the LPJG live handshake."
+      _err "  Tight mode REQUIRES relative filenames (Option C: e.g. \"imogen_lpjg_flux.txt\")."
+      _err "  See COUPLED_MODEL_INVESTIGATION.md §3.7 for the full footgun forensic."
+      _err "  Backup at ${INS_BAK}; revert via: cp '${INS_BAK}' '${INS_FILE}'"
+      exit 1
+    fi
+  fi
+
+  _ok "  Rewrote ${INS_FILE} for NATURAL=Option-${NATURAL_TARGET} + ANTHRO=Option-${ANTHRO_TARGET}; coupling_mode line synced to \"${COUPLING_MODE}\"."
+  _ok "  Backup at ${INS_BAK}; idempotent re-run safe."
+fi
 
 # =============================================================================
 # Step 5: Clean stale per-year IMOGEN engine output (always; idempotent re-run)
