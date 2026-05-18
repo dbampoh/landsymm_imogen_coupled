@@ -39,8 +39,8 @@
 scenario              "cmip6"
 firstyear             1850
 lastyear              2100
-lpjg_start_year       1871   ! Smoke override: predecessor used 1901
-lpjg_end_year         1872   ! Smoke override: 2-year smoke
+lpjg_start_year       1900   ! [B19 Phase 3 addendum 2026-05-18 B34(β): shifted 1871→1900 for intermediary-py compat]
+lpjg_end_year         1901   ! [B19 Phase 3 addendum 2026-05-18 B34(β): shifted 1872→1901; 2-year smoke]
 
 baseDirectory                          ""   ! placeholder; intermediary_py at step 10+
 pathToLogFile                          ""
@@ -138,14 +138,14 @@ DIR_CLIM        "../../imogen/CRUNCEP_1960_1989/"
 
 ! Anthropogenic emission scenarios (committed Tier-1/Tier-2 mix; from
 ! imogen/emiss/DKB_dataset_totals/ via step 6 import).
-FILE_SCEN_EMITS    "../../imogen/emiss/DKB_dataset_totals/co2_emissions_annual_historical_rcp26_non_lpjg.txt"
+!FILE_SCEN_EMITS    "../../imogen/emiss/DKB_dataset_totals/co2_emissions_annual_historical_rcp26_non_lpjg.txt"
 ! [Step 9 fix 2026-05-07: was "../../imogen/emiss/RF_NONCO2_GHG_IS92A.dat"
 !  but that file has 243 rows starting at year 1859 - mismatch with
 !  NYR_NON_CO2=251 (which expects 251 rows starting at year 1850).
 !  Switched to scenario-specific SSP126 file (251 rows, 1850-2100;
 !  imported from version_B at step 9). - DKB]
 FILE_NON_CO2_VALS  "../../imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt"
-FILE_CH4_N2O_EMITS "../../imogen/emiss/DKB_dataset_totals/ch4_n2o_annual_historical_rcp26_non_lpjg_simulated.txt"
+!FILE_CH4_N2O_EMITS "../../imogen/emiss/DKB_dataset_totals/ch4_n2o_annual_historical_rcp26_non_lpjg_simulated.txt"
 
 ! ============================================================================
 ! [Step 9 + 13 EMPIRICAL: see coupling_mode comment above + F-10 + F-12]
@@ -160,8 +160,8 @@ FILE_CH4_N2O_EMITS "../../imogen/emiss/DKB_dataset_totals/ch4_n2o_annual_histori
 ! waiting for LPJG handshake (predecessor's "bug C35" mechanic, intentionally
 ! preserved as the only v1.0-single-process-functional configuration).
 ! ----------------------------------------------------------------------------
-FILE_LPJG_FLUX          "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/Co2/co2_pg_emissions_natural_historical_ssp126_1850_2100.txt"
-FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/CH4-N2O/ch4_n2o_annual_historical_natural_ssp126_1850_2100.txt"
+!FILE_LPJG_FLUX          "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/Co2/co2_pg_emissions_natural_historical_ssp126_1850_2100.txt"
+!FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/imogen/emiss/CMIP6/CH4-N2O/ch4_n2o_annual_historical_natural_ssp126_1850_2100.txt"
 
 ! ----------------------------------------------------------------------------
 ! OPTION B (added at step 13 of unified rebuild; intermediary_py-driven) --
@@ -174,19 +174,23 @@ FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/lands
 !       (per step 11; takes ~10 min via `python3 run_all.py --skip-plots`)
 !   (2) Adapter run produced runs/SSP1-2.6/inputs/{co2,ch4_n2o}*.txt
 !       (per step 13; takes <1 sec via this script)
-!   (3) Year-range params updated below: NYR_LPJG_FLUX / NYR_EMISS = 201
-!       (matches intermediary_py's 1900-2100 coverage), YEAR1 = 1900.
-!   (4) FILE_NON_CO2_VALS may need NYR_NON_CO2 = 201 too OR keep the
-!       251-row SSP126 NON_CO2 RF file at NYR_NON_CO2 = 251 (the engine
-!       reads only NYR_NON_CO2 rows starting at the file's first year).
-! Same F-10 deadlock applies as Option A (engine reads from absolute path,
-! ignores LPJG handshake; coupled-loop validity gated on F-12).
+!   (3) Year-range params updated below: NYR_LPJG_FLUX / NYR_EMISS / NYR_EMISS_NONCO2 = 201
+!       (matches intermediary_py's 1900-2100 coverage), YEAR1 = 1900, IYEND = 1901
+!       for the 2-year smoke. NYR_NON_CO2 stays 251 (FILE_NON_CO2_VALS is the
+!       1850-2100 251-row CMIP6 RF file regardless of backbone).
+!
+!   [B19 Phase 3 addendum 2026-05-18 B34(β)]: requirement (3) is now AUTOMATED
+!   by the launcher's step 4.5 NYR_* auto-rewrite — see scripts/run_coupled.sh
+!   "BACKBONE-determined NYR_* auto-rewrite" block. Manual edits here are no
+!   longer needed when the launcher is used; if you bypass the launcher you
+!   are responsible for setting NYR_* yourself per the matrix at
+!   notes/B19.md §5.4.2.
 ! ----------------------------------------------------------------------------
-!FILE_LPJG_FLUX          "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/imogen_lpjg_flux.txt"
-!FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/imogen_lpjg_ch4_n2o_flux.txt"
-!FILE_SCEN_EMITS         "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/co2_anthro_emissions.txt"
-!FILE_CH4_N2O_EMITS      "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/ch4_n2o_anthro_emissions.txt"
-!! ALSO change: NYR_EMISS = 201, NYR_LPJG_FLUX = 201, YEAR1 = 1900
+FILE_LPJG_FLUX          "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/imogen_lpjg_flux.txt"
+FILE_LPJG_CH4_N2O_FLUX  "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/imogen_lpjg_ch4_n2o_flux.txt"
+FILE_SCEN_EMITS         "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/co2_anthro_emissions.txt"
+FILE_CH4_N2O_EMITS      "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/runs/SSP1-2.6/inputs/ch4_n2o_anthro_emissions.txt"
+!! Above is now launcher-managed; manual NYR_* tweaking is unnecessary when run_coupled.sh is used.
 
 ! ----------------------------------------------------------------------------
 ! OPTION C (real tight coupling; un-testable in v1.0 single-process) -- BARE
@@ -263,11 +267,15 @@ CO2_INIT_PPMV   286.085
 CH4_INIT_PPBV   865.0
 N2O_INIT_PPBV   277.4
 
-! Number-of-years parameters: smoke uses 2-year window
-NYR_NON_CO2     251     ! RF_NONCO2_GHG_IS92A.dat covers full 1850-2100
-NYR_EMISS_NONCO2 251    ! Anthropogenic CH4+N2O emissions span
-NYR_EMISS       251     ! Anthropogenic CO2 emissions span
-NYR_LPJG_FLUX   251     ! LPJG flux file span (relevant when LPJG_CFLUX=1)
+! Number-of-years parameters: smoke uses 2-year window. NYR_* are now LAUNCHER-MANAGED
+! per backbone — see scripts/run_coupled.sh step 4.5 "BACKBONE-determined NYR_*
+! auto-rewrite" block. Static-iiasa = 251 (1850-2100 files); intermediary-py = 201
+! (1900-2100 files). NYR_NON_CO2 stays 251 (the CMIP6 RF file is 1850-2100 regardless
+! of backbone). [B19 Phase 3 addendum 2026-05-18 B34(β); landed at 17c.x.]
+NYR_NON_CO2     251     ! RF_NONCO2_GHG_IS92A.dat covers full 1850-2100; never auto-rewritten
+NYR_EMISS_NONCO2 201    ! Anthropogenic CH4+N2O emissions span; backbone=intermediary-py (auto-rewritten by run_coupled.sh step 4.5)
+NYR_EMISS       201     ! Anthropogenic CO2 emissions span; backbone=intermediary-py (auto-rewritten by run_coupled.sh step 4.5)
+NYR_LPJG_FLUX   201     ! LPJG flux file span; backbone=intermediary-py (auto-rewritten by run_coupled.sh step 4.5)
 
 ! Behavioural flags
 FILE_NON_CO2          1   ! Use non-CO2 RF file
@@ -316,11 +324,13 @@ param "file_tmax"    (str "./IMOGEN/output/YYYY/Tmax_anom.dat")
 !///////////////////////////////////////////////////////////////////////////////////////
 ! COUPLING params (LPJG <-> IMOGEN year-range coordination)
 !
-! Smoke: 2 years (1871-1872) per Decision 3 of step-9 plan.
+! Smoke: 2 years (1900-1901) per Decision 3 of step-9 plan + B19 Phase 3 addendum
+! 2026-05-18 B34(β) shift from 1871-1872 → 1900-1901 (intermediary-py compat).
+! Static-iiasa Option A files cover 1850-2100 so this range is in-range for either backbone.
 !///////////////////////////////////////////////////////////////////////////////////////
-YEAR1       1871    ! First year of the IMOGEN numerical experiment
-IYEND       1872    ! Stop year of the IMOGEN run (2-year smoke)
-YEAR1_LPJG  1871    ! First year of the LPJG main simulation (smoke: same as YEAR1)
+YEAR1       1900    ! First year of the IMOGEN numerical experiment [B34(β) 2026-05-18]
+IYEND       1901    ! Stop year of the IMOGEN run (2-year smoke) [B34(β) 2026-05-18]
+YEAR1_LPJG  1900    ! First year of the LPJG main simulation (smoke: same as YEAR1) [B34(β) 2026-05-18]
 SPINUP      0       ! Smoke: SPINUP done by LPJG nyear_spinup; IMOGEN doesn't spinup
 KEEPRUNNING 1       ! Engine main loop control flag
 FIRSTCALL   1       ! First call from LPJG (sentinel; flipped by step 8 writer afterwards)

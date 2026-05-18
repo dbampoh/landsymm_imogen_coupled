@@ -14,6 +14,56 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-18 (afternoon, session 5 continuation) — B19 Phase 3 ADDENDUM — Run C intermediary-py verification + B34 ✅ CLOSED via option β + B35 ✅ CLOSED + small launcher source extension (NYR_* auto-rewrite) — **1 source+doc commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+
+**Scope of this commit**: Phase 3 ADDENDUM landing the empirical verification of the IMOGEN engine round-trip on the **intermediary-py** backbone (Phase 3 Run B at `ed51e05` only verified static-iiasa) + closing 2 audit items surfaced at Phase 3 (B34 year-range mismatch + B35 cosmetic launcher skip-message). 6 source files modified (~+136/-37 LOC; 5 surface doc cascade ~+250 LOC; 1 sibling-narrative + 3 audit artefacts). All TRUNK-IRRELEVANT-by-novelty.
+
+**Source-code surface modifications**:
+
+- `runs/SSP1-2.6/main.ins` — smoke window shifted 1871-1872 → 1900-1901 in `firsthistyear / lasthistyear / firstoutyear / lastoutyear`; updated comment to cite B34(β); +13/-4 LOC.
+- `runs/SSP1-2.6/imogen_intermediary.ins` — `lpjg_start_year / lpjg_end_year` 1871/1872 → 1900/1901; `YEAR1 / IYEND / YEAR1_LPJG` 1871/1872/1871 → 1900/1901/1900; updated Option B docblock to reference the new launcher-managed NYR_* auto-rewrite (manual NYR_* tweaking no longer required when launcher is used); updated NYR_* trailing comments to reflect launcher-management semantics + cite B34(β); +33/-15 LOC.
+- `scripts/run_coupled.sh` — `YEAR1_BOOT / IYEND_BOOT` 1871/1872 → 1900/1901; **NEW backbone-determined NYR_* auto-rewrite block at step 4.5** (parallel to the existing FILE_* sed-toggle logic; maps `--backbone static-iiasa` → `NYR_EMISS=NYR_EMISS_NONCO2=NYR_LPJG_FLUX=251` and `--backbone intermediary-py` → `NYR_*=201`; `NYR_NON_CO2` stays 251 always); per-parameter post-rewrite verification with explicit error if exactly-1-active-line invariant violates; **B35 skip-message fix at lines 303,317** (now branches on `${BACKBONE}` and emits accurate text under all (--backbone × --no-intermediary × --no-adapter) combinations); doc-comment updates at lines 41 + 338-340 + 345-346; +80/-12 LOC.
+- `runs/SSP1-2.6/README.md` — example bootstrap block in the "Empirical findings" section updated for 1900-1901 + cites B34(β); +8/-3 LOC.
+- `scripts/cluster/run_coupled.sbatch` — `--smoke` help text updated to "4-cell + 1900-1901"; +1/-1 LOC.
+- `tools/imogen_inputs_to_lpjg_format.py` — comment update at line 68 to reflect smoke-window shift; +1/-1 LOC.
+
+**Run C executed 2026-05-18 16:59:27 → 17:18** (~9 min foreground; deliberately killed after F-10 case-α deadlock signature confirmed at year 4): `timeout 1500 scripts/run_coupled.sh --backbone intermediary-py --coupling-mode prescribed --scenario SSP1-2.6 --smoke --no-build --no-intermediary --no-adapter`. Engine produced **4 year-dirs (1900-1903)** with full 12-file climate output set per dir + `done` marker; smoke 2-year window (1900-1901) fully covered with 2 bonus years.
+
+**Phase 3 acceptance verdict for Run C — PARTIAL-PASS** under amended `notes/B19.md` §5.1.1 criteria (cross-verifying Run B's PARTIAL-PASS finding):
+
+- **B3+B4+B5+B6 ALL PASS** (4/4 strict PASS): per-year output dirs created (4 year-dirs 1900-1903); `CO2.dat` 8-column schema confirmed (1900: 285.829 ppm CO2 conc; 1901: 285.577 ppm; slight non-monotonic decline reflects intermediary-py LPJG sink dominating early-period anthro — physically sensible); zero NaN/Inf across 4×12=48 output files; zero ERROR/WARN/SEVERE/FATAL lines in 6,341-line log.
+- **B1+B2 PARTIAL-FAIL** (expected and reproduced; pre-existing F-10 case-α; 4th independent reproduction; outside B19 scope): engine completed 4 years then entered polling loop for `DONE` marker that LPJG main loop never wrote.
+- **B-active.ins ✅ PASS**: launcher's step 4.5 auto-rewrite confirmed Option B FILE_* lines active + NYR_*={EMISS:201, EMISS_NONCO2:201, LPJG_FLUX:201} + NYR_NON_CO2:251 untouched + coupling_mode "prescribed" + YEAR1=1900, IYEND=1901, YEAR1_LPJG=1900.
+
+**NEW empirical observation — productive-year-ceiling configuration-dependence**: Run B (static-iiasa, YEAR1=1871) ran **32 productive years** before F-10 case-α; Run C (intermediary-py, YEAR1=1900) ran only **4 productive years** before the same F-10 case-α. Both runs satisfy the F-10 case-α structural signature but the productive-year ceiling differs. Hypothesized causes (not verified): SPINUP state-machine interaction with YEAR1; engine pre-staging buffer logic; minimum of (NYR_*, IYEND-YEAR1+1) bound. Filed as NEW audit item **B37** for post-B19 explanatory follow-up; LOW priority; does not affect v1.0 verification mandate.
+
+**B19 Phase 2 source-code changes RE-VALIDATED by Run C** (cross-verifying Run B's validation): B31(a) `.ins` auto-rewrite emitted Option B banner + post-state confirms 4 active FILE_* lines; B31(b) banner deterministic per (mode, backbone); B31(c) bootstrap consistency (post-run `imogen_lpjg.txt` has SPINUP=TRUE + KEEPRUNNING=TRUE + FIRSTCALL=TRUE per A3 fix); B33(b) launcher pre-flight bypassed correctly in prescribed mode (no false-positive); A3 SPINUP/FIRSTCALL fix accepted by engine. **No regressions detected.**
+
+**F-10 case-α 4th independent reproduction**: Obs 1 = `notes/STEP_9.md` §4.4 (2026-05-11 era); Obs 2 = `notes/STEP_17c.md` §1.7 + `notes/B19.md` §9 R3 risk register; Obs 3 = Phase 3 Run B `ed51e05`; **Obs 4 = this Run C**. Same polling-loop signature, different productive-year ceiling. F-12 remains the eventual fix path.
+
+**Audit-item state matrix at this addendum**: B34 ⏳ → ✅ **CLOSED** via option β (smoke years + companion launcher NYR_* auto-rewrite); B35 ⏳ → ✅ **CLOSED** (skip-message bug fix bundled); B36 unchanged (still deferred to local v1 verification window between B19 close-out + 17c.1+ cluster phases); **B37 ⏳ NEW** (productive-year-ceiling explanatory study; LOW priority post-B19 work; possibly TRUNK-RELEVANT only if it surfaces a substantive code observation in canonical Fortran source); B31+B33+A3 unchanged ✅ from Phase 2; B29+B30+B32 unchanged.
+
+**Cumulative B19 backport-debt state at this addendum** (per `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 B19 group): **+145 LOC eligible-for-backport** — UNCHANGED from Phase 2 Commit 3 (this addendum is per-fork in entirety: launcher + .ins + downstream tool/doc surfaces).
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (`scripts/run_coupled.sh` + `runs/SSP1-2.6/` + per-fork docs/tools all downstream-only). Cumulative B19 backport classification unchanged from Phase 2 Commit 3 (PARTIALLY TRUNK-RELEVANT; +145 LOC eligible).
+
+**v1.0 % done estimate revised UP to ~82-84%** (from ~80-82% at Phase 3 Run B close-out `ed51e05`; the intermediary-py backbone is now validated end-to-end + B34/B35 closed + launcher hardened with NYR_* auto-rewrite (defensive against future backbone-switch silent mis-config)). The next substantive milestone is Phase 4 PASS (closed-loop validation vs legacy A/B; +5-8%).
+
+**Rule-#10 verification-integrity discipline operating cleanly at 5 consecutive datapoints**: Datapoints 1+2+3 = Phase 2 Commits 1+2+3; Datapoint 4 = Phase 3 Run B `ed51e05`; **Datapoint 5 = this Phase 3 addendum** — Run C's empirical productive-year ceiling differs from the §5.1.1 amendment's "≥32" expectation; the addendum honestly reports the divergence + files B37 for explanatory follow-up rather than retro-fitting §5.1.1 to fit the new datapoint. Promotion to formal rule #10 still scheduled for B19 Phase 5 close-out.
+
+**Phase 4 opening-agenda confirmation** (per `notes/B19.md` §6; ACTIVE NEXT after this commit, ~2-6 h depending on outcome): unchanged from Phase 3 close-out at `ed51e05`. Step 6.2.1 (locate legacy A reference engine output for equivalent smoke config) is the first action — note the smoke window is now 1900-1901, so legacy A reference data must cover that range; if it only covers older smoke ranges this may surface a new sub-issue.
+
+**5-file in-tree doc cascade + 6 source surfaces + 1 sibling-artifact + 3 audit artefacts**:
+
+- _source_: `runs/SSP1-2.6/main.ins` + `runs/SSP1-2.6/imogen_intermediary.ins` + `scripts/run_coupled.sh` + `runs/SSP1-2.6/README.md` + `scripts/cluster/run_coupled.sbatch` + `tools/imogen_inputs_to_lpjg_format.py`
+- _doc_: `notes/B19.md` (header status update + NEW §5.4.2 ~+150 LOC + §11 row update + tail timestamp); `notes/FOLLOWUPS.md` (this entry + B34 ✅ DONE flip + B35 ✅ DONE flip + B37 NEW row + B19 dashboard row update); `CHANGELOG.md` (this entry); `EXECUTION_PLAN.md` (row 17c B19-status prepend); `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW Phase 3 addendum sub-entry under §3 B19 group; cumulative state unchanged at +145 LOC)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` — NEW Part 10f (Run C narrative)
+- _audit_: `_chat_artifacts/b19_phase3_smoke_run/launcher_intermediary_py_1900_1901_2026-05-18.log` (~200 KB / 6,341 lines)
+- _audit_: `_chat_artifacts/b19_phase3_smoke_run/post_run_state_2026-05-18.txt` (~120 lines)
+- _audit_: `_chat_artifacts/b19_phase3_smoke_run/acceptance_evaluation_2026-05-18.md` (~150 lines; per-gate B1-B6 + B-active.ins + Z0-Z4 process gates with concrete-artifact citations)
+
+**Files** (5 in-tree doc + 6 source + 1 sibling-narrative + 3 audit): `notes/B19.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `runs/SSP1-2.6/main.ins` + `runs/SSP1-2.6/imogen_intermediary.ins` + `scripts/run_coupled.sh` + `runs/SSP1-2.6/README.md` + `scripts/cluster/run_coupled.sbatch` + `tools/imogen_inputs_to_lpjg_format.py` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` + audit bundle at `_chat_artifacts/b19_phase3_smoke_run/`.
+
 ### 2026-05-17 (evening, session 5 continuation) — B19 Phase 3 ⚠️ PARTIAL-PASS DONE — engine round-trip empirically verified end-to-end + F-10 case-α deadlock confirmed (3rd independent reproduction); pure-doc 5-surface cascade landing record (`notes/B19.md` §5.1.1 AMENDMENT + §5.4.1 NEW + §11 row Phase 3 flip + tail timestamp) + 3 NEW audit items B34+B35+B36 + rule-#10 verification-integrity discipline operating cleanly at 4 consecutive datapoints (most challenging case yet) — **1 documentation commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 **Scope of this commit**: pure-doc 5-surface cascade landing the Phase 3 IMOGEN engine round-trip workstation smoke verification outcome. **ZERO source-code changes** at this commit. Empirical evidence captured from a two-run sequence: Run A (`--backbone intermediary-py`; crashed with EC=99 at year 1871 due to year-range mismatch → NEW audit item B34); Run B (`--backbone static-iiasa` fallback; engine actively produced output 2026-05-17 16:26:21 → 16:28:15 = ~114 s for 32 years, then entered F-10 case-α polling loop until `timeout 1500` killed the process at ~25 min wall).

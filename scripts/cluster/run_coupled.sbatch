@@ -33,7 +33,7 @@
 #                         prescribed | tight (BLOCKED in v1.0; F-12 Option C
 #                         needed; gives a hard error and refuses to proceed)
 #   --backbone WHICH      static-iiasa | intermediary-py (default: static-iiasa)
-#   --smoke               4-cell + 1871-1872 (default; ~minutes)
+#   --smoke               4-cell + 1900-1901 (default; ~minutes; was 1871-1872 pre-B34(β) 2026-05-18)
 #   --production          62892-cell + 1900-2100 (~hours per scenario)
 #   --no-build            Skip step 2 (use existing build_mpi/guess)
 #   --no-intermediary     Skip step 3 (use existing intermediary_py outputs)

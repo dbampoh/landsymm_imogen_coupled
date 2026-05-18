@@ -89,13 +89,16 @@ nyear_spinup        100            ! 100y spinup (production: 500). LPJG validat
 freenyears          50             ! 50y N-free spinup (production: 100). Smaller for smoke speed.
 
 ! Year-range parameters (LPJG validator requires firsthistyear/lasthistyear > 0).
-! Smoke matches IMOGEN window in imogen_intermediary.ins (YEAR1=1871, IYEND=1872).
-! For production, both predecessor's main.ins used 1901-2100; here we use 1871-1872
-! because that's our 2-year smoke window.
-firsthistyear       1871
-lasthistyear        1872
-firstoutyear        1871
-lastoutyear         1872
+! Smoke matches IMOGEN window in imogen_intermediary.ins (YEAR1=1900, IYEND=1901).
+! [B19 Phase 3 addendum 2026-05-18 / B34(β) shifted smoke window 1871-1872 → 1900-1901
+!  so that --backbone intermediary-py works without Run-A-style EMISS_TALLY=0 crash;
+!  intermediary_py outputs cover 1900-2100 only. Static-iiasa Option A files cover
+!  1850-2100 so the 1900-1901 window is in-range for both backbones. See notes/B19.md
+!  §5.4.2 + notes/FOLLOWUPS.md B34. -DKB]
+firsthistyear       1900
+lasthistyear        1901
+firstoutyear        1900
+lastoutyear         1901
 
 firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency (step 9.5 deferred)
 run_landcover       1              ! [Step 9 user guidance 2026-05-07]: enable LU; uses version_A's

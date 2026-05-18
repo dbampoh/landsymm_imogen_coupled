@@ -28,13 +28,16 @@ mkdir -p Common-directory/LPJG_main/IMOGEN
 # produce (it hasn't started its main loop). See "Empirical findings"
 # below for why this bootstrap is necessary in v1.0.
 cat > Common-directory/LPJG_main/IMOGEN/imogen_lpjg.txt <<'EOF'
-YEAR1 1871 !IN First year of the numerical experiment
-IYEND 1872 !IN Stop year of the ENTIRE run
-YEAR1_LPJG 1871 !IN First year of the whole LPJ-GUESS simulation
-SPINUP FALSE !IN Are we in the spin-up phase of LPJ-GUESS?
+YEAR1 1900 !IN First year of the numerical experiment
+IYEND 1901 !IN Stop year of the ENTIRE run
+YEAR1_LPJG 1900 !IN First year of the whole LPJ-GUESS simulation
+SPINUP TRUE !IN Are we in the spin-up phase of LPJ-GUESS?
 KEEPRUNNING TRUE !IN control flag to keep imogen running
 FIRSTCALL TRUE !IN Is this the very first call to IMOGEN from LPJ-GUESS
 EOF
+# [NB: smoke years shifted 1871-1872 → 1900-1901 per B19 Phase 3 addendum
+#  2026-05-18 / B34(β); see notes/B19.md §5.4.2. SPINUP=TRUE follows the
+#  d9c90d5 state machine (climatemodel.cpp:1181-1199) for YEAR1<1901.]
 echo "bootstrap" > Common-directory/LPJG_main/IMOGEN/done
 
 # Then launch:

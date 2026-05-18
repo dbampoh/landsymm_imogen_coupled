@@ -38,8 +38,12 @@
 #                         Switching backbone toggles which Option-A vs
 #                         Option-B block is active in imogen_intermediary.ins.
 #   --smoke               Smoke-test mode: 4-cell gridlist_test2.txt, 2 years
-#                         (1871-1872), nyear_spinup=100, 1 patch. Default for
-#                         development. Already configured in main.ins as v1.0.
+#                         (1900-1901; was 1871-1872 pre-B34(β) addendum 2026-05-18),
+#                         nyear_spinup=100, 1 patch. Default for development.
+#                         Already configured in main.ins + imogen_intermediary.ins
+#                         as v1.0. The 1900-1901 window is in-range for both
+#                         --backbone static-iiasa (1850-2100 CMIP6 ref files) and
+#                         --backbone intermediary-py (1900-2100 adapter outputs).
 #   --production          Production mode: 62892-cell production gridlist,
 #                         full 1900-2100 horizon, nyear_spinup=500, 25 patches.
 #                         REQUIRES F-10/F-12 work to actually complete; v1.0
@@ -300,7 +304,11 @@ if [ "$BACKBONE" = "intermediary-py" ] && [ "$DO_INTERMEDIARY" = "1" ]; then
     _ok "[2/7] intermediary_py complete; output at ${PY_OUT_CSV}"
   fi
 else
-  _info "[2/7] backbone=static-iiasa (predecessor's reference files); skipping intermediary_py."
+  if [ "$BACKBONE" = "intermediary-py" ]; then
+    _info "[2/7] backbone=intermediary-py + --no-intermediary; skipping intermediary_py end-to-end run (assuming ${PY_OUT_CSV} already exists)."
+  else
+    _info "[2/7] backbone=${BACKBONE} (predecessor's reference files); skipping intermediary_py."
+  fi
 fi
 
 # =============================================================================
@@ -314,7 +322,11 @@ if [ "$BACKBONE" = "intermediary-py" ] && [ "$DO_ADAPTER" = "1" ]; then
     2>&1 | tee -a "${LOG_FILE}"
   _ok "[3/7] Adapter complete; 4 files at ${RUN_DIR}/inputs/"
 else
-  _info "[3/7] backbone=static-iiasa; skipping adapter (predecessor's static files used directly via Option A)."
+  if [ "$BACKBONE" = "intermediary-py" ]; then
+    _info "[3/7] backbone=intermediary-py + --no-adapter; skipping adapter (assuming ${RUN_DIR}/inputs/{co2,ch4_n2o}_*.txt already populated)."
+  else
+    _info "[3/7] backbone=${BACKBONE}; skipping adapter (predecessor's static files used directly via Option A)."
+  fi
 fi
 
 # =============================================================================
@@ -334,16 +346,22 @@ fi
 #  Before this fix the bootstrap hardcoded SPINUP=FALSE, which (a) disagreed
 #  with the d9c90d5 dynamic semantics for any YEAR1<1901, and (b) could never
 #  be auto-corrected on re-run because of the if-not-exist guard. Now: bootstrap
-#  is always re-written; SPINUP follows the state machine. For smoke + production
-#  v1.0 configs (both have YEAR1=1871) this means SPINUP=TRUE on first iteration.
-#  v1.1 audit (B34? — not yet filed): make YEAR1_BOOT / IYEND_BOOT parameterizable
-#  for non-1871 start years. -DKB]
+#  is always re-written; SPINUP follows the state machine. For smoke v1.0
+#  configs (YEAR1=1900 post-B34(β) addendum 2026-05-18; was 1871) this means
+#  SPINUP=TRUE on first iteration (1900<1901 still triggers the spinup branch).
+#  v1.1 audit: make YEAR1_BOOT / IYEND_BOOT parameterizable from .ins
+#  (today they are kept synchronized manually with imogen_intermediary.ins
+#  YEAR1/IYEND). -DKB]
 _info "[4/7] Bootstrapping LPJG_main/IMOGEN/ handshake dir..."
 HSHAKE_DIR="${RUN_DIR}/Common-directory/LPJG_main/IMOGEN"
 mkdir -p "${HSHAKE_DIR}"
 
-YEAR1_BOOT=1871
-IYEND_BOOT=1872
+# [B19 Phase 3 addendum 2026-05-18 B34(β): smoke years shifted 1871-1872 → 1900-1901
+#  to support --backbone intermediary-py (whose adapter outputs cover 1900-2100 only).
+#  These MUST stay in sync with runs/<SSP>/imogen_intermediary.ins YEAR1/IYEND and
+#  runs/<SSP>/main.ins firsthistyear/lasthistyear.]
+YEAR1_BOOT=1900
+IYEND_BOOT=1901
 if [ "${YEAR1_BOOT}" -lt 1901 ]; then SPINUP_BOOT="TRUE"; else SPINUP_BOOT="FALSE"; fi
 if [ "${IYEND_BOOT}" -gt 1900 ]; then FIRSTCALL_BOOT="FALSE"; else FIRSTCALL_BOOT="TRUE"; fi
 # Bootstrap == "this is the very first call from LPJG"; FIRSTCALL_BOOT is TRUE
@@ -454,6 +472,58 @@ else
   # Also sync the engine-side coupling_mode line itself to match the launcher arg.
   sed -i -E "s/^coupling_mode[[:space:]]+\"[a-z]+\"/coupling_mode       \"${COUPLING_MODE}\"/" "${INS_FILE}"
 
+  # ---------------------------------------------------------------------------
+  # [B19 Phase 3 addendum 2026-05-18 / B34(β)]: BACKBONE-determined NYR_*
+  # auto-rewrite (extension of the FILE_* auto-rewrite logic above).
+  #
+  # The Fortran/C++ engine's per-year emissTally validation at climatemodel.cpp
+  # :741-756 (and imogen_lpjg.f:825-836) loops 0..NYR_EMISS-1 looking for a
+  # year-column match against IYEAR. If NYR_EMISS exceeds the file's actual row
+  # count, the read overflows past EOF; if NYR_EMISS is too small, IYEAR may
+  # not be in range and emissTally=0 → "Emission dataset does not match run"
+  # crash. Each backbone has a fixed dataset year-span and row count:
+  #   - static-iiasa  : 1850-2100 = 251 rows for {NATURAL CO2, NATURAL CH4/N2O,
+  #                     ANTHRO CH4/N2O}; ANTHRO CO2 is 252 rows incl. dup-tail
+  #                     (engine reads first 251 — verified empirically Run B).
+  #   - intermediary-py: 1900-2100 = 201 rows for all 4 adapter outputs.
+  # NYR_NON_CO2 stays 251 always (FILE_NON_CO2_VALS = the 1850-2100 CMIP6 RF
+  # file, regardless of backbone).
+  #
+  # Pre-B34(β) (i.e., the Phase 3 Run A 2026-05-17 attempt with
+  # --backbone intermediary-py): the NYR_* values stayed at the 251 default
+  # while the FILE_* paths flipped to Option B → engine read 251 rows from a
+  # 201-row file → emissTally=0 for IYEAR=1871 → crash. B34(β) addresses both
+  # axes (smoke window + NYR_*) at this commit.
+  #
+  # Cross-refs: notes/B19.md §5.4.2 (B34 closure record); notes/FOLLOWUPS.md
+  # B34 entry; runs/<SSP>/imogen_intermediary.ins lines 167-189 (Option B
+  # docblock); engine source at climatemodel.cpp:741-756. -DKB
+  # ---------------------------------------------------------------------------
+  case "${BACKBONE}" in
+    static-iiasa)    NYR_EMISS_VAL=251; NYR_EMISS_NONCO2_VAL=251; NYR_LPJG_FLUX_VAL=251 ;;
+    intermediary-py) NYR_EMISS_VAL=201; NYR_EMISS_NONCO2_VAL=201; NYR_LPJG_FLUX_VAL=201 ;;
+    *)               _err "Unrecognized BACKBONE for NYR_* rewrite: '${BACKBONE}'"; exit 2 ;;
+  esac
+
+  # Use leading-anchor + at-least-one-space form so the existing column padding
+  # in the .ins is preserved roughly; the trailing comment is also rewritten so
+  # it keeps documenting the active backbone deterministically per-run.
+  sed -i -E "s|^NYR_EMISS_NONCO2[[:space:]]+[0-9]+([[:space:]].*)?$|NYR_EMISS_NONCO2 ${NYR_EMISS_NONCO2_VAL}    ! Anthropogenic CH4+N2O emissions span; backbone=${BACKBONE} (auto-rewritten by run_coupled.sh step 4.5)|" "${INS_FILE}"
+  sed -i -E "s|^NYR_EMISS[[:space:]]+[0-9]+([[:space:]].*)?$|NYR_EMISS       ${NYR_EMISS_VAL}     ! Anthropogenic CO2 emissions span; backbone=${BACKBONE} (auto-rewritten by run_coupled.sh step 4.5)|" "${INS_FILE}"
+  sed -i -E "s|^NYR_LPJG_FLUX[[:space:]]+[0-9]+([[:space:]].*)?$|NYR_LPJG_FLUX   ${NYR_LPJG_FLUX_VAL}     ! LPJG flux file span; backbone=${BACKBONE} (auto-rewritten by run_coupled.sh step 4.5)|" "${INS_FILE}"
+  # NYR_NON_CO2 deliberately NOT auto-rewritten — it's always 251 per the CMIP6 RF file.
+
+  # Verify exactly 1 active NYR_EMISS + NYR_EMISS_NONCO2 + NYR_LPJG_FLUX line at the rewritten value
+  for triple in "NYR_EMISS:${NYR_EMISS_VAL}" "NYR_EMISS_NONCO2:${NYR_EMISS_NONCO2_VAL}" "NYR_LPJG_FLUX:${NYR_LPJG_FLUX_VAL}"; do
+    pname="${triple%:*}"; pval="${triple#*:}"
+    n=$(grep -cE "^${pname}[[:space:]]+${pval}([[:space:]]|$)" "${INS_FILE}" || true)
+    if [ "${n}" -ne 1 ]; then
+      _err "B34(β) NYR_* post-rewrite verification FAILED: expected 1 active '${pname} ${pval}' line; got ${n}"
+      _err "  Backup at ${INS_BAK}; revert via: cp '${INS_BAK}' '${INS_FILE}'"
+      exit 1
+    fi
+  done
+
   # Verify exactly 1 active FILE_LPJG_FLUX + 1 active FILE_LPJG_CH4_N2O_FLUX + 1 active FILE_SCEN_EMITS + 1 active FILE_CH4_N2O_EMITS
   for p in FILE_LPJG_FLUX FILE_LPJG_CH4_N2O_FLUX FILE_SCEN_EMITS FILE_CH4_N2O_EMITS; do
     n=$(grep -cE "^${p}[[:space:]]+" "${INS_FILE}" || true)
@@ -481,7 +551,7 @@ else
     fi
   fi
 
-  _ok "  Rewrote ${INS_FILE} for NATURAL=Option-${NATURAL_TARGET} + ANTHRO=Option-${ANTHRO_TARGET}; coupling_mode line synced to \"${COUPLING_MODE}\"."
+  _ok "  Rewrote ${INS_FILE} for NATURAL=Option-${NATURAL_TARGET} + ANTHRO=Option-${ANTHRO_TARGET}; coupling_mode synced to \"${COUPLING_MODE}\"; NYR_*={EMISS:${NYR_EMISS_VAL}, EMISS_NONCO2:${NYR_EMISS_NONCO2_VAL}, LPJG_FLUX:${NYR_LPJG_FLUX_VAL}} per backbone=${BACKBONE} (B34(β) launcher-managed)."
   _ok "  Backup at ${INS_BAK}; idempotent re-run safe."
 fi
 

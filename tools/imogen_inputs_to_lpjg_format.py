@@ -65,7 +65,7 @@ adapter's outputs in `coupling_mode = prescribed` mode:
   2. Update year-range parameters to match intermediary_py's coverage:
         NYR_EMISS             201      (was 251; 1900-2100 vs 1850-2100)
         NYR_LPJG_FLUX         201      (was 251)
-        YEAR1                 1900     (was 1850 in predecessor; or 1871 in our smoke)
+        YEAR1                 1900     (was 1850 in predecessor; was 1871 in our pre-B34(β) smoke; now 1900 in our smoke too)
 
   3. Re-run the smoke test in coupling_mode = prescribed; verify the
      engine reads the new files cleanly without "data does not match
