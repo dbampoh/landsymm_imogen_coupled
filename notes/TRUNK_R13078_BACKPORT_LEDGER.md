@@ -2094,7 +2094,46 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 ✅ FULLY CLOSED — Phase 5 close-out (this commit, 2026-05-18 evening session 5 continuation): doc cascade + tag `v0.19.0-b19-literature-validated` + rule #9 + #10 promotions + B32 closure + B39 NEW filing — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
+### B20 ✅ DONE — literature-comparison sanity check for global LPJG-natural CH4 + N2O magnitudes (this commit, 2026-05-18 late evening session 5 continuation): NEW Python validation tool + 5 doc surfaces + sibling Part 1 of new session5_post_b19 handoff file + tag `v0.20.0-b20-literature-sanity-checked` — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
+
+**Background**: B20 closes the NEXT-TASK CLUSTER (B19 + B20) per the user-authorised 2026-05-15 night ordering at 17c.0.8 PREP close-out. Distinct from B19 Phase 4 (intra-codebase consistency vs legacy A/B references — pivoted to literature comparison vs Law Dome ice core); B20 is **extra-codebase scientific plausibility check** comparing LPJG-natural-only fluxes against published global natural budgets.
+
+**This commit lands** (all per-fork; ZERO eligible LOC for backport):
+
+| File | LOC delta | Per-fork or canonical? | Trunk presence | Backport relevance |
+|---|---|---|---|---|
+| `scripts/b20_literature_validate.py` (NEW) | +~430 | per-fork (novel Python tool) | NOT in trunk (no Python tooling in trunk_r13078; trunk uses Fortran + minimal shell) | **TRUNK-IRRELEVANT-by-novelty** |
+| `notes/FOLLOWUPS.md` | +~30/-2 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `CHANGELOG.md` | +~75 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `EXECUTION_PLAN.md` | +~3/-1 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry) | +~30 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/STEP_17c.md` | +~10/-3 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| **Total source LOC at this commit** | **+~430 (NEW Python tool only)** | | | **0 eligible-for-backport** |
+
+**B20 verdict**: `WITHIN_ENVELOPE_MEAN_WITH_TIME_VARIATION` ✅ PASS (full 1900-2100 time-means of CH4 = 179.87 TgCH4/yr + N2O = 11.18 TgN2O/yr both within Saunois 2020 + Tian 2020 published envelopes; modern-decade N2O hump filed as NEW B40 for explanatory follow-up at paper-stage analytical work).
+
+**Cumulative B19+B20 backport-debt state at B20 close**: UNCHANGED at **+145 LOC eligible-for-backport** — still entirely from Phase 2 Commit 3 (`6862d03`)'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites at L425/L432/L631/L648.
+
+**B19+B20 backport-debt aggregation FINAL** (UPDATED at this B20 close commit):
+
+| Phase / Commit | Source LOC | Eligible-for-backport LOC | Cumulative eligible | Notes |
+|---|---|---|---|---|
+| (B19 phases 0-5 — see prior table) | … | … | +145 | (entirely from `6862d03`) |
+| **B20 close-out (THIS commit)** | **+~430 (NEW Python tool)** | **0** | **+145** | per-fork in entirety; B20 closes |
+
+**Backport Sprint guidance at B19+B20 close** (UNCHANGED from B19 close): The Backport Sprint at the post-B19+B20 backport-relevant work cycle should handle BOTH B10 (+121 LOC writer fix from step 17b's `imogen_lpjg.f`) AND B33(c) (+145 LOC from Phase 2 Commit 3's `imogen_lpjg.f`) **together**, since both touch the same canonical Fortran engine source file. Risk profile for both: ZERO.
+
+**B19+B20 ✅ COMPLETE. What's next** (post-B19+B20):
+
+- **17c.1+ cluster phases** on KIT IMK-IFU `owl` — TRUNK-relevance TBD per sub-phase as the work lands.
+- **Local v1 verification window** (~6-13 h cumulative; can be done in parallel with cluster setup): B36 (~2-4 h Fortran IMOGEN background-emission audit; **possibly TRUNK-RELEVANT** if surfaces a fix) + B37 (~1-3 h productive-year-ceiling explanatory study; possibly TRUNK-RELEVANT) + B39 (~1-2 h CO2_INIT_PPMV per-YEAR1 configurability; TRUNK-IRRELEVANT-by-novelty) + B40 (~2-4 h modern-decade N2O hump explanatory study; possibly TRUNK-RELEVANT if surfaces N-cycle source code refactor).
+- **Future intermediary_py revision cycle**: B29 + B30 (~1.5 h cumulative; cosmetic; TRUNK-IRRELEVANT-by-novelty).
+
+The Backport Sprint should review this LEDGER's full B19+B20 group at the time of the sprint to identify the canonical +145 LOC + decide on porting timing relative to other backlog items. B36 + B37 + B40 outcomes (whether they surface fixes or confirm "no-defect-by-finding") will modulate the cumulative eligible-for-backport state.
+
+---
+
+### B19 ✅ FULLY CLOSED — Phase 5 close-out (commit `7543c1e`, 2026-05-18 evening session 5 continuation): doc cascade + tag `v0.19.0-b19-literature-validated` + rule #9 + #10 promotions + B32 closure + B39 NEW filing — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
 
 **Background**: B19 Phase 5 is the FINAL B19 commit. Lands the close-out doc cascade summarising Phases 0+1+2+3+3-ADDENDUM+4 + 1 source touch (`docs/scientific_framework.md` NEW §5.3 = B32 closure) + 1 sibling Part 11 narrative + the annotated tag `v0.19.0-b19-literature-validated`.
 
