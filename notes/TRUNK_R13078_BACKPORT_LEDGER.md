@@ -2094,7 +2094,48 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### Post-B19-Phase-3-ADDENDUM hygiene cleanup (this commit, 2026-05-18 evening session 5 continuation): `lpjguess/modules/climatemodel.cpp` UTF-8 forensic encoding restoration (cosmetic; zero behavioral impact) — **TRUNK-IRRELEVANT-by-novelty**; ZERO eligible LOC contributed for backport.
+### B19 Phase 4 BALLPARK_PASS landing (this commit, 2026-05-18 evening session 5 continuation): literature-comparison validation vs Law Dome ice-core record + Option-B plan pivot — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
+
+**Background**: original B19.md §6 plan called for comparing v1.0 Run C engine output against legacy_A reference outputs. Stage 4-pre investigation at session 5 evening (2026-05-18 ~17:00 UTC+2) surfaced that legacy_A's SSP1-2.6 reference outputs at `version_A/.../IMOGEN_SSP1_RCP26_Clim/output/` are physically implausible for the early 20th century (CO2 +9 ppm/yr in 1900-1903 vs Law Dome historical ~0.7 ppm/yr; CH4 -50 ppb/yr — wrong direction). Plan PIVOTED to Option B (literature comparison) per user authorization 2026-05-18 ~17:30 UTC+2.
+
+**This commit lands**: NEW Python validation script + 5-surface in-tree doc cascade + 1 sibling-narrative + 3 audit artefacts. The validation script reads v1.0 Run C engine output (`runs/SSP1-2.6/Common-directory/IMOGEN/output/<year>/CO2.dat` for 1900-1903) → extracts col 2/7/8 (atm CO2 ppm + CH4 ppbv + N2O ppbv) → compares against hardcoded Law Dome reference (MacFarling Meure 2006) → applies tolerance gates → emits Markdown report + JSON summary. Phase 4 acceptance: ✅ BALLPARK_PASS (overall verdict; 8 of 12 cells STRICT_PASS, 4 of 12 BALLPARK_PASS, zero AMBER/FAIL).
+
+**Per-source-file backport classification at this commit**:
+
+| File | LOC delta | Per-fork or canonical? | Trunk presence | Backport relevance |
+|---|---|---|---|---|
+| `scripts/b19_phase4_literature_validate.py` (NEW) | +~280 | per-fork (novel Python tooling) | NOT in trunk (no Python tooling in trunk_r13078; trunk uses Fortran + minimal shell) | **TRUNK-IRRELEVANT-by-novelty** |
+| `notes/B19.md` | +~120/-3 (this §6.4.1 + §0 + §11 + tail) | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/FOLLOWUPS.md` | +~25/-2 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `CHANGELOG.md` | +~50 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `EXECUTION_PLAN.md` | +~3/-1 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry) | +~25 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| **Total source LOC at this commit** | **+~280 (NEW Python tool only)** | | | **0 eligible-for-backport** |
+
+**Cumulative B19 backport-debt state at Phase 4 close**: UNCHANGED at **+145 LOC eligible-for-backport** — still entirely from Phase 2 Commit 3's `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites at `6862d03`. The Backport Sprint at B19 Phase 5 close-out should still handle B10 (+121 LOC writer fix from step 17b) + B33(c) (+145 LOC) together since both touch `imogen/code/imogen_lpjg.f`.
+
+**B19 backport-debt aggregation status by phase** (UPDATED at this Phase 4 commit):
+
+| Phase | Source LOC | Eligible-for-backport LOC | Cumulative eligible | Notes |
+|---|---|---|---|---|
+| Phase 0 (`d9c90d5`) | +54/-12 (`imogenoutput.cpp`) | 0 | 0 | per-fork surface (C++ port of writer) |
+| Phase 1 (`9c7417c` + `4c83561`) | +37/0 (`run_all.py` reorder) | 0 | 0 | per-fork (`intermediary_py/` not in trunk) |
+| Phase 2 Commit 1 (`d7a0673`) | +165/-9 (`run_coupled.sh`) | 0 | 0 | per-fork launcher novelty |
+| Phase 2 Commit 2 (`53e19f5`) | +47/-6 (`imogen_intermediary.ins`) | 0 | 0 | per-fork .ins |
+| Phase 2 Commit 3 (`6862d03`) | +145/0 (`imogen_lpjg.f`) | **+145** | **+145** | canonical engine source; first eligible LOC |
+| Phase 2 close-out (`170039e`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 close (`ed51e05`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 ADDENDUM (`0e665d4`) | +136/-37 (per-fork only) | 0 | +145 | per-fork in entirety (B34 + B35) |
+| Post-Phase-3-ADDENDUM hygiene (`f7ab695`) | +17/-17 (encoding-only) | 0 | +145 | per-fork in entirety (canonical file but novel comments) |
+| **Phase 4 BALLPARK_PASS landing (this commit)** | **+~280 (NEW Python tool)** | **0** | **+145** | per-fork in entirety (Python validation tool + doc cascade) |
+
+**Bycatch finding for the Backport Sprint** (documented in B19.md §6.4.1; mentioned here for ledger completeness): legacy_A SSP1-2.6 reference outputs at `version_A/.../IMOGEN_SSP1_RCP26_Clim/output/` were empirically determined to be physically implausible for the early 20th century. **Implication for Backport Sprint**: when porting B33(c)'s WARN_POSIX_CONCAT_COLLAPSE helper to `trunk_r13078`'s `imogen/code/imogen_lpjg.f`, do NOT use legacy_A outputs as a numerical-comparison reference for trunk-side validation. Use Law Dome ice-core record (or any other authoritative published source) as reference instead. This bycatch finding is consistent with the user-noted general fact that legacy A and B "do not work properly or at all".
+
+**Phase 5 close-out (FINAL) ACTIVE NEXT**: 6-surface cascade summarising Phases 0-4 + B19 close-out tag. The Backport Sprint will likely live at OR after Phase 5 (depending on user preference); when it begins it should focus on the +145 LOC eligible content from Phase 2 Commit 3 + the +121 LOC eligible content from B10 (step 17b writer fix) — both at `imogen/code/imogen_lpjg.f`. ALL OTHER B19 work (Phase 0/1/3/3-ADDENDUM/post-hygiene/4 + this commit) is per-fork; ZERO trunk-side touch needed.
+
+---
+
+### Post-B19-Phase-3-ADDENDUM hygiene cleanup (commit `f7ab695`, 2026-05-18 evening session 5 continuation): `lpjguess/modules/climatemodel.cpp` UTF-8 forensic encoding restoration (cosmetic; zero behavioral impact) — **TRUNK-IRRELEVANT-by-novelty**; ZERO eligible LOC contributed for backport.
 
 **Background**: HEAD's `lpjguess/modules/climatemodel.cpp` had pre-existing CP1252-style invalid-UTF-8 single-byte chars (0x97 = em-dash, 0x9D = em-dash-or-degree, 0xA7 = section sign) embedded in 17 inline doc-comment lines. These were already invalid UTF-8 at HEAD (`ed51e05`); the commit history at lines 1-3000ish shows this corruption traces back at least to step 7 (`71c171d`) and step 9.5 (`f00033c`) doc-block additions. At some point during B19 Phase 3 ADDENDUM context-loading session (2026-05-18 afternoon), an editor canonicalized those 1-byte CP1252 chars into 3-byte U+FFFD (`0xEF 0xBF 0xBD`) replacement chars, giving the working-tree state observed at the start of `0e665d4` work. Both forms displayed as `�` in modern UTF-8 terminals/editors but neither was the intended character. The B34 work at `0e665d4` deliberately did NOT touch this file; it was deferred per user-authorized Q1 option C ("restore the correct UTF-8 chars") with prerequisite role-evaluation step.
 
