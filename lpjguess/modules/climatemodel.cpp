@@ -239,8 +239,8 @@ int RUN_IMOGEN_ENGINE() {
     bool nonco2Emissions = IMOGENConfig::NONCO2_EMISSIONS;
     bool nonco2EmissionsLpjg = IMOGENConfig::NONCO2_EMISSIONS_LPJG;
     bool co2RfFair = IMOGENConfig::CO2_RF_FAIR;
-    // [Step 17b (F-12 sub-milestone C2; B3 LANDED) ù close-by-architectural-
-    //  reframing: this `regrid` local is currently DEAD CODE ù declared but
+    // [Step 17b (F-12 sub-milestone C2; B3 LANDED) ‚Äî close-by-architectural-
+    //  reframing: this `regrid` local is currently DEAD CODE ‚Äî declared but
     //  never read inside RUN_IMOGEN_ENGINE(). The C++ in-process engine port
     //  has only ONE climate-anomaly writer block (the native-IMOGEN-grid
     //  branch at line ~890 below); there is no `if (regrid) { ... } else
@@ -252,7 +252,7 @@ int RUN_IMOGEN_ENGINE() {
     //  F-11 Backport Sprint, Phase-2 IMOGENCXX parity work, or any other
     //  future REGRID feature add), `regrid` will become live and Tmin/Tmax
     //  writers MUST be added there per B2 pattern (see canonical B3 doc
-    //  block at line ~890 below + notes/STEP_17b.md ù3e). Until that
+    //  block at line ~890 below + notes/STEP_17b.md ¬ß3e). Until that
     //  happens, IMOGENConfig::REGRID is silently a no-op in this port (the
     //  imogencfx mode that uses this engine always writes on the native
     //  IMOGEN grid). A defensive runtime warning when REGRID==true is
@@ -348,7 +348,7 @@ int RUN_IMOGEN_ENGINE() {
             std::this_thread::sleep_for(std::chrono::seconds(3));
             std::cout << "." << std::flush;
 
-            // [Step 7 of unified-codebase rebuild: bug C2 fix ù restore the
+            // [Step 7 of unified-codebase rebuild: bug C2 fix ‚Äî restore the
             //  doneExist filesystem check that was previously short-circuited
             //  to "doneExist = true" (which silently bypassed the LPJG?IMOGEN
             //  per-year handshake's safety semantics). The first-call special
@@ -362,14 +362,14 @@ int RUN_IMOGEN_ENGINE() {
 
             {
                 std::ifstream file(dirCommon + "/LPJG_main/IMOGEN/imogen_lpjg.txt");
-                // [Step 7 fix: bug C3 part 1 ù restore the runnowOpen guard]
+                // [Step 7 fix: bug C3 part 1 ‚Äî restore the runnowOpen guard]
                 runnowOpen = !file.is_open();
             }
 
             runfluxExist = filesystem_dkb::exists(fileLpjgFlux);
             {
                 std::ifstream file(fileLpjgFlux);
-                // [Step 7 fix: bug C3 part 2 ù restore the runfluxOpen guard]
+                // [Step 7 fix: bug C3 part 2 ‚Äî restore the runfluxOpen guard]
                 runfluxOpen = !file.is_open();
             }
             errorExist = filesystem_dkb::exists(dirCommon + "/LPJG_main/IMOGEN/error");
@@ -378,7 +378,7 @@ int RUN_IMOGEN_ENGINE() {
                 runnonco2fluxExist = filesystem_dkb::exists(fileLpjgCh4N2oFlux);
                 {
                     std::ifstream file(fileLpjgCh4N2oFlux);
-                    // [Step 7 fix: bug C3 part 3 ù restore the runnonco2fluxOpen guard]
+                    // [Step 7 fix: bug C3 part 3 ‚Äî restore the runnonco2fluxOpen guard]
                     runnonco2fluxOpen = !file.is_open();
                 }
             }
@@ -907,29 +907,29 @@ int RUN_IMOGEN_ENGINE() {
                 }
 
                 // Output in native IMOGEN grid (the ONLY climate-anomaly writer
-                // branch in this C++ in-process port ó see B3 canonical doc
+                // branch in this C++ in-process port ‚Äî see B3 canonical doc
                 // block below for the architectural rationale).
                 std::cout << "Writing native-grid anomalies for year: " << iyear << "\n";
                 // [Step 9.5: file100/file101 added for Tmin_anom.dat / Tmax_anom.dat
                 //  (computed as T -/+ DTEMP/2 per cell x month x sub-day step;
-                //  Decision #11 algebra ó same Kelvin units as T_anom).
+                //  Decision #11 algebra ‚Äî same Kelvin units as T_anom).
                 //  - DKB 2026-05-07]
                 //
-                // [Step 17b (F-12 sub-milestone C2; B3 LANDED 2026-05-12) ó CANONICAL
+                // [Step 17b (F-12 sub-milestone C2; B3 LANDED 2026-05-12) ‚Äî CANONICAL
                 //  B3 DOC BLOCK; close-by-architectural-reframing.
                 //
                 //  HISTORY OF THE PRIOR `// TODO at step 9.5b: replicate this in
                 //  the REGRID branch.` comment (now removed): when step 9.5
                 //  introduced file100/file101 above (Tmin/Tmax derived per
                 //  Decision #11), the author left a forward-reference TODO
-                //  anticipating that a C++ REGRID branch ó analogous to the
+                //  anticipating that a C++ REGRID branch ‚Äî analogous to the
                 //  Fortran engine's IF (REGRID) THEN ... ELSE ... ENDIF block
-                //  at imogen/code/imogen_lpjg.f lines ~962-1117 ó would later
+                //  at imogen/code/imogen_lpjg.f lines ~962-1117 ‚Äî would later
                 //  be added here, and that when it was, Tmin/Tmax writers
                 //  would need replicating in the new branch.
                 //
                 //  FORENSIC FINDING (2026-05-12; full forensic in notes/STEP_17b.md
-                //  ß3e + this B3 commit): the anticipated C++ REGRID branch was
+                //  ¬ß3e + this B3 commit): the anticipated C++ REGRID branch was
                 //  never built. This C++ in-process port has only ONE
                 //  climate-anomaly writer branch: the native-IMOGEN-grid block
                 //  immediately below. Evidence: (a) `bool regrid` declared at
@@ -984,7 +984,7 @@ int RUN_IMOGEN_ENGINE() {
                 //  engine, not by this in-process C++ port. Deferred to keep
                 //  B3 docs-only.
                 //
-                //  Cross-references: notes/STEP_17b.md ß3e (full B3 forensic
+                //  Cross-references: notes/STEP_17b.md ¬ß3e (full B3 forensic
                 //  record + cross-engine parity matrix correction + dead-code
                 //  analysis of `bool regrid` declaration); imogen/code/
                 //  imogen_lpjg.f ~lines 1019-1160 (B2 Fortran symmetric
@@ -1007,8 +1007,8 @@ int RUN_IMOGEN_ENGINE() {
                 //  fully populated; EVEN years 1872, 1874, ... empty). Discovered
                 //  empirically at C1.2 (1-cell xval; constrained to need ODD-only
                 //  climate via nyear_spinup=1 + lasthistyear=1871). Surfaced as
-                //  blocker for C1.3 sub-step 7.3.1 multi-cell xval (4-cell ù any
-                //  nyear_spinup hits EVEN imogen_years for some cell ù year_idx).
+                //  blocker for C1.3 sub-step 7.3.1 multi-cell xval (4-cell ‚Äî any
+                //  nyear_spinup hits EVEN imogen_years for some cell ‚Äî year_idx).
                 //
                 //  FIX: open ALL output files unconditionally per IYEAR iteration.
                 //  `thisYear` is already updated per iteration at line ~457
@@ -1406,7 +1406,7 @@ double radf_non_co2(int year, int nyr_non_co2, bool file_non_co2, const std::str
  * Calculates saturation mixing ratio at given temperatures and pressures.
  *
  * Uses a lookup table of saturation water vapor pressures based on the
- * Goff-Gratch formulae, with values over water above 0ùC and over ice below 0ùC.
+ * Goff-Gratch formulae, with values over water above 0¬∞C and over ice below 0¬∞C.
  *
  * @param qs Output saturation mixing ratio (kg/kg).
  * @param t Input temperature (K).

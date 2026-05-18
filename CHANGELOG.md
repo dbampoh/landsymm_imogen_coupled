@@ -14,6 +14,46 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-18 (evening, session 5 continuation) — `lpjguess/modules/climatemodel.cpp` UTF-8 forensic encoding restoration (cosmetic; zero behavioral impact) — **1 source + 2 doc commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
+
+**Scope of this commit**: pre-existing UTF-8 mojibake in `lpjguess/modules/climatemodel.cpp` inline comments cleaned up forensically. Surfaced during B19 Phase 3 ADDENDUM context-loading at the previous commit `0e665d4` as an unrelated working-tree modification (17 lines containing 18 U+FFFD `\xef\xbf\xbd` bytes); the working-tree state had been reached when an editor canonicalized HEAD's pre-existing CP1252-style single-byte chars (0x97 em-dash / 0x9D em-dash-or-degree / 0xA7 section sign — all invalid UTF-8) into 3-byte U+FFFD replacement chars. Both forms displayed as `�` but neither was the correct character.
+
+**Forensic restoration**: each U+FFFD mapped to its contextually-correct UTF-8 char by reading surrounding text — 13× em-dash `—` (UTF-8 `0xE2 0x80 0x94`), 3× section sign `§` (UTF-8 `0xC2 0xA7`), 2× degree sign `°` (UTF-8 `0xC2 0xB0`) — applied via `StrReplace`-equivalent operations with adequate per-call context for uniqueness.
+
+**Byte-level verification**:
+- Pre-fix WT: 18 U+FFFD chars across 17 lines
+- Post-fix WT: 0 U+FFFD chars; distinct non-ASCII bytes are exactly `{0x80, 0x94, 0xA7, 0xB0, 0xC2, 0xE2}` (the multi-byte UTF-8 components of em-dash/section/degree, no isolated continuation bytes)
+- Hex spot-check confirmed `0xE2 0x80 0x94` at expected em-dash positions (e.g. line 243), `0xC2 0xA7` at section positions (e.g. line 255), `0xC2 0xB0` × 2 at degree positions (line 1409)
+- File size delta: +31 bytes (expected: 13 em-dash @ +2 + 3 section @ +1 + 2 degree @ +1 = +31; arithmetic exact)
+
+**Affected lines** (all inline doc-comments; ZERO code-path changes):
+- L242-243: B3 doc-block opening (em-dash × 2)
+- L255: STEP_17b.md cross-ref (section sign)
+- L351, L365, L372, L381: Step 7 bug-C2 + bug-C3-parts-1/2/3 fix headers (em-dash × 4)
+- L910, L915, L918: B3 canonical doc-block at native-grid writer (em-dash × 3)
+- L925, L927: REGRID branch forensic narrative (em-dash × 2)
+- L932, L987: STEP_17b.md cross-refs in B3 forensic + Cross-references section (section sign × 2)
+- L1010-1011: alternating-year staged-climate quirk forensic (em-dash × 2)
+- L1409: Goff-Gratch formulae docstring (degree sign × 2 — 0°C / 0°C)
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty. The file `lpjguess/modules/climatemodel.cpp` is shared between fork and trunk_r13078 (per `notes/TRUNK_R13078_BACKPORT_LEDGER.md` step 7 C2/C3 entry — the C2/C3 5-line fix region is byte-identical between forks). HOWEVER, the affected comment content at this commit is entirely rebuild-era novel material (B3 / step 17b / F-12 / Decision #11 / Step 7-9.5 references which post-date the trunk_r13078 baseline); trunk doesn't have these specific comment blocks at all, so there's nothing to "backport encoding for" in trunk. ZERO eligible LOC contributed for backport.
+
+**Nature of fix**: pure cosmetic / docs-hygiene. Inline comments in C++ source are stripped by the preprocessor before compilation; even the previous CP1252-byte form at HEAD compiled correctly (gcc treats inline-comment bytes as opaque). The fix improves human-readability of the canonical B3/step-17b doc-block + downstream forensic comments. ZERO behavioral impact; ZERO ABI change; ZERO binary delta on rebuild (compiler discards comments).
+
+**Surface inventory at this commit** (1 source + 2 doc; NO B-item filed since this is hygiene, not audit-item-level work):
+
+- `lpjguess/modules/climatemodel.cpp` — 18 char-level encoding restorations across 17 lines; +17/-17 LOC stat (each affected line shows as 1 deletion + 1 insertion in the diff because the byte sequences differ even though the displayed content is now correct UTF-8 vs prior mojibake); +31 bytes file size.
+- `CHANGELOG.md` — this entry.
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` — NEW small entry documenting the encoding-restoration as TRUNK-IRRELEVANT-by-novelty under §3 (post-B19-Phase-3-ADDENDUM hygiene cleanup; cumulative B19 backport state UNCHANGED at +145 LOC).
+
+**Why a separate commit and not bundled with the B34/B35 commit `0e665d4`**: per the user's authorized Q1 workflow at the start of B19 Phase 3 ADDENDUM session (option C with prerequisite role evaluation): the encoding fix is forensically distinct (different defect class, different scope, different verification methodology) from the B34/B35 launcher-and-config work; bundling would have bloated `0e665d4`'s diff by 17 unrelated cosmetic lines + a verification subsection that isn't germane to B34/B35 closure. Doing it as a separate, focused, small commit provides clean reviewer experience and isolates the encoding-restoration's forensic narrative for future maintainers.
+
+**v1.0 % done estimate UNCHANGED** at ~82-84% (this is hygiene / docs work; doesn't move v1.0-functional progress).
+
+**Phase 4 (closed-loop validation vs legacy A/B per `notes/B19.md` §6) REMAINS ACTIVE NEXT** after this commit — clean working-tree baseline now established for that work.
+
+**Files** (1 source + 2 doc): `lpjguess/modules/climatemodel.cpp` + `CHANGELOG.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md`.
+
 ### 2026-05-18 (afternoon, session 5 continuation) — B19 Phase 3 ADDENDUM — Run C intermediary-py verification + B34 ✅ CLOSED via option β + B35 ✅ CLOSED + small launcher source extension (NYR_* auto-rewrite) — **1 source+doc commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 **Scope of this commit**: Phase 3 ADDENDUM landing the empirical verification of the IMOGEN engine round-trip on the **intermediary-py** backbone (Phase 3 Run B at `ed51e05` only verified static-iiasa) + closing 2 audit items surfaced at Phase 3 (B34 year-range mismatch + B35 cosmetic launcher skip-message). 6 source files modified (~+136/-37 LOC; 5 surface doc cascade ~+250 LOC; 1 sibling-narrative + 3 audit artefacts). All TRUNK-IRRELEVANT-by-novelty.

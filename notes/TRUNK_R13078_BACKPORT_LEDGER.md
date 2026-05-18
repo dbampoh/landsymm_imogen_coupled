@@ -2094,7 +2094,44 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 Phase 3 ADDENDUM (this commit, 2026-05-18 afternoon session 5 continuation): mixed source + doc commit landing the Run C empirical verification of the IMOGEN engine round-trip on the **intermediary-py** backbone + B34 ✅ CLOSED via option β (smoke years 1871-1872 → 1900-1901) + companion launcher NYR_* auto-rewrite extension at `scripts/run_coupled.sh` step 4.5 + B35 ✅ CLOSED (cosmetic skip-message bug fix bundled) + B37 ⏳ NEW filed (productive-year-ceiling explanatory study; LOW priority post-B19 work) — **TRUNK-IRRELEVANT-by-novelty in entirety**. All 6 source-modified files are per-fork: `runs/SSP1-2.6/main.ins` (per-fork .ins; not in `trunk_r13078`), `runs/SSP1-2.6/imogen_intermediary.ins` (per-fork .ins), `scripts/run_coupled.sh` (per-fork launcher; novel post-step-14), `runs/SSP1-2.6/README.md` (per-fork doc), `scripts/cluster/run_coupled.sbatch` (per-fork doc), `tools/imogen_inputs_to_lpjg_format.py` (per-fork tool comment update). All 5 in-tree doc-cascade surfaces are per-fork. 1 sibling-narrative + 3 audit artefacts at `_chat_artifacts/b19_phase3_smoke_run/`. **ZERO eligible LOC contributed for backport at this commit; cumulative B19 backport-debt state UNCHANGED at +145 LOC eligible-for-backport** (still entirely from Phase 2 Commit 3's `imogen/code/imogen_lpjg.f` change at `6862d03`).
+### Post-B19-Phase-3-ADDENDUM hygiene cleanup (this commit, 2026-05-18 evening session 5 continuation): `lpjguess/modules/climatemodel.cpp` UTF-8 forensic encoding restoration (cosmetic; zero behavioral impact) — **TRUNK-IRRELEVANT-by-novelty**; ZERO eligible LOC contributed for backport.
+
+**Background**: HEAD's `lpjguess/modules/climatemodel.cpp` had pre-existing CP1252-style invalid-UTF-8 single-byte chars (0x97 = em-dash, 0x9D = em-dash-or-degree, 0xA7 = section sign) embedded in 17 inline doc-comment lines. These were already invalid UTF-8 at HEAD (`ed51e05`); the commit history at lines 1-3000ish shows this corruption traces back at least to step 7 (`71c171d`) and step 9.5 (`f00033c`) doc-block additions. At some point during B19 Phase 3 ADDENDUM context-loading session (2026-05-18 afternoon), an editor canonicalized those 1-byte CP1252 chars into 3-byte U+FFFD (`0xEF 0xBF 0xBD`) replacement chars, giving the working-tree state observed at the start of `0e665d4` work. Both forms displayed as `�` in modern UTF-8 terminals/editors but neither was the intended character. The B34 work at `0e665d4` deliberately did NOT touch this file; it was deferred per user-authorized Q1 option C ("restore the correct UTF-8 chars") with prerequisite role-evaluation step.
+
+**Role evaluation outcome** (from B19 Phase 3 ADDENDUM session): `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` is the active C++ in-process IMOGEN engine in v1.0 (symbol `_Z17RUN_IMOGEN_ENGINEv` exported in `lpjguess/build/guess`; called from `imogencfx.cpp:549` when `simulation_mode == "online"`). Both Phase 3 Run B (static-iiasa) and Phase 3 ADDENDUM Run C (intermediary-py) used this engine path. The file is one of the most central source files in the v1.0 codebase. The mojibake however was confined to inline doc-comments; zero behavioral impact at any commit.
+
+**Restoration mechanic at this commit** (per CHANGELOG entry; full forensic record there): each U+FFFD char mapped to its contextually-correct UTF-8 char by reading surrounding text. 18 char-level substitutions across 17 lines: 13 em-dash `—` (`0xE2 0x80 0x94`) + 3 section sign `§` (`0xC2 0xA7`) + 2 degree sign `°` (`0xC2 0xB0`). Verification: post-fix WT has 0 U+FFFD chars; distinct non-ASCII bytes are exactly the multi-byte UTF-8 components; file size delta +31 bytes matches arithmetic exactly (13×2 + 3×1 + 2×1 = 31).
+
+**Per-source-file backport classification at this commit**:
+
+| File | LOC delta | Per-fork or canonical? | Trunk presence | Backport relevance |
+|---|---|---|---|---|
+| `lpjguess/modules/climatemodel.cpp` | +17/-17 (encoding-only; zero code-path change) | shared file but rebuild-era novel comment content | trunk_r13078 has the file BUT does NOT have these specific B3/step-17b/F-12/Decision #11/Step 7-9.5 doc-block comments (all post-trunk-baseline rebuild material per `notes/STEP_17b.md` §3e + `notes/B19.md` §3.4.2.5) | **TRUNK-IRRELEVANT-by-novelty** (no trunk-side comments to encode-fix) |
+| `CHANGELOG.md` | +~50 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | +~25 (this entry) | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| **Total source LOC at this commit** | **+17/-17** (encoding-only) | | | **0 eligible-for-backport** |
+
+**Cumulative B19 backport-debt state at this hygiene-cleanup commit**: UNCHANGED at **+145 LOC eligible-for-backport** — still entirely from Phase 2 Commit 3's `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites at `6862d03`. The Backport Sprint at B19 Phase 5 close-out should still handle B10 (+121 LOC writer fix from step 17b) + B33(c) (+145 LOC) together since both touch `imogen/code/imogen_lpjg.f`.
+
+**B19 backport-debt aggregation status by phase** (UPDATED at this commit):
+
+| Phase | Source LOC | Eligible-for-backport LOC | Cumulative eligible | Notes |
+|---|---|---|---|---|
+| Phase 0 (`d9c90d5`) | +54/-12 (`imogenoutput.cpp`) | 0 | 0 | per-fork surface (C++ port of writer) |
+| Phase 1 (`9c7417c` + `4c83561`) | +37/0 (`run_all.py` reorder) | 0 | 0 | per-fork (`intermediary_py/` not in trunk) |
+| Phase 2 Commit 1 (`d7a0673`) | +165/-9 (`run_coupled.sh`) | 0 | 0 | per-fork launcher novelty |
+| Phase 2 Commit 2 (`53e19f5`) | +47/-6 (`imogen_intermediary.ins`) | 0 | 0 | per-fork .ins |
+| Phase 2 Commit 3 (`6862d03`) | +145/0 (`imogen_lpjg.f`) | **+145** | **+145** | canonical engine source; first eligible LOC |
+| Phase 2 close-out (`170039e`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 close (`ed51e05`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 ADDENDUM (`0e665d4`) | +136/-37 (per-fork only) | 0 | +145 | per-fork in entirety (B34 + B35) |
+| **Post-Phase-3-ADDENDUM hygiene (this commit)** | **+17/-17** (encoding-only) | **0** | **+145** | per-fork in entirety (canonical file but novel comments) |
+
+**Discipline note for future maintainers**: the legacy C++ in-process IMOGEN engine port at `lpjguess/modules/climatemodel.cpp` was authored in an era / on a system that wrote CP1252-style 1-byte chars for em-dash/section/degree even though the source-tree convention was nominally UTF-8. This drift produced HEAD's pre-existing invalid-UTF-8 byte state. The encoding restoration at this commit lands a clean canonical UTF-8 baseline going forward; any future inline-comment additions to this file should use proper UTF-8 multi-byte sequences (em-dash `0xE2 0x80 0x94` etc.) rather than CP1252 single bytes. No changes to other source files are warranted at this commit; if similar mojibake is found elsewhere in the codebase, file as a separate hygiene-cleanup commit.
+
+---
+
+### B19 Phase 3 ADDENDUM (commit `0e665d4`, 2026-05-18 afternoon session 5 continuation): mixed source + doc commit landing the Run C empirical verification of the IMOGEN engine round-trip on the **intermediary-py** backbone + B34 ✅ CLOSED via option β (smoke years 1871-1872 → 1900-1901) + companion launcher NYR_* auto-rewrite extension at `scripts/run_coupled.sh` step 4.5 + B35 ✅ CLOSED (cosmetic skip-message bug fix bundled) + B37 ⏳ NEW filed (productive-year-ceiling explanatory study; LOW priority post-B19 work) — **TRUNK-IRRELEVANT-by-novelty in entirety**. All 6 source-modified files are per-fork: `runs/SSP1-2.6/main.ins` (per-fork .ins; not in `trunk_r13078`), `runs/SSP1-2.6/imogen_intermediary.ins` (per-fork .ins), `scripts/run_coupled.sh` (per-fork launcher; novel post-step-14), `runs/SSP1-2.6/README.md` (per-fork doc), `scripts/cluster/run_coupled.sbatch` (per-fork doc), `tools/imogen_inputs_to_lpjg_format.py` (per-fork tool comment update). All 5 in-tree doc-cascade surfaces are per-fork. 1 sibling-narrative + 3 audit artefacts at `_chat_artifacts/b19_phase3_smoke_run/`. **ZERO eligible LOC contributed for backport at this commit; cumulative B19 backport-debt state UNCHANGED at +145 LOC eligible-for-backport** (still entirely from Phase 2 Commit 3's `imogen/code/imogen_lpjg.f` change at `6862d03`).
 
 **Per-source-file backport classification at this addendum**:
 
