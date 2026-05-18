@@ -341,6 +341,126 @@ closed-loop tight run is a v1.1 milestone (F-12 Option B).
 
 See [`v2_roadmap.md`](v2_roadmap.md) §4 + §5.
 
+### 5.3 Natural-flux channel mutual exclusion + the no-double-counting invariant
+
+_Origin: B32 (B19 Phase 5 close-out 2026-05-18 evening; condensed from
+`COUPLED_MODEL_INVESTIGATION.md` §2.3 + §3.7; rediscovered as a key
+architectural quirk during user-driven double-counting investigation at
+B19 Phase 1 CLOSE 2026-05-16 evening per `notes/B19.md` §3.4.2)._
+
+The IMOGEN engine integrates four anthropogenic + natural emission channels
+into the atmospheric CO2 / CH4 / N2O budget, controlled by four
+`<runs/<SCEN>/imogen_intermediary.ins>` parameters:
+
+| Channel | `.ins` parameter | What it carries |
+|---|---|---|
+| Natural CO2 (LPJG-side) | `FILE_LPJG_FLUX` | LPJG-derived natural ecosystem CO2 flux (NEE; positive = source) |
+| Natural CH4 + N2O (LPJG-side) | `FILE_LPJG_CH4_N2O_FLUX` | LPJG-derived natural CH4 (wetland + fire) + N2O (soil + fire) |
+| Anthropogenic CO2 | `FILE_SCEN_EMITS` | Scenario fossil + LULUC CO2 emissions |
+| Anthropogenic CH4 + N2O | `FILE_CH4_N2O_EMITS` | Scenario CH4 + N2O emissions (industry, agriculture, etc.) |
+
+The two **natural** channels (`FILE_LPJG_FLUX` + `FILE_LPJG_CH4_N2O_FLUX`)
+each have **three mutually-exclusive resolution options**:
+
+- **Option A** — static CMIP6 reference (`imogen/emiss/CMIP6/Co2/co2_pg_emissions_natural_historical_ssp<XXX>_1850_2100.txt` etc.; the predecessor's pre-existing IIASA-derived files; v1.0 default).
+- **Option B** — `intermediary_py`-derived adapter outputs (`runs/<SCEN>/inputs/imogen_lpjg_flux.txt` etc.; from the step-13 adapter applied to `intermediary_py`'s `imogen_inputs_<SCEN>.csv`; introduced at step 13 of the unified-codebase rebuild).
+- **Option C** — relative bare-filename (`imogen_lpjg_flux.txt` etc.; the engine's POSIX path-concat resolves these to `<DIR_COMMON>/LPJG_main/IMOGEN/<filename>` where step-8's `ImogenOutput::flush_year` writes the per-year LIVE LPJG handshake; the F-10 deadlock applies here).
+
+The two **anthropogenic** channels (`FILE_SCEN_EMITS` + `FILE_CH4_N2O_EMITS`)
+each have **two mutually-exclusive options**:
+
+- **Option A** — `imogen/emiss/DKB_dataset_totals/co2_emissions_annual_historical_<scen>_non_lpjg.txt` etc. (pre-existing scenario files).
+- **Option B** — `runs/<SCEN>/inputs/co2_anthro_emissions.txt` etc. (`intermediary_py`-derived adapter outputs).
+
+#### The mutual-exclusion invariant
+
+For each natural channel, **exactly ONE of {A, B, C} must be active** in the
+`.ins` file at any given time. For each anthropogenic channel, **exactly ONE
+of {A, B} must be active**. Activating two options simultaneously would
+result in **double-counting**: both options' fluxes would feed into the engine
+budget, doubling (or worse) the natural / anthropogenic contribution to the
+atmospheric budget for that year.
+
+Since v0.18 (B31 launcher auto-rewrite at `scripts/run_coupled.sh` step 4.5;
+landed at commit `d7a0673` 2026-05-16/17), the launcher enforces this
+invariant deterministically per `(--coupling-mode, --backbone)` flag tuple
+via content-keyed sed toggles + a post-rewrite verification loop that aborts
+if any of the four `FILE_*` parameters has anything other than exactly 1
+active line. The `(--coupling-mode, --backbone) → Options` mapping:
+
+| `--coupling-mode` | `--backbone` | NATURAL Option | ANTHRO Option |
+|---|---|---|---|
+| prescribed | static-iiasa | A | A |
+| prescribed | intermediary-py | B | B |
+| tight | static-iiasa | C | A |
+| tight | intermediary-py | C | B |
+| loose | * | (skipped; loose mode bypasses LPJG handshake entirely) | (skipped) |
+
+#### Why "Option A and Option B at once" is forbidden by science
+
+Option A (CMIP6 static reference) and Option B (`intermediary_py` adapter)
+each represent **the same physical quantity** (natural ecosystem CO2 / CH4 /
+N2O flux for SSP1-2.6 etc.) computed from different upstream sources +
+different methodologies. They are **alternatives**, not contributions. If
+both flow into the engine, the natural CO2 sink would count twice (or, more
+precisely, would sum two correlated-but-not-identical estimates); the
+atmospheric CO2 trajectory would diverge from physical reality by ~5-10 ppm
+per year of double-counted sink.
+
+#### Why "Option B and Option C at once" is forbidden by architecture
+
+Option C (LIVE LPJG handshake) and Option B (intermediary_py-derived static
+reference) both describe LPJG-natural-flux contributions. Option C is the
+**real-time-computed-by-LPJG-this-run** value; Option B is the
+**pre-computed-from-an-earlier-LPJG-run-via-intermediary_py** value. In a
+properly-functioning closed-loop run (post-F-12 v1.1+), these would reflect
+the same simulation; activating both would double-count this run's LPJG
+contribution.
+
+#### `intermediary_py`'s anthropogenic-only invariant
+
+A frequently-encountered side-question (raised by user at B19 Phase 1 CLOSE
+investigation; resolved NEGATIVE per `notes/B19.md` §3.4.2.2): does
+`intermediary_py` itself produce a "natural CH4 emissions" file that gets
+used in our coupled run? **No.** `intermediary_py` produces TWO outputs that
+feed IMOGEN:
+- `runs/<SCEN>/inputs/{co2_anthro_emissions, ch4_n2o_anthro_emissions}.txt` →
+  Anthropogenic Option B (intentional; this is the integrated anthropogenic
+  channel `intermediary_py` was designed to produce per the IPCC 2019 Tier-1
+  AFOLU-substituted-into-RCMIP-Phase-2 methodology).
+- `runs/<SCEN>/inputs/{imogen_lpjg_flux, imogen_lpjg_ch4_n2o_flux}.txt` →
+  Natural Option B (NOT a separate "natural CH4 from intermediary_py";
+  these are derived from LPJ-GUESS reference outputs applied through the
+  step-13 adapter, NOT from `intermediary_py`'s anthropogenic computation).
+
+The architecture enforces no-double-counting at the `.ins` layer (mutual
+exclusion above) AND no-naming-collision at the channel layer (anthro vs
+natural file names are distinct + their `.ins` parameter names are distinct).
+
+#### Forensic backstory + cross-references
+
+The mutual-exclusion invariant was originally documented as a footnote in
+the predecessor's design notes; lost during the rebuild's step 8 + step 9
+.ins refactoring; rediscovered as a documentation gap during the B19 Phase
+1 CLOSE user-driven double-counting investigation (2026-05-16 evening) +
+filed as audit item B32. Lands here at B19 Phase 5 close-out per the
+deferred-to-Phase-5 schedule.
+
+The architectural footgun related to this invariant — the
+"loose-masquerading-as-tight" POSIX path-concat collapse that silently
+breaks Option C → Option A reduction when `FILE_LPJG_FLUX` starts with `/` —
+is documented at `COUPLED_MODEL_INVESTIGATION.md` §3.7 + addressed in 3
+defense-in-depth layers wired in at B19 Phase 2 (B33 audit item; commits
+`d7a0673` / `53e19f5` / `6862d03`): launcher auto-rewrite + launcher
+pre-flight abort + Fortran defensive `WARN_POSIX_CONCAT_COLLAPSE` runtime
+print.
+
+Cross-references:
+- `notes/B19.md` §3.4.2 (B19 Phase 1 CLOSE side-investigation full record)
+- `COUPLED_MODEL_INVESTIGATION.md` §2.3 (canonical mutual-exclusion forensic) + §3.7 (POSIX-concat collapse footgun forensic)
+- `runs/SSP1-2.6/imogen_intermediary.ins` lines 156-242 (3-Option block + maintainer-critical inline comment harden by B33(a) at commit `53e19f5`)
+- `scripts/run_coupled.sh` step 4.5 (the launcher auto-rewrite implementing the matrix above)
+
 ---
 
 ## 6. Units integrity (Decision #6)

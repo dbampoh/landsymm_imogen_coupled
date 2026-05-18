@@ -2094,7 +2094,59 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
-### B19 Phase 4 BALLPARK_PASS landing (this commit, 2026-05-18 evening session 5 continuation): literature-comparison validation vs Law Dome ice-core record + Option-B plan pivot — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
+### B19 ✅ FULLY CLOSED — Phase 5 close-out (this commit, 2026-05-18 evening session 5 continuation): doc cascade + tag `v0.19.0-b19-literature-validated` + rule #9 + #10 promotions + B32 closure + B39 NEW filing — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
+
+**Background**: B19 Phase 5 is the FINAL B19 commit. Lands the close-out doc cascade summarising Phases 0+1+2+3+3-ADDENDUM+4 + 1 source touch (`docs/scientific_framework.md` NEW §5.3 = B32 closure) + 1 sibling Part 11 narrative + the annotated tag `v0.19.0-b19-literature-validated`.
+
+**This commit lands** (all per-fork; ZERO eligible LOC for backport):
+
+| File | LOC delta | Per-fork or canonical? | Trunk presence | Backport relevance |
+|---|---|---|---|---|
+| `docs/scientific_framework.md` | +~155/-3 (NEW §5.3 = B32 closure) | per-fork doc | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/B19.md` | +~150/-10 (§0 ✅ CLOSED + §1.3 phase progression all-DONE + NEW §7.4.1 + §11 row 5 ✅ DONE + tail) | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/FOLLOWUPS.md` | +~100/-5 (NEW dashboard entry + B19 ✅ + B20 NEXT + B32 ✅ + B39 NEW + rules #9 + #10 PROMOTED) | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `CHANGELOG.md` | +~60 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `EXECUTION_PLAN.md` | +~5/-1 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (this entry) | +~40 | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| `notes/STEP_17c.md` | +~10/-3 (§1.7.8 update for B19 ✅ CLOSED → B20 ACTIVE) | per-fork | not in trunk | TRUNK-IRRELEVANT-by-novelty |
+| **Total source LOC at this commit** | **+~520/-22** | | | **0 eligible-for-backport** |
+
+**Cumulative B19 backport-debt state at B19 ✅ FULLY CLOSED**: **+145 LOC eligible-for-backport** — UNCHANGED across the entire B19 arc; entirely from Phase 2 Commit 3 (`6862d03`)'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites at L425/L432/L631/L648.
+
+**B19 backport-debt aggregation FINAL** (UPDATED at this Phase 5 close-out commit):
+
+| Phase | Source LOC | Eligible-for-backport LOC | Cumulative eligible | Notes |
+|---|---|---|---|---|
+| Phase 0 (`d9c90d5`) | +54/-12 (`imogenoutput.cpp`) | 0 | 0 | per-fork surface (C++ port of writer) |
+| Phase 1 INTERIM (`4c83561`) | +37/0 (`run_all.py` reorder) | 0 | 0 | per-fork (`intermediary_py/` not in trunk) |
+| Phase 1 CLOSE (`9c7417c`) | +0/-0 (pure-doc cascade) | 0 | 0 | TRUNK-IRRELEVANT pure-doc |
+| Phase 2 Commit 1 (`d7a0673`) | +165/-9 (`run_coupled.sh`) | 0 | 0 | per-fork launcher novelty |
+| Phase 2 Commit 2 (`53e19f5`) | +47/-6 (`imogen_intermediary.ins`) | 0 | 0 | per-fork .ins |
+| Phase 2 Commit 3 (`6862d03`) | +145/0 (`imogen_lpjg.f`) | **+145** | **+145** | canonical engine source; first eligible LOC |
+| Phase 2 close-out (`170039e`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 close (`ed51e05`) | 0 | 0 | +145 | pure-doc cascade |
+| Phase 3 ADDENDUM (`0e665d4`) | +136/-37 (per-fork only) | 0 | +145 | per-fork in entirety (B34 + B35) |
+| Post-Phase-3-ADDENDUM hygiene (`f7ab695`) | +17/-17 (encoding-only) | 0 | +145 | per-fork in entirety (canonical file but novel comments) |
+| Phase 4 BALLPARK_PASS landing (`82a1bc8`) | +~280 (NEW Python tool) | 0 | +145 | per-fork in entirety |
+| **Phase 5 close-out (THIS commit)** | **+~520/-22** (per-fork only) | **0** | **+145 (FINAL)** | per-fork in entirety; B19 closes |
+
+**Backport Sprint guidance at B19 close** (for the future maintainer who picks this up):
+
+The Backport Sprint at the post-B19 backport-relevant work cycle should handle BOTH B10 (+121 LOC writer fix from step 17b's `imogen_lpjg.f`) AND B33(c) (+145 LOC from Phase 2 Commit 3's `imogen_lpjg.f`) **together**, since both touch the same canonical Fortran engine source file. Risk profile for both: ZERO (B10 = additive-only writer; B33(c) = additive-only + warn-only with conservative predicate `IF (INDEX(RESOLVED_PATH, '/IMOGEN//') .EQ. 0) RETURN`).
+
+**Bycatch finding for the Backport Sprint** (already documented in B19.md §6.4.1; mentioned here for ledger completeness): legacy_A SSP1-2.6 reference outputs at `version_A/.../IMOGEN_SSP1_RCP26_Clim/output/` are physically implausible for the early 20th century (CO2 +9 ppm/yr in 1900-1903 vs Law Dome's ~0.7 ppm/yr; CH4 wrong direction). When porting B33(c)'s WARN_POSIX_CONCAT_COLLAPSE helper to `trunk_r13078`'s `imogen/code/imogen_lpjg.f`, do NOT use legacy_A outputs as a numerical-comparison reference for trunk-side validation. Use Law Dome ice-core record (or any other authoritative published source) as reference instead. This bycatch finding is consistent with the user-noted general fact that legacy A and B "do not work properly or at all".
+
+**B19 ✅ FULLY CLOSED. What's next** (post-B19):
+
+- **B20 NEXT-IN-QUEUE (~1-2 d)** — literature-comparison sanity check for global N2O magnitudes; ZERO TRUNK source-touch expected (B20 is full-resolution scenario runs + literature plot comparison; per-fork analysis only).
+- **17c.1+ cluster phases** on KIT IMK-IFU `owl` — TRUNK-relevance TBD per sub-phase as the work lands.
+- **Local v1 verification window** (B36 + B37 + B39): B36 is "**possibly TRUNK-RELEVANT** if the audit surfaces any source-code fix needed" per its FOLLOWUPS row; B37 "possibly TRUNK-RELEVANT only if substantive Fortran source observation surfaces"; B39 TRUNK-IRRELEVANT-by-novelty (`runs/<SCEN>/imogen_intermediary.ins` is per-fork; the engine source consumer at `climatemodel.cpp:163-167` is the C++ port also per-fork).
+
+The Backport Sprint should review this LEDGER's full B19 group at the time of the sprint to identify the canonical +145 LOC + decide on porting timing relative to other backlog items.
+
+---
+
+### B19 Phase 4 BALLPARK_PASS landing (commit `82a1bc8`, 2026-05-18 evening session 5 continuation): literature-comparison validation vs Law Dome ice-core record + Option-B plan pivot — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport.
 
 **Background**: original B19.md §6 plan called for comparing v1.0 Run C engine output against legacy_A reference outputs. Stage 4-pre investigation at session 5 evening (2026-05-18 ~17:00 UTC+2) surfaced that legacy_A's SSP1-2.6 reference outputs at `version_A/.../IMOGEN_SSP1_RCP26_Clim/output/` are physically implausible for the early 20th century (CO2 +9 ppm/yr in 1900-1903 vs Law Dome historical ~0.7 ppm/yr; CH4 -50 ppb/yr — wrong direction). Plan PIVOTED to Option B (literature comparison) per user authorization 2026-05-18 ~17:30 UTC+2.
 

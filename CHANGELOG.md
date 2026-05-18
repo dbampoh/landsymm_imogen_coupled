@@ -14,6 +14,71 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-18 (evening, session 5 continuation) — B19 ✅ FULLY CLOSED — Phase 5 close-out doc cascade + tag `v0.19.0-b19-literature-validated` (annotated; 3-remote-pushed) + rule #9 + rule #10 BOTH ✅ PROMOTED to standing rules + B32 ✅ CLOSED (`docs/scientific_framework.md` §5.3 NEW) + B39 NEW filed — **6-surface in-tree doc cascade + 1 source touch + 1 sibling-narrative on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; tag pushed at THIS commit; 3-remote convergence verified at THIS commit**
+
+**Scope of this commit**: B19 Phase 5 close-out — the FINAL B19 commit. Lands the close-out doc cascade summarising Phases 0+1+2+3+3-ADDENDUM+4 + 1 source touch (`docs/scientific_framework.md` NEW §5.3 = B32 closure) + 1 sibling Part 11 narrative + the annotated tag `v0.19.0-b19-literature-validated` + 3-remote convergence verification + rule #9 + rule #10 formal promotions in `notes/FOLLOWUPS.md` Operational Heuristics § + B39 NEW audit-item filing.
+
+**Tag wording decision** (user-deferred to me at Phase 5 opening): selected `v0.19.0-b19-literature-validated` (compact + accurate). The original §7 plan's `v0.19.0-b19-closed-loop-verified` was technically inaccurate post-Phase-4-pivot (we did literature comparison vs Law Dome ice-core, not legacy A/B closed-loop comparison; legacy_A reference was empirically unreliable). The chosen wording reads cleanly in `git tag --list`; the long-form annotation message provides the full B19 close-out narrative.
+
+**B19 phase progression at close** (canonical summary):
+
+| Phase | Outcome | Commit |
+|---|---|---|
+| Phase 0 — SPINUP/FIRSTCALL hardcoding investigation | ✅ outcome (β); 3-LOC source change at `imogenoutput.cpp:399-401` | `d9c90d5` |
+| Phase 1 — `intermediary_py` + step-13 adapter reproducibility re-run | ✅ PASS-with-bonus; ALL 4 reproducibility gates byte-exact + 20 PNGs bonus | `4c83561` + `9c7417c` |
+| Phase 2 — IMOGEN engine state-machine prep + inputs verification | ✅ PASS; B31 + B33 + A3 all CLOSED; +145 LOC eligible-for-backport | `d7a0673` + `53e19f5` + `6862d03` + close-out `170039e` |
+| Phase 3 — IMOGEN engine round-trip workstation smoke (Run B + Run C) | ⚠️ + ✅ PARTIAL-PASS + BALLPARK_PASS; F-10 case-α 3rd + 4th reproductions; B34 + B35 CLOSED at ADDENDUM | `ed51e05` + `0e665d4` + post-B34 hygiene `f7ab695` |
+| Phase 4 — Closed-loop validation REFRAMED as literature comparison vs Law Dome ice-core | ✅ BALLPARK_PASS; CO2 ≤5% / CH4 ≤1% / N2O ≤1.5% of MacFarling Meure 2006 | `82a1bc8` |
+| Phase 5 — Doc cascade + B19 close-out tag | ✅ DONE at THIS commit; tag `v0.19.0-b19-literature-validated` 3-remote-pushed | THIS commit |
+
+**Audit-item state matrix at B19 close**:
+
+- **CLOSED at B19**: A3 + B28 + B31 + B32 + B33(a)+(b)+(c) + B34 + B35 (8 audit items + 1 sub-finding closed)
+- **Deferred to local v1 verification window** (between B19 close + 17c.1+ cluster phases; ~4-9 h cumulative): B36 (Fortran IMOGEN background-emission audit; ~2-4 h) + B37 (productive-year-ceiling explanatory study; ~1-3 h) + B39 (CO2_INIT_PPMV per-YEAR1 configurability; ~1-2 h; NEW at this commit)
+- **Deferred to future intermediary_py revision cycle** (cosmetic; not v1.0-blocking): B29 (intermediary_py schema divergence; ~30-60 min) + B30 (intermediary_py plotting-output-location; ~1 h)
+
+**Rule promotions at this commit**:
+
+1. **Rule #9** (harness-authoring + targeted verification routinely surface latent defects in the system under test) — formally promoted to standing rule in `notes/FOLLOWUPS.md` Operational Heuristics § rule #9. Empirical justification: 5+ independent recurrences across step 17b/c (B12 NaN; B15+B16+B17(a)+B17(b)+Path α; B28+B29+B30; B31+B32+B33+B34+B35+B37+B39; A3a+b+c). Promotion was "firmly justified" per `CHANGELOG.md` line 412 after the A3a+b+c recurrence at Phase 2 Commit 1.
+
+2. **Rule #10** (verification-integrity discipline: gate tables MUST cite concrete artifacts; gates authored + executed BEFORE doc claims; amend acceptance criteria honestly when empirical outcomes diverge rather than silently moving goalposts) — formally promoted to standing rule in `notes/FOLLOWUPS.md` Operational Heuristics § rule #10. Empirical justification: 6 consecutive clean operating datapoints across B19 Phase 2/3/3-ADDENDUM/4 (`d7a0673` proposal-after-fabrication-catch + `53e19f5` + `6862d03` + `ed51e05` + `0e665d4` + `82a1bc8`). Most challenging case: the §5.1.1 amendment at `ed51e05` documenting a partially-disagreeing empirical outcome rather than silently moving goalposts.
+
+**B32 closure narrative**:
+
+`docs/scientific_framework.md` NEW §5.3 "Natural-flux channel mutual exclusion + the no-double-counting invariant" lands at this commit (placed as subsection of §5 F-10 architectural caveat for logical adjacency; `as_5_3` placement option per user-authorized 2026-05-18 evening framing decision). ~+155 LOC condensed from `COUPLED_MODEL_INVESTIGATION.md` §2.3 + §3.7 + the B19 Phase 1 CLOSE side-investigation findings + the B33 defense-in-depth narrative. Documents the 4-channel × 3-option matrix (NATURAL CO2 + NATURAL CH4/N2O each have Options A/B/C; ANTHRO CO2 + ANTHRO CH4/N2O each have Options A/B); the mutual-exclusion invariant; the (--coupling-mode, --backbone) → Options mapping enforced by the B31 launcher auto-rewrite at `scripts/run_coupled.sh` step 4.5; the per-option-pair "why double-counting is forbidden" subsections; the `intermediary_py` anthropogenic-only invariant; and the forensic backstory (rediscovered as documentation gap during B19 Phase 1 CLOSE user-driven double-counting investigation 2026-05-16 evening).
+
+**B39 NEW filing narrative**:
+
+The empirical Phase 4 outcome at `82a1bc8` showed a uniform CO2 negative bias of -3.5% to -4.2% across the smoke window 1900-1903 vs Law Dome ice-core reference. The Phase 4 attribution (rule #10 honest framing) traced this to ONE root cause: `CO2_INIT_PPMV 286.085` in `runs/SSP1-2.6/imogen_intermediary.ins` is a 1850s pre-industrial value, used as the engine's seed for iteration 1 (year YEAR1=1900). For 1900-start sims this seed is ~10 ppm BELOW the historical 1900 concentration (296.1 ppm). The engine's flux dynamics + CMIP6-SSP1-2.6 anthropogenic emissions trajectory are correct (CH4 ≤1% drift, N2O ≤1.5% drift); only the init seed is wrong-era. **B39 is filed as a NEW audit item to track the per-YEAR1 configurability fix** — option (α) declare `CO2_INIT_PPMV` as a per-YEAR1-configurable parameter (~5-10 LOC) OR option (β) modify engine to PRE-AGE the seed via spinup years (~30-50 LOC). Recommended option (α) at the local v1 verification window. Acceptance test: re-run B19 Phase 4 with the fix applied; expect CO2 drift to drop from -3.5-4.2% → <1% (STRICT_PASS); CH4 + N2O drift unchanged.
+
+**Phase 5 acceptance — Y0-Y5 cascade-integrity gates** (rule #10 evidence-citation discipline applied to a pure-doc commit; the equivalent of a "runtime smoke" for documentation): all 6 PASS. Canonical evaluation at `notes/B19.md` §7.4.1.
+
+**Cumulative B19 backport-debt state at B19 close**: **+145 LOC eligible-for-backport** — entirely from Phase 2 Commit 3 (`6862d03`)'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE` helper subroutine + 4 CALL sites at L425/L432/L631/L648. Phase 5 contributes zero source-code LOC to canonical engine sources. The Backport Sprint should handle B10 (+121 LOC writer fix from step 17b) + B33(c) (+145 LOC) together since both touch `imogen/code/imogen_lpjg.f`.
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (`docs/scientific_framework.md` is per-fork; the 6 doc-cascade surfaces are all per-fork; the sibling Part 11 is outside-repo).
+
+**v1.0 % done estimate revised UP to ~92-94%** (from ~88-91% at Phase 4 close `82a1bc8`). Phase 5 close-out is the operational milestone that retires B19 entirely + unblocks B20 + 17c.1+ cluster phases. The remaining ~6-8% spans: B20 (~1-2 d), B36 + B37 + B39 + B29 + B30 (~1-3 h cumulative), 17c.1+ cluster setup.
+
+**What's next** (post-B19):
+
+- **B20 NEXT-IN-QUEUE (~1-2 d)** — literature-comparison sanity check for global N2O magnitudes per Tian 2020 GCB / Saikawa 2014 ACP / IPCC AR6 WG1 Ch. 5 / Saunois 2020 ESSD. Per `notes/STEP_17c.md` §1.7.8 + the user-authorised 2026-05-15 night NEXT-TASK CLUSTER ordering.
+- **17c.1+ cluster phases** on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative): step 17c sub-phases 17c.1 + 17c.2 + 17c.3 + 17c.4 covering production-scale runs + paper-stage data generation.
+- **Deferred items (local v1 verification window)**: B36 + B37 + B39 (~4-9 h cumulative); can be done in any order between B19 close + 17c.1+ start.
+- **Deferred items (future intermediary_py revision cycle)**: B29 + B30 (~1.5 h cumulative); cosmetic.
+
+**6-file in-tree doc cascade + 1 source touch + 1 sibling-narrative at this commit**:
+
+- _source_: `docs/scientific_framework.md` NEW §5.3 (B32 closure; ~+155 LOC)
+- _doc_: `notes/B19.md` (§0 ✅ CLOSED + §1.3 phase progression all-DONE + NEW §7.4.1 ~+150 LOC + §11 row 5 ✅ DONE + tail timestamp)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard close-out entry + B19 row → ✅ CLOSED + B20 row → PRIORITY HIGH NEXT-IN-QUEUE + B32 ✅ CLOSED flip + B39 NEW row + Operational Heuristics § rules #9 + #10 PROMOTED)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B19 → ✅ DONE flip)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B19 close summary entry; cumulative state UNCHANGED at +145 LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B19 ✅ CLOSED → B20 ACTIVE NEXT)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md` — NEW Part 11 (B19 close-out narrative)
+
+**Files** (1 source + 6 doc + 1 sibling-narrative): `docs/scientific_framework.md` + `notes/B19.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-12_session3.md`.
+
 ### 2026-05-18 (evening, session 5 continuation) — B19 Phase 4 ✅ BALLPARK_PASS DONE — literature-validated via Law Dome ice-core record (MacFarling Meure 2006); C1+C2+C3+C4 all PASS; v1.0 GHG concentrations within ≤5% of authoritative published 1900-1903 SSP1-2.6 historical values — **1 source + 5 doc commit on `b19-pipeline-verification` working branch off `main @ v0.17.8-step17c-prep-complete` commit `56fcfd8`; 3-remote-converge pending; NO tag yet (deferred to B19 Phase 5 close-out)**
 
 **Scope of this commit**: B19 Phase 4 closed-loop validation lands as literature-comparison BALLPARK_PASS. Phase 4 plan PIVOTED from the original §6 "compare against legacy_A reference" to "compare against Law Dome ice-core literature" (Option B; user-authorized 2026-05-18 evening) after Stage 4-pre investigation surfaced that legacy_A's SSP1-2.6 reference outputs at `version_A/.../IMOGEN_SSP1_RCP26_Clim/output/` are physically implausible (CO2 +9 ppm/yr in 1900-1903 vs Law Dome's ~0.7 ppm/yr; CH4 -50 ppb/yr — wrong direction). NEW Python validation tool `scripts/b19_phase4_literature_validate.py` (~280 LOC; per-fork; TRUNK-IRRELEVANT-by-novelty) reads v1.0 Run C `CO2.dat` for 1900-1903 → extracts col 2 (atm CO2 ppm) + col 7 (CH4 ppbv) + col 8 (N2O ppbv) → compares against hardcoded Law Dome reference (MacFarling Meure 2006 NOAA archive; spline-fit corrected; CH4 NOAA04 scale) → computes per-year per-species drift → applies tolerance gates → emits Markdown report + JSON summary.
