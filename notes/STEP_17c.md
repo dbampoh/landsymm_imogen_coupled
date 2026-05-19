@@ -1100,7 +1100,7 @@ The original 17c.0 PREP forecast (per session-3 handoff §0.4 → 5-phase plan i
 
 No stash this sub-phase. 17c.0.8 is pure book-keeping; no pre-existing WIP exists.
 
-#### 1.7.8 What's next (POST-B40 status update at 2026-05-19 evening session 7 continuation — LOCAL V1 VERIFICATION WINDOW IS NOW ✅ FULLY COMPLETE)
+#### 1.7.8 What's next (POST-LOCAL-V1-VERIFICATION-WINDOW-CLOSEOUT status update at 2026-05-19 evening session 7 continuation — close-out summary + annotated tag `v0.21.0-local-v1-verification-window-complete` 3-remote-pushed at THIS commit)
 
 Per the user-authorised next-task cluster (originally locked-in 2026-05-15 night at 17c.0.8 PREP close-out; updated at B19 close 2026-05-18 evening; updated at B37 + B36 + B39 close-outs in session 7; **further updated at B40 close 2026-05-19 evening session 7 continuation to reflect the COMPLETION of the local v1 verification window**):
 

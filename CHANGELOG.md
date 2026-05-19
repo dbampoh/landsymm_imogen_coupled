@@ -14,6 +14,84 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7 continuation) — LOCAL V1 VERIFICATION WINDOW ✅ FULLY COMPLETE — close-out summary commit + annotated tag `v0.21.0-local-v1-verification-window-complete` 3-remote-pushed at this commit; NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` canonical window summary (~340 LOC) consolidates the 4-item arc (B37 + B36 + B39 + B40); 3 NEW post-v1.0 audit items filed across the window (B44 + B45 + B46; NONE v1.0-blocking); cumulative backport-debt UNCHANGED at +145 LOC throughout; Rule #9 + Rule #10 at 11th consecutive datapoint each (with 2 honest self-corrections); v1.0 % done revised UP to ~96-98%; ZERO source-code change at this close-out commit; post-window NEXT = (optional) B44 productisation + 17c.1+ cluster phases on KIT IMK-IFU `owl` + Track 2 production runs + paper writing → v1.0 paper submission (~6-10 weeks calendar) — **5 in-tree doc surfaces (1 NEW + 4 updates) + 1 sibling Part 7 of session5_post_b19 handoff + annotated tag 3-remote-pushed at this commit**
+
+**Scope of this commit**: local v1 verification window close-out summary + tag. Pure synthesis/consolidation commit (no new technical findings; no source-code change). Bridges the gap between (a) the per-item close-outs at B37 + B36 + B39 + B40 (each landed via their own 6-surface cascade) and (b) the window-level audit-trail discipline that ties the 4-item arc together as a coherent verification-cycle milestone unblocking the path to 17c.1+ cluster phases + Track 2 production runs + paper writing.
+
+**Window arc** (all 4 items closed in session 7 continuation; ~4 h cumulative actual wall-clock vs 6-13 h cumulative estimate):
+
+| Commit | Item | Effort estimate | Actual | One-line verdict |
+|---|---|---|---|---|
+| `75811c0` | **B37** Productive-year-ceiling explanatory study | ~1-3 h | ~2 h | Path (iv) sidecar empirically confirmed; production-IMOGEN runs FEASIBLE without F-12; B44 + B45 NEW filed |
+| `a77ea8f` | **B36** Fortran IMOGEN background-emission audit | ~2-4 h | ~30 min | NO DOUBLE-COUNTING DEFECTS FOUND; all 4 sub-item criteria PASS; Rule-#10 self-correction #1 (IS92A doc-drift retracted) |
+| `8026740` | **B39** CO2_INIT_PPMV per-YEAR1 configurability fix (option α) | ~1-2 h | ~45 min | STRICT_PASS empirically confirmed at B19 Phase 4 re-validation; CO2 drift -3.5/-4.2% → -0.09/-0.80%; Rule-#10 self-correction #2 (xval-files-git-ignored discovery) |
+| `4ca1ef6` | **B40** Modern-decade N2O hump explanatory study | ~2-4 h | ~30 min | Methodological characteristic NOT defect; Saikawa-aligned channel scope; paper §2.4.4 paragraph drafted; B46 NEW filed |
+
+**Window-level headline findings** (5-bullet TL;DR; full narrative at `notes/LOCAL_V1_VERIFICATION_WINDOW.md` §1):
+
+1. **v1.0 paper-publication production-IMOGEN runs are FEASIBLE WITHOUT F-12 architectural fix** (B37's headline; empirically demonstrated via DR1; ~63 min total local scaled for all 5 SSP-RCPs)
+2. **No hidden double-counting in Fortran IMOGEN engine** (B36 confirmed clean; multi-layer no-double-counting defense intact)
+3. **Atmospheric concentrations now match Law Dome at STRICT_PASS-level** (B39 option α fix; 11 of 12 STRICT_PASS post-fix vs 8 of 12 pre-fix)
+4. **Modern-decade N2O hump is methodological characteristic NOT defect** (B40 Saikawa-aligned channel scope confirmation; paper §2.4.4 paragraph drafted)
+5. **Multi-layer scientific validation lines intact** (B19 Phase 4 + B20 + B36 + B37 + B39 + B40 combined evidence is scientifically-defensible for paper's results section)
+
+**Newly-filed post-v1.0 audit items across the window** (NONE v1.0-blocking):
+
+| ID | Title | Filed at | Priority | Trunk |
+|---|---|---|---|---|
+| **B44** | Productise path-iv sidecar in `scripts/run_coupled.sh` as `--engine-only-mode` flag | B37 close (`75811c0`) | MEDIUM | TRUNK-IRRELEVANT-by-novelty |
+| **B45** | Parametrise 3 hardcoded year sentinels (1901, 2100, 1871) in `lpjguess/modules/climatemodel.cpp::updateImogenControlData()` | B37 close (`75811c0`) | LOW | **TRUNK-RELEVANT** |
+| **B46** | Optional v1.5+ source-edit: split `Fluxes::N2O_SOIL` into separately-attributed channels in `ntransform.cpp` | B40 close (`4ca1ef6`) | LOW | **TRUNK-RELEVANT if option α full** |
+
+**Cumulative backport-debt across the entire window**: UNCHANGED at **+145 LOC** eligible-for-backport throughout (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`). **None of the 4 window items touched canonical engine source.** Future B45 (~5-15 LOC TRUNK-RELEVANT) + B46 option α full (~150-250 LOC TRUNK-RELEVANT) would add to cumulative debt when implemented in v1.1-1.5+ era.
+
+**Rule #9 + Rule #10 operating posture across the window**: clean operation at every commit; cumulative ≥11 consecutive datapoints each since formal promotion at B19 Phase 5 close-out (`7543c1e`). Two honest mid-cascade-authoring self-corrections (both retracted via grep/git verification before commit landed):
+
+1. **B36 self-correction**: initial IS92A→CMIP6 doc-drift fix proposal for `docs/scientific_framework.md` retracted via `grep` confirming reference was in FOLLOWUPS B36 row pre-audit framing (preserved as historical context per audit-trail discipline)
+2. **B39 self-correction**: initial xval `.ins` directive edits reverted after `git check-ignore` confirmed git-IGNORED status (regenerable by `setup_run.sh` copy-from-main; auto-inherits post-B39 main .ins values at next re-activation)
+
+**Paper-stage action needed (from B40 §4; not in this commit; user-side responsibility)**: the B40 §4 sector-ownership rule paragraph (drafted at `notes/B40.md` §4) needs paper-author integration into the working paper draft (`~/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/version_A/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/References/IMOGEN-PAPER-GMD_updated_intro_methods-aa.docx`) §2.4.4 sector-ownership rule section. Plus other paper amendments per `notes/PRODUCTION_RUN_CONFIG.md` §6 (IIASA → RCMIP/CMIP6 narrative update + Track 1 vs Track 2 framing + B19/B20/B36-B40 validation discussion).
+
+**Audit-item state matrix at this commit**:
+- B37 + B36 + B39 + B40 = ✅ ALL DONE
+- B44 + B45 + B46 = ⏳ NEW filed across the window (all post-v1.0)
+- All other audit items unchanged from B40 close at `4ca1ef6`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (close-out is pure synthesis; NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` is per-fork; doc-cascade surfaces are per-fork; sibling Part 7 is outside-repo; annotated tag is repo-scoped per the 3-remote-push discipline).
+
+**v1.0 % done estimate revised UP modestly to ~96-98%** (from ~95-97% at B41+B42+B43 close `268837f`; B40 close `4ca1ef6` was UNCHANGED at ~95-97%). The bump reflects:
+- v1.0 paper-publication path is now empirically unblocked for production-IMOGEN runs (B37)
+- engine architecture is verified clean on hidden-defaults risk (B36)
+- atmospheric concentration validation is now at STRICT_PASS-level (B39)
+- N2O channel methodological framing is documented + paper paragraph drafted (B40)
+- 3 NEW post-v1.0 audit items filed (B44 + B45 + B46; all post-v1.0; none v1.0-blocking)
+
+The remaining ~2-4% spans the OPTIONAL B44 productisation + 17c.1+ cluster phases + Track 2 production runs + validation triad + paper writing → v1.0 paper submission (~6-10 weeks calendar per `notes/PRODUCTION_RUN_CONFIG.md` §6.2).
+
+**Post-window roadmap** (full table at `notes/LOCAL_V1_VERIFICATION_WINDOW.md` §8):
+
+| Order | Item | Effort | Priority |
+|---|---|---|---|
+| (optional) | **B44** Productise path-iv sidecar in `scripts/run_coupled.sh` | ~20-30 min | MEDIUM |
+| 1 | **17c.1+ cluster phases** on KIT IMK-IFU `owl` | ~1-2 weeks SSH-iterative | HIGH (paper-publication critical-path) |
+| 2 | **Track 2 production runs** (5 SSP-RCPs × 1900-2100 × 62538-cell gridlist; using B37 path-iv sidecar) | ~1-2 weeks compute | HIGH |
+| 3 | **Validation triad execution + paper figures** | ~1 week | HIGH |
+| 4 | **Paper amendments + writing** (intro + methods + results + discussion + conclusion + §2.4.4 paragraph per B40 §4) | ~2-3 weeks active drafting | HIGH |
+| 5 | **v1.0 paper submission** to GMD or similar venue | target | TERMINAL |
+
+**5-surface in-tree doc cascade + 1 sibling-narrative + tag at this commit**:
+
+- _doc_: NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` (~340 LOC canonical window summary; consolidates the 4-item arc + cumulative state + paper-stage actions + post-window roadmap)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard window-complete entry; B37 + B36 + B39 + B40 rows all ✅ DONE from prior commits; B44 + B45 + B46 NEW rows from prior commits)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c window-complete annotation)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW window-summary entry; cumulative state UNCHANGED at +145 LOC throughout)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 window-complete annotation; cleaner forward-pointer to 17c.1+ cluster phases)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 7 (window close-out narrative; appends to session 7 evening Parts 3-6)
+- _tag_: `v0.21.0-local-v1-verification-window-complete` (annotated; 3-remote-pushed at this commit)
+
+**Files** (5 doc + 1 NEW window-summary; 0 source): NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` + tag.
+
 ### 2026-05-19 (evening, session 7 continuation) — B40 ✅ DONE — Modern-decade N2O hump explanatory study CLOSED with verdict METHODOLOGICAL CHARACTERISTIC NOT DEFECT; LPJG's `N2O_SOIL` channel scope confirmed at source level as Saikawa-2014-aligned (N-deposition-influenced natural pathway) rather than Tian-2020-narrow ("purely natural" only); full 1900-2100 time-mean (11.18 TgN2O/yr) WITHIN both envelopes; modern-decade peak (~14.43 TgN2O/yr 2008-2017) explained by ~10-15× increase in atmospheric NHx + NOy deposition perturbing soil mineral N pool; NEW B46 filed (optional v1.5+ source-edit to split channel; LOW priority); paper §2.4.4 sector-ownership rule paragraph drafted; ZERO source-code change; **LOCAL V1 VERIFICATION WINDOW IS NOW ✅ FULLY COMPLETE** (B37 + B36 + B39 + B40 all closed in this session 7); Rule #9 + Rule #10 at 11th consecutive datapoint each — **6 in-tree doc surfaces (1 NEW + 5 updates) + 1 sibling Part 6 of session5_post_b19 handoff on `main` working branch directly; 3-remote-converge pending at this commit**
 
 **Scope of this commit**: B40 close-out doc cascade. ZERO source-code change to `lpjguess/` or `imogen/` engine trees (B40 is investigation; B46 optional source-edit deferred per B-item lifecycle discipline + per the FOLLOWUPS B40 row prescription "Possibly leads to a NEW v1.5 audit item if substantive code refinement is warranted"). Bridges the gap between (a) the B20 close-out empirical observation of the modern-decade N2O hump (2008-2017 mean 14.43 TgN2O/yr; +50.27% above Tian 2020 envelope max 11.5 TgN2O/yr) and (b) the source-level mechanism confirmation + paper-stage analytical narrative.

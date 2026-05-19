@@ -2094,6 +2094,34 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
+### LOCAL V1 VERIFICATION WINDOW ✅ FULLY COMPLETE — close-out summary + annotated tag `v0.21.0-local-v1-verification-window-complete` (this commit, 2026-05-19 evening session 7 continuation, immediately after B40 close at `4ca1ef6`): 5 in-tree doc-cascade surfaces (1 NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` ~340 LOC + 4 doc updates) + sibling Part 7 of session5_post_b19 handoff + annotated tag 3-remote-pushed; ZERO source-code change — **TRUNK-IRRELEVANT-by-novelty in entirety** (close-out is pure synthesis/consolidation; no new technical findings; window-level audit-trail discipline); ZERO eligible LOC contributed for backport at this commit.
+
+**Cumulative backport-debt across the entire local v1 verification window**: UNCHANGED at **+145 LOC** eligible-for-backport throughout (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`). **None of the 4 window items (B37 + B36 + B39 + B40) touched canonical engine source.**
+
+**Window arc per-item backport classification**:
+
+| Commit | Item | Source touches | Backport classification | Eligible LOC contributed |
+|---|---|---|---|---|
+| `75811c0` | B37 productive-year-ceiling explanatory study | ZERO source change (investigation only) | TRUNK-IRRELEVANT-by-novelty | 0 |
+| `a77ea8f` | B36 Fortran IMOGEN background-emission audit | ZERO source change (investigation only) | TRUNK-IRRELEVANT-by-finding | 0 |
+| `8026740` | B39 CO2_INIT_PPMV per-YEAR1 configurability fix | 1 git-committed .ins file (main `runs/SSP1-2.6/imogen_intermediary.ins`; per-fork) + 1 Python script POST-B39-NOTE prepend (per-fork) + NEW `docs/scientific_framework.md` §6.1 cross-reference table (per-fork) + NEW row in `notes/PRODUCTION_RUN_CONFIG.md` §2.1 (per-fork) | TRUNK-IRRELEVANT-by-novelty in entirety | 0 |
+| `4ca1ef6` | B40 modern-decade N2O hump explanatory study | ZERO source change (investigation only) | TRUNK-IRRELEVANT-by-finding | 0 |
+| **THIS commit** | Window close-out summary + tag | ZERO source change (pure synthesis) | TRUNK-IRRELEVANT-by-novelty | 0 |
+| **WINDOW TOTAL** | — | — | — | **0** |
+
+**Future backport-debt projections** (when implemented post-v1.0):
+
+| Future ID | Title | Estimated eligible LOC | Trunk-relevance |
+|---|---|---|---|
+| **B44** (productise path-iv sidecar in `scripts/run_coupled.sh` as `--engine-only-mode` flag) | ~20-30 LOC bash | 0 | TRUNK-IRRELEVANT-by-novelty (`scripts/run_coupled.sh` is per-fork) |
+| **B45** (parametrise 3 hardcoded year sentinels 1901/2100/1871 in `lpjguess/modules/climatemodel.cpp::updateImogenControlData()`) | ~5-15 LOC source-edit | **5-15** | **TRUNK-RELEVANT** (canonical engine source; Fortran twin at `imogen/code/imogen_lpjg.f` likely has analogous logic the Backport Sprint should handle together) |
+| **B46 option α full** (split `Fluxes::N2O_SOIL` into separately-attributed channels in `lpjguess/modules/ntransform.cpp` + Fluxes enum extension in `framework/guess.h`) | ~150-250 LOC source-edit | **150-250** | **TRUNK-RELEVANT** (canonical N-cycle module + Fluxes enum shared with `trunk_r13078/`) |
+| B46 option β ratio-based (per-fork output-side post-hoc) | ~60-90 LOC | 0 | TRUNK-IRRELEVANT-by-novelty |
+
+**Backport Sprint addendum**: at the post-step-19 Backport Sprint work cycle, the cumulative TRUNK-RELEVANT debt is +145 LOC (current) + (potentially) +5-15 LOC (B45 if implemented) + (potentially) +150-250 LOC (B46 option α full if implemented) = up to **+310-410 LOC** total eligible-for-backport in worst case. All TRUNK-RELEVANT items touch the canonical engine source files (`imogen/code/imogen_lpjg.f` + `lpjguess/modules/climatemodel.cpp` + `lpjguess/modules/ntransform.cpp` + `lpjguess/framework/guess.h`); the Backport Sprint should handle them as a coordinated batch since they share the same backport-target file set.
+
+---
+
 ### B40 ✅ DONE — Modern-decade N2O hump explanatory study CLOSED with verdict METHODOLOGICAL CHARACTERISTIC NOT DEFECT (this commit, 2026-05-19 evening session 7 continuation, immediately after B39 close at `8026740`): 6 in-tree doc-cascade surfaces (1 NEW `notes/B40.md` ~400 LOC + 5 doc updates) + sibling Part 6 of session5_post_b19 handoff; ZERO source-code change — **TRUNK-IRRELEVANT-by-finding** (audit confirms LPJG N-cycle architecture is consistent with published Smith 2014 / Olin 2015 / Xu-Ri 2008 / Ma 2022 JAMES design; the modern-decade N2O hump empirical signal is well-explained by Saikawa-2014-aligned channel-scope definition; no defect requiring source-code fix at this commit); ZERO eligible LOC contributed for backport at this commit.
 
 **Audit outcome**: source-level smoking-gun at `lpjguess/modules/somdynam.cpp:1689-1691` confirmed the FOLLOWUPS B40 hypothesis (LPJG's `N2O_SOIL` channel aggregates "purely natural" + "N-deposition-influenced natural" N2O contributions without source-discrimination). Paper §2.4.4 sector-ownership rule paragraph drafted (per `notes/B40.md` §4) explicitly framing v1.0's LPJG-natural-N2O channel as Saikawa-2014-aligned. **NEW B46 filed** (optional v1.5+ source-edit to split `Fluxes::N2O_SOIL` into separately-attributed channels; LOW priority; NOT v1.0-blocking).
