@@ -14,6 +14,83 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7) — B37 ✅ DONE — productive-year-ceiling explanatory study CLOSED; root cause IDENTIFIED + closed-form formula derived + Run B + Run C + DR2 empirical match exact; PATH (iv) launcher-side `done`-marker sidecar surfaced + EMPIRICALLY CONFIRMED in DR1 (202 year-dirs 1900-2101 produced in 12 min 48 sec wall); v1.0 paper-publication production-IMOGEN-engine runs (full 1900-2100 × 5 SSP-RCP scenarios) ✅ FEASIBLE WITHOUT F-12 architectural fix; B44 NEW filed (productise path-iv sidecar in `scripts/run_coupled.sh`; MEDIUM priority; TRUNK-IRRELEVANT-by-novelty); B45 NEW filed (parametrise the 3 hardcoded year sentinels in `lpjguess/modules/climatemodel.cpp::updateImogenControlData()`; LOW priority; TRUNK-RELEVANT for canonical engine source); NEW `notes/B37.md` canonical landing record (~340 LOC) + sibling acceptance evaluation; **B37 is the FIRST item closed in the local v1 verification window — investigation-only commit; ZERO source-code change** — **6 in-tree doc surfaces (1 NEW + 5 updates) + 1 sibling Part 3 of session5_post_b19 handoff + audit-evidence bundle on `main` working branch directly; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: B37 close-out doc cascade. Investigation completed without any source-code change to the C++ engine (`lpjguess/modules/climatemodel.cpp`) or the Fortran twin (`imogen/code/imogen_lpjg.f`) per the B-item lifecycle discipline (B37 is investigation; B45 source-edit fix deferred). Bridges the gap between (a) the prior B19 Phase 3 + 3-ADDENDUM empirical observations of an 8× discrepancy in productive-year ceiling (Run B 1871-start → 32 years; Run C 1900-start → 4 years; classified as "interesting, hypothesized but not verified" at filing time) and (b) the rigorous source-reading + empirical-validation answer required by the session 6 morning paper-publication-critical-path priority bump.
+
+**Headline finding**: the productive-year ceiling under single-process `imogencfx` mode + F-10 case-α deadlock is **NOT** a stochastic empirical mystery — it is a **deterministic closed-form function of the bootstrap YEAR1**, governed by **three hardcoded year sentinels** (`1901`, `2100`, `1871`) embedded in pure C++ logic at `lpjguess/modules/climatemodel.cpp::updateImogenControlData()` lines 1185-1197, **none parametrised against the .ins**:
+
+```
+void updateImogenControlData() {
+    IMOGENConfig::YEAR1++;
+    IMOGENConfig::IYEND++;
+    if (IMOGENConfig::YEAR1 == 1901) { IMOGENConfig::SPINUP=false; }
+    if (IMOGENConfig::YEAR1 == 2100) { IMOGENConfig::KEEPRUNNING = false; }
+    if (IMOGENConfig::IYEND > 1900)  { IMOGENConfig::FIRSTCALL = false; }  // <- THE CEILING ROOT CAUSE
+    IMOGENConfig::YEAR1_LPJG = 1871;                                       // <- the over-shoot cosmetic-ugliness source
+}
+```
+
+The closed-form formula `K_flip = ⌈(1900 - YEAR1 + 1) / 2⌉; productive_years = 2 × (K_flip + 1)` matches Run B (1871 → 32), Run C + DR2 (1900 → 4) **exactly**.
+
+**Per-path verdicts** (3 original candidates + 1 NEW surfaced in source-reading):
+
+| Path | Verdict | Evidence |
+|---|---|---|
+| (i) Configurable productive-year ceiling | VIABLE; requires 5-15 LOC source-edit at `updateImogenControlData()` | source-reading; filed as B45 NEW |
+| (ii) `--coupling-mode loose` bypass | **NOT VIABLE** for `-input imogencfx` (only affects LPJG-side `imogenoutput.cpp` flush_year writer, not engine) | source-reading decisive |
+| (iii) `skip_inprocess_engine_run` two-step | Partially viable; flag works as designed but needs upstream pre-stage solution | source-reading |
+| **(iv) Launcher-side `done`-marker sidecar (NEW)** | **✅✅ VIABLE; empirically confirmed in DR1** | DR1 = 202 year-dirs (1900-2101) in 12 min 48 sec wall on smoke 4-cell |
+
+**Empirical evidence (DR2 control + DR1 treatment, 2026-05-19 evening)**:
+
+- **DR2 control** (no sidecar; re-reproduces Run C on current HEAD): produced exactly **4 year-dirs (1900-1903)** in 10 min wall (timeout-killed at F-10 deadlock per design). All acceptance gates G0-G7 ✅ PASS or ℹ️ INFO. Empirically validates the closed-form formula on current HEAD `268837f`.
+- **DR1 treatment** (path-iv sidecar `while true; do touch <HSHAKE>/done; sleep 1; done` in background): produced **202 year-dirs (1900-2101)** in 12 min 48 sec wall. ALL 201 paper-publication-target years 1900-2100 have valid CO2.dat with physically-sensible SSP1-2.6 trajectory (1900: 285.829 ppm → 2050 peak: 462.785 → 2100: 417.518 ppm; matches B19 Phase 4 / B39 below-Law-Dome attribution + SSP1-2.6 published mitigation pathway shape). The +1 over-shoot empty 2101 placeholder is a benign cosmetic side-effect of the engine attempting one extra iter past YEAR1==2100 and hitting the brittle `YEAR1_LPJG=1871` hardcoded reset (filed as B45 cleanup). G2 + G6 ✅ PASS; G3 + G5 ❌ FAIL-as-expected (single failure caused by the empty 2101 placeholder; characterized + explained per Rule #10 honest framing); G0 + G1 + G4 ✅ PASS.
+
+**Wall-time scaling estimate**: ~3.78 sec per productive year on this workstation (i9-11900K; smoke 4-cell config). 5-SSP-RCP scaling: ~63 min total local wall for all 5 paper-target scenarios' engine-only standalone phase. **Local-during-verification-window timing operationally viable per Decision (c)**.
+
+**Bottom line for v1.0 paper publication**: ✅ Path (iv) closes B37's paper-publication critical-path dependency that the session 6 morning priority bump established. The v1.0 paper-publication production-IMOGEN-engine runs (full 1900-2100 × 5 SSP-RCP scenarios) are **NOT blocked on F-12 architectural fix**. F-12 + Track-2 cluster-MPI tight-coupling remain v1.1+ work per B43 (unchanged).
+
+**B44 NEW filing narrative**: productise the path-iv `done`-marker sidecar in `scripts/run_coupled.sh` as a new `--engine-only-mode` (or `--bypass-lpjg-handshake`) flag. ~20-30 LOC bash addition with trap-on-EXIT cleanup, launcher-message integration, `--help` text + inline header comment. MEDIUM priority; TRUNK-IRRELEVANT-by-novelty. Recommended timing: alongside or shortly after B37 close-out + before 17c.1+ cluster setup so the cluster-orchestration `sbatch` can use the new flag.
+
+**B45 NEW filing narrative**: parametrise the 3 hardcoded year sentinels (`1901`, `2100`, `1871`) in `lpjguess/modules/climatemodel.cpp::updateImogenControlData()` via new IMOGENConfig parameters (`SPINUP_END_YEAR`, `RUN_END_YEAR`, optional `YEAR1_LPJG_RESET` or just remove the reset entirely). ~5-15 LOC source-edit. LOW priority; TRUNK-RELEVANT for canonical engine source; the Fortran twin at `imogen/code/imogen_lpjg.f` likely has analogous logic the Backport Sprint should handle together. Recommended timing: v1.1+ alongside F-12 architectural work. NOT v1.0-blocking.
+
+**Audit-item state matrix at this commit**:
+- **B37 ✅ DONE** (investigation; root cause identified + closed-form formula derived + Run B/C/DR2/DR1 empirical match)
+- **B44 ⏳ NEW filed** (productise path-iv sidecar; MEDIUM priority; ~20-30 LOC bash)
+- **B45 ⏳ NEW filed** (parametrise 3 hardcoded year sentinels; LOW priority; ~5-15 LOC source-edit; TRUNK-RELEVANT)
+- All other audit items unchanged from B41+B42+B43 close at `268837f`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (B37 is investigation; no source-code change to `lpjguess/` or `imogen/` trees; doc-cascade surfaces are per-fork; new `notes/B37.md` is per-fork; audit-evidence at `_chat_artifacts/b37_diagnostic_run_2026-05-19/` is sibling-only). Cumulative B19+B20+B41+B42+B43+B37 backport-debt UNCHANGED at **+145 LOC** eligible-for-backport (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`). The future B45 implementation would add ~5-15 LOC TRUNK-RELEVANT to the cumulative debt.
+
+**v1.0 % done estimate UNCHANGED at ~95-97%** (this commit is investigation-only; no source changes; the v1.0 architecture is unchanged; B37's value is unblocking the path forward for production-IMOGEN runs without F-12).
+
+**Rule #9 + Rule #10 datapoints at this commit**:
+- **Rule #9 (harness-authoring surfaces latent defects)** — 8th consecutive recurrence: the DR2 + DR1 harness-authoring surfaced (a) the path-iv NEW solution path that wasn't in the original 3-candidate scope; (b) the 2101 over-shoot empty placeholder side-effect; (c) the brittle `./IMOGEN/output/1871/T_anom.dat` fallback in the over-shoot iter (forensic clue for the `YEAR1_LPJG=1871` hardcode at `climatemodel.cpp:1197`).
+- **Rule #10 (verification-integrity discipline)** — 8th consecutive clean operating datapoint: harness scripts authored + acceptance gates pre-specified BEFORE diagnostic runs were executed (`_chat_artifacts/b37_diagnostic_run_2026-05-19/{_common.sh, dr2_control_no_sidecar.sh, dr1_treatment_with_sidecar.sh}`); G3 + G5 FAIL-as-expected verdicts honestly reported AS-IS (not retro-fit to claim PASS) and explained via 2101-over-shoot empty-placeholder narrative + the brittle YEAR1_LPJG=1871 fallback forensic; path-iv NEW solution honestly acknowledged as outside the original 3-candidate scope per Rule #10 amendment-vs-rewrite corollary.
+
+**Verification window NEXT** (~5-10 h remaining of original 6-13 h budget):
+- **B36** (~2-4 h Fortran IMOGEN background-emission audit at `imogen/code/imogen_lpjg.f`)
+- **B39** (~1-2 h CO2_INIT_PPMV per-YEAR1 configurability fix)
+- **B40** (~2-4 h modern-decade N2O hump explanatory study; paper-stage analytical work)
+
+Then 17c.1+ cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative); production-IMOGEN-engine standalone phase can be done LOCAL via path-iv sidecar (~63 min for all 5 SSP-RCPs) OR cluster whichever-is-fastest per Decision (c).
+
+**6-surface in-tree doc cascade + 1 sibling-narrative + audit-evidence bundle at this commit**:
+
+- _doc_: NEW `notes/B37.md` canonical landing record (~340 LOC; full source-reading + DR2 + DR1 + per-path verdict + NEW B44/B45 narratives)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B37 close entry + B37 row → ✅ DONE + B44 NEW row + B45 NEW row + dashboard refresh)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B37-status prepend)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B37 entry; cumulative state UNCHANGED at +145 LOC; cross-reference for future B45 implementation that will add ~5-15 TRUNK-RELEVANT LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B37 ✅ DONE → B36 ACTIVE NEXT)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 3 (B37 narrative; opens session 7 evening)
+- _audit_: `_chat_artifacts/b37_diagnostic_run_2026-05-19/{_common.sh (~11.3 KB), dr2_control_no_sidecar.sh (~3.2 KB), dr1_treatment_with_sidecar.sh (~4.8 KB), baseline_run_c_output_snapshot/, DR2_control_no_sidecar_run_*.log + pre_state.txt + post_state.txt + acceptance_gates.txt, DR1_treatment_with_sidecar_run_*.log (169944 lines) + sidecar_*.log + pre_state.txt + post_state.txt + progress.log + acceptance_gates.txt, B37_acceptance_evaluation_2026-05-19.md}`
+
+No tag at this commit (B37 close is operational milestone unblocking production-IMOGEN runs but not itself a release-worthy v0.x.0 milestone; the next tag candidate is at the local v1 verification window close-out after B36 + B39 + B40 complete, OR at v1.0.0-paper-publication-ready).
+
+**Files** (6 doc + 1 sibling-narrative + audit bundle): `notes/B37.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` + audit bundle at `_chat_artifacts/b37_diagnostic_run_2026-05-19/`.
+
 ### 2026-05-19 (morning, session 6) — B41 + B42 + B43 ✅ DONE FILING + decisions-recorded — production-config consolidated reference document `notes/PRODUCTION_RUN_CONFIG.md` authored (~300 LOC initial draft); B37 priority BUMPED to paper-publication critical-path dependency; v1.0 paper publication pipeline architecture + Track 1 vs Track 2 ecosystem comparison design + smoke→production parameter delta + updated `_peatland` LU forcing path map + `cf` → `cfx` → `imogencfx` input-module evolution + tight-coupling roadmap (F-12 → v1.1+) all locked in — **6 in-tree doc surfaces (5 within `lpj-guess_imogen_landsymm/` + sibling Part 2 of session5_post_b19 handoff) on `main` working branch directly; small surgical doc-cascade commit before local v1 verification window kickoff; 3-remote-converge pending at this commit**
 
 **Scope of this commit**: production-run configuration reference authoring + B41/B42/B43 audit-item filing + B37 priority bump to paper-publication critical-path dependency. Documentation-only: ZERO source-code change. Bridges the gap between (a) the smoke-test live LPJG run configuration in `runs/SSP1-2.6/main.ins` (4-cell `gridlist_test2.txt`; `nyear_spinup 1`; `npatch 1`; basic LU; NO SimFire BLAZE; NO popdens; basic ndep; `firsthistyear`/`lasthistyear` 1900/1901) and (b) the v1.0 paper-publication production-style run configuration (full 62892-cell gridlist; `nyear_spinup 500`; `npatch 25`; updated `_peatland` LU; SimFire BLAZE binary; popdens NetCDF; 4-NetCDF wet/dry NHx + NOy ndep; full 1900-2100 envelope across all 5 SSP-RCPs).
