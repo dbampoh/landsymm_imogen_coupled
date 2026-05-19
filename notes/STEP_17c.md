@@ -1100,7 +1100,11 @@ The original 17c.0 PREP forecast (per session-3 handoff §0.4 → 5-phase plan i
 
 No stash this sub-phase. 17c.0.8 is pure book-keeping; no pre-existing WIP exists.
 
-#### 1.7.8 What's next (POST-LOCAL-V1-VERIFICATION-WINDOW-CLOSEOUT status update at 2026-05-19 evening session 7 continuation — close-out summary + annotated tag `v0.21.0-local-v1-verification-window-complete` 3-remote-pushed at THIS commit)
+#### 1.7.8 What's next (POST-B44 status update at 2026-05-19 evening session 7 continuation — `--engine-only-mode` flag productisation complete; cluster sbatch integration deferred to 17c.1 cluster setup; 17c.1+ cluster phases NOW UNBLOCKED)
+
+**B44 ✅ DONE 2026-05-19 evening session 7 continuation** (canonical landing record at `notes/B44.md`; no tag — operational-convenience milestone; cumulative backport-debt UNCHANGED at +145 LOC). Actual elapsed time ~1 h cumulative (~15 min source-edit + ~13 min acceptance-test wall + ~30 min cascade + ~10 min commit-drafting; per FOLLOWUPS B44 row estimate ~20-30 min source-edit + cascade overhead). Verdict: **`--engine-only-mode` flag added to `scripts/run_coupled.sh` (+~120 LOC bash) productising the path-iv launcher-side `done`-marker sidecar mechanism empirically confirmed at B37 DR1**. Acceptance test ✅✅ PASS (202 year-dirs 1900-2101 produced in ~12 min 35 sec wall on smoke 4-cell — exact behavior parity with B37 DR1 + uniform +10 ppm shift from post-B39 init-seed correction propagating forward). 17c.1+ cluster orchestration UNBLOCKED for clean `--engine-only-mode` passthrough at `scripts/cluster/run_coupled.sbatch` (1-line addition deferred to 17c.1 cluster setup phase per `notes/B44.md` §4). NO new audit items filed at B44 close. Rule #9 + Rule #10 at 12th consecutive datapoint each (B44 acceptance-test surfaced post-B39 CO2 trajectory at 2050 ~472.872 ppm at upper end of SSP1-2.6 published peak range; honestly framed as B44-out-of-scope observation worth flagging for future paper-validation-triad work at 17c.1+).
+
+Per the user-authorised next-task cluster (updated post-B44 to reflect cluster orchestration unblocking):
 
 Per the user-authorised next-task cluster (originally locked-in 2026-05-15 night at 17c.0.8 PREP close-out; updated at B19 close 2026-05-18 evening; updated at B37 + B36 + B39 close-outs in session 7; **further updated at B40 close 2026-05-19 evening session 7 continuation to reflect the COMPLETION of the local v1 verification window**):
 

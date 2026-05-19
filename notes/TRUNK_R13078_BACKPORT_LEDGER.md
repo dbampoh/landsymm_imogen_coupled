@@ -2094,6 +2094,18 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
+### B44 ✅ DONE — `--engine-only-mode` flag added to `scripts/run_coupled.sh` productising the path-iv launcher-side `done`-marker sidecar mechanism (this commit, 2026-05-19 evening session 7 continuation, immediately after local v1 verification window close-out commit `429f723` + tag `v0.21.0-local-v1-verification-window-complete`): 6 in-tree doc-cascade surfaces (1 NEW `notes/B44.md` ~340 LOC + 5 doc updates) + 1 source touch (`scripts/run_coupled.sh` +~120 LOC bash) + sibling Part 8 of session5_post_b19 handoff + audit-evidence bundle; **TRUNK-IRRELEVANT-by-novelty in entirety** (`scripts/run_coupled.sh` is per-fork launcher; novel since step 14; not in `trunk_r13078/`); ZERO eligible LOC contributed for backport at this commit.
+
+**Implementation outcome**: 4 source-edit chunks in `scripts/run_coupled.sh` — (a) header `--help` text addition; (b) variable init + CLI parsing case arm; (c) validation requiring `--coupling-mode prescribed`; (d) sidecar spawn + `trap cleanup_sidecar EXIT` + context-switched warning text. Acceptance test ✅✅ PASS: 202 year-dirs (1900-2101) in ~12 min 35 sec wall on smoke 4-cell — exact behavior parity with B37 DR1 + uniform +10 ppm CO2 shift from post-B39 init-seed correction propagating forward. NO new audit items filed at B44 close.
+
+**Backport-Sprint relevance**: ZERO. `scripts/run_coupled.sh` is per-fork (novel since step 14 + not in `trunk_r13078/`). No B44-related future LOC are anticipated for backport.
+
+**Cluster sbatch integration deferred**: the SLURM wrapper at `scripts/cluster/run_coupled.sbatch` (also per-fork; TRUNK-IRRELEVANT-by-novelty) needs a 1-line addition at 17c.1 cluster setup phase to pass `--engine-only-mode` through to `run_coupled.sh` for production-IMOGEN runs. Bundling with other 17c.1 setup changes (SLURM resource requests; ndep/popdens/simfire path translations) is more efficient.
+
+**Cumulative backport-debt state at B44 close (this commit)**: UNCHANGED at **+145 LOC** eligible-for-backport (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`).
+
+---
+
 ### LOCAL V1 VERIFICATION WINDOW ✅ FULLY COMPLETE — close-out summary + annotated tag `v0.21.0-local-v1-verification-window-complete` (this commit, 2026-05-19 evening session 7 continuation, immediately after B40 close at `4ca1ef6`): 5 in-tree doc-cascade surfaces (1 NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` ~340 LOC + 4 doc updates) + sibling Part 7 of session5_post_b19 handoff + annotated tag 3-remote-pushed; ZERO source-code change — **TRUNK-IRRELEVANT-by-novelty in entirety** (close-out is pure synthesis/consolidation; no new technical findings; window-level audit-trail discipline); ZERO eligible LOC contributed for backport at this commit.
 
 **Cumulative backport-debt across the entire local v1 verification window**: UNCHANGED at **+145 LOC** eligible-for-backport throughout (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`). **None of the 4 window items (B37 + B36 + B39 + B40) touched canonical engine source.**

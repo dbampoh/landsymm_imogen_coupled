@@ -14,6 +14,72 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7 continuation) — B44 ✅ DONE — `--engine-only-mode` flag added to `scripts/run_coupled.sh` (+~120 LOC bash) productising the path-iv launcher-side `done`-marker sidecar mechanism empirically confirmed at B37 DR1; acceptance test ✅✅ PASS (202 year-dirs 1900-2101 produced in ~12 min 35 sec wall on smoke 4-cell — exact behavior parity with B37 DR1 + uniform +10 ppm shift from post-B39 init-seed correction); cluster sbatch integration (1-line addition) deferred to 17c.1 setup phase; NEW `notes/B44.md` canonical landing record (~340 LOC); 17c.1+ cluster orchestration UNBLOCKED for clean `--engine-only-mode` passthrough; v1.0 % done UNCHANGED at ~96-98%; Rule #9 + Rule #10 at 12th consecutive datapoint each — **6 in-tree doc surfaces (1 NEW + 5 updates) + 1 source touch (`scripts/run_coupled.sh`) + 1 sibling Part 8 of session5_post_b19 handoff + audit-evidence bundle on `main` working branch directly; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: B44 close-out — productisation of the path-iv launcher-side `done`-marker sidecar mechanism (per `notes/B37.md` §5 + `notes/B44.md`) as a first-class `--engine-only-mode` flag on `scripts/run_coupled.sh`. Per user session-7 q_b44_timing option `b44_now_session7` decision: do B44 BEFORE 17c.1+ cluster phases so the cluster sbatch wrapper can pass `--engine-only-mode` cleanly without duplicating sidecar logic or path-depending on the DR1 harness.
+
+**Implementation** — 4 source-edit chunks in `scripts/run_coupled.sh` (+~120 LOC total):
+
+| Chunk | Location | What changed |
+|---|---|---|
+| (a) Header `--help` text addition | between `--no-adapter` and `--anaconda3-prefix` in the leading comment block | ~35 LOC documenting the path-iv mechanism + cross-refs B37/B44/B45 + empirical timing (~3.78 sec/year; ~63 min for all 5 SSP-RCPs) + required-flags note (`--coupling-mode prescribed`) |
+| (b) Variable init + CLI parsing case arm | lines 117-149 area | `ENGINE_ONLY_MODE=0` added to variable init; `--engine-only-mode) ENGINE_ONLY_MODE=1; shift ;;` case arm added between `--no-adapter` and `--anaconda3-prefix` cases |
+| (c) Validation | after the existing enum validators (~lines 151-157) | ~20 LOC requiring `--coupling-mode prescribed` when `--engine-only-mode` is set; rejects loose + tight with explicit error message explaining why (loose bypasses LPJG handshake at input-module not engine; tight = prescribed in v1.0 since LPJG main loop never runs either way) |
+| (d) Sidecar spawn + cleanup trap + context-switched warning | engine launch site (step 6 of launcher; lines 565-630 area) | ~60 LOC defining `cleanup_sidecar` function + `trap cleanup_sidecar EXIT` (works alongside existing ERR trap at line 112; safety net for any exit path); when `ENGINE_ONLY_MODE=1` spawns background bash that touches `<HSHAKE>/done` every 1s + logs sidecar PID at new step 6a/7; context-switches the exit-99 warning text to engine-only-mode terminal narrative (mentions B37 + B44 + B45 cross-references) vs F-10 deadlock workaround text; happy-path `cleanup_sidecar` call after engine launch for prompt cleanup |
+
+**Acceptance test** (empirical validation per Rule #10):
+
+- **Methodology**: pre-clean `runs/SSP1-2.6/Common-directory/IMOGEN/output/`; run `timeout 900 scripts/run_coupled.sh --backbone intermediary-py --coupling-mode prescribed --scenario SSP1-2.6 --smoke --no-build --no-intermediary --no-adapter --engine-only-mode`; verify outcome vs B37 DR1 + B39 acceptance test baselines
+- **Result**: ✅✅ 202 year-dirs (1900-2101) produced in **~12 min 33 sec wall** (Processing year 1900 started 22:48:17; Processing year 2100 started 23:00:50). Launcher exit code 0; engine exit 99 (over-shoot at YEAR1==2100 per the brittle hardcoded sentinels at `climatemodel.cpp:1185-1199`; B45 NEW filed for v1.1+ source-edit cleanup); sidecar PID=2229543 logged + cleaned up via trap-on-EXIT.
+- **Behavior parity vs B37 DR1**: EXACT MATCH on year-dir count (202) + year range (1900-2101) + wall time (~12.5 min); same over-shoot empty 2101 placeholder.
+- **CO2 trajectory consistency**: B44 run shows uniform +10 ppm shift vs B37 DR1 across all sampled years (1900: 295.844 vs 285.829 = +10.015 ppm; 1950: 308.706 vs 298.685 = +10.021; 2050: 472.872 vs 462.785 = +10.087; 2100: 427.620 vs 417.518 = +10.102) — exactly matches the post-B39 CO2_INIT_PPMV shift (286.085 → 296.1 = +10.015 ppm) propagating forward through engine flux integration. **Trajectory shape preserved**; only absolute level shifted uniformly. ✅ scientifically expected.
+- **All 8 acceptance gates G0-G7 PASS** at `_chat_artifacts/b44_acceptance_test_2026-05-19/B44_acceptance_evaluation_2026-05-19.md`.
+
+**B44-out-of-scope observation worth flagging** (NOT a B44 blocker; NOT filed as new audit item at this commit; mentioned for future maintainer awareness): the post-B39 CO2 trajectory at 2050 (472.872 ppm) is at the upper end of SSP1-2.6's published peak range (~430-470 ppm per IPCC AR6); the post-B39 init-seed shift of +10 ppm accumulates to a modest over-estimate of the SSP1-2.6 peak. First observed in this B44 run because it's the first full 1900-2100 post-B39 production-IMOGEN trajectory. Whether the SSP1-2.6 mid-/end-century trajectory shape is paper-defensible is a separate validation question (could be a future B-item filed during paper validation triad work at the 17c.1+ cluster phase).
+
+**Cluster sbatch wrapper integration (DEFERRED to 17c.1 cluster setup phase)**: the SLURM wrapper at `scripts/cluster/run_coupled.sbatch` currently does NOT include the path-iv sidecar (predates B37 DR1 discovery + B44 productisation). At 17c.1 setup, the sbatch wrapper needs a 1-line addition to pass `--engine-only-mode` through to `run_coupled.sh` for production-IMOGEN runs. Bundling this with other 17c.1 setup changes (SLURM resource requests; ndep/popdens/simfire path translations from local `/media/bampoh-d/lpjg_input/...` to cluster `/bg/data/lpj/...` per `notes/PRODUCTION_RUN_CONFIG.md` §3.2) is more efficient than a standalone 1-line cluster-prep commit at B44 close.
+
+**Audit-item state matrix at this commit**:
+- **B44 ✅ DONE** (productisation + acceptance test PASS empirically confirmed)
+- All other audit items unchanged from local v1 verification window close-out at `429f723`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (`scripts/run_coupled.sh` is per-fork launcher; novel since step 14; not in `trunk_r13078/`). Cumulative B19+B20+B41+B42+B43+B37+B36+B39+B40+B44 backport-debt UNCHANGED at **+145 LOC** eligible-for-backport.
+
+**v1.0 % done estimate UNCHANGED at ~96-98%** (B44 is operational-convenience commit; v1.0 architecture is unchanged; B44's value is unblocking clean 17c.1+ cluster sbatch integration + improving paper-publication methodology language).
+
+**Rule #9 + Rule #10 datapoints at this commit**:
+- **Rule #9 (harness-authoring routinely surfaces latent defects)** — 12th consecutive datapoint: the B44 acceptance-test re-run via the new launcher flag surfaced (a) the post-B39 CO2 trajectory at 2050 (472.872 ppm) being at the upper end of SSP1-2.6 published peak range — first observed in this B44 run because it's the first full 1900-2100 post-B39 production-IMOGEN trajectory; (b) the cluster sbatch wrapper currently doesn't include the path-iv sidecar so 17c.1 setup needs a 1-line addition (documented in `notes/B44.md` §4).
+- **Rule #10 (verification-integrity discipline)** — 12th consecutive clean operating datapoint: the B44 acceptance test cites concrete artifacts (full launcher log; per-year CO2.dat trajectory; comparison table vs B37 DR1 + B39 baselines; 8-gate acceptance evaluation Markdown); the post-B39 CO2 over-estimate at 2050 is honestly framed as "B44-out-of-scope observation worth noting" not hidden or minimized; the cluster sbatch integration is honestly deferred to 17c.1 setup (not silently claimed as completed at this commit).
+
+**What's next (POST-B44)**:
+
+| Order | Item | Effort | Priority |
+|---|---|---|---|
+| 1 | **17c.1+ cluster phases** on KIT IMK-IFU `owl` (including 1-line `scripts/cluster/run_coupled.sbatch` update to pass `--engine-only-mode` through) | ~1-2 weeks SSH-iterative | HIGH (paper-publication critical-path) |
+| 2 | **Track 2 production runs** (5 SSP-RCPs × 1900-2100 × 62538-cell gridlist; `-input imogencfx`; using B44 `--engine-only-mode` cluster orchestration) | ~1-2 weeks compute + iteration | HIGH |
+| 3 | **Validation triad execution + paper figures** | ~1 week | HIGH |
+| 4 | **Paper amendments + writing** (incl. B40 §4 paragraph + RCMIP/CMIP6 narrative + Track 1 vs Track 2 framing) | ~2-3 weeks active drafting | HIGH |
+| 5 | **v1.0 paper submission** | target | TERMINAL |
+
+Total estimated calendar time from this commit to v1.0 paper submission: ~6-10 weeks (unchanged from window close-out estimate per `notes/PRODUCTION_RUN_CONFIG.md` §6.2).
+
+**6-surface in-tree doc cascade + 1 source touch + 1 sibling-narrative + audit-evidence bundle at this commit**:
+
+- _source_: `scripts/run_coupled.sh` (+~120 LOC; 4 source-edit chunks: header --help + variable init + validation + sidecar spawn/trap/context-switched-warning)
+- _doc_: NEW `notes/B44.md` canonical landing record (~340 LOC)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B44 close entry + B44 row → ✅ DONE)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B44-status prepend)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B44 entry; cumulative state UNCHANGED at +145 LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B44 ✅ DONE → 17c.1+ cluster phases ACTIVE NEXT)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 8 (B44 narrative; appends to session 7 evening Part 7 window-close narrative)
+- _audit_: `_chat_artifacts/b44_acceptance_test_2026-05-19/b44_acceptance_run_20260519_224813.log` (~7.3 MB; full launcher log)
+- _audit_: `_chat_artifacts/b44_acceptance_test_2026-05-19/B44_acceptance_evaluation_2026-05-19.md` (~8 KB; 8-gate acceptance evaluation per Rule #10)
+
+No tag at this commit (B44 close is operational-convenience milestone; not itself release-worthy).
+
+**Files** (6 doc + 1 source; 0 engine source): `scripts/run_coupled.sh` + `notes/B44.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` + audit bundle at `_chat_artifacts/b44_acceptance_test_2026-05-19/`.
+
 ### 2026-05-19 (evening, session 7 continuation) — LOCAL V1 VERIFICATION WINDOW ✅ FULLY COMPLETE — close-out summary commit + annotated tag `v0.21.0-local-v1-verification-window-complete` 3-remote-pushed at this commit; NEW `notes/LOCAL_V1_VERIFICATION_WINDOW.md` canonical window summary (~340 LOC) consolidates the 4-item arc (B37 + B36 + B39 + B40); 3 NEW post-v1.0 audit items filed across the window (B44 + B45 + B46; NONE v1.0-blocking); cumulative backport-debt UNCHANGED at +145 LOC throughout; Rule #9 + Rule #10 at 11th consecutive datapoint each (with 2 honest self-corrections); v1.0 % done revised UP to ~96-98%; ZERO source-code change at this close-out commit; post-window NEXT = (optional) B44 productisation + 17c.1+ cluster phases on KIT IMK-IFU `owl` + Track 2 production runs + paper writing → v1.0 paper submission (~6-10 weeks calendar) — **5 in-tree doc surfaces (1 NEW + 4 updates) + 1 sibling Part 7 of session5_post_b19 handoff + annotated tag 3-remote-pushed at this commit**
 
 **Scope of this commit**: local v1 verification window close-out summary + tag. Pure synthesis/consolidation commit (no new technical findings; no source-code change). Bridges the gap between (a) the per-item close-outs at B37 + B36 + B39 + B40 (each landed via their own 6-surface cascade) and (b) the window-level audit-trail discipline that ties the 4-item arc together as a coherent verification-cycle milestone unblocking the path to 17c.1+ cluster phases + Track 2 production runs + paper writing.

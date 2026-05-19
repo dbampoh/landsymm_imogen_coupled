@@ -55,6 +55,37 @@
 #                         exist at intermediary_py/imogen_ghg_controller/
 #                         outputs/imogen_inputs/imogen_inputs_<SSP>.csv).
 #   --no-adapter          Skip step 3 (assume runs/<SSP>/inputs/ already populated).
+#   --engine-only-mode    Productisation of the path-iv launcher-side `done`-marker
+#                         sidecar mechanism empirically confirmed at B37 DR1
+#                         (2026-05-19 evening session 7; per notes/B37.md sec 5 +
+#                         notes/B44.md). When set, spawns a background bash
+#                         sidecar that touches <HSHAKE_DIR>/done every 1 second
+#                         BEFORE invoking ./guess, so the IMOGEN engine's
+#                         per-iter polling loop (climatemodel.cpp:347-401) sees
+#                         the `done` marker on every cycle and progresses through
+#                         all years without waiting for an LPJG `done` write that
+#                         the F-10 case-α deadlock prevents (LPJG main loop never
+#                         runs because imogencfx::init() inline-calls
+#                         RUN_IMOGEN_ENGINE which never returns until engine
+#                         exits). The sidecar PID is captured + cleaned up via
+#                         trap-on-EXIT on any exit path (normal/error/signal/
+#                         timeout). Engine produces ~200-202 year-dirs for a
+#                         YEAR1=1900/IYEND=2100 production-IMOGEN run (DR1
+#                         empirically demonstrated 202 year-dirs 1900-2101 in
+#                         12 min 48 sec wall on smoke 4-cell; ~3.78 sec/year
+#                         scaling; ~63 min total local for all 5 SSP-RCPs);
+#                         engine exits 99 on the YEAR1=2100 over-shoot (per the
+#                         brittle YEAR1==2100 hardcoded KEEPRUNNING=false +
+#                         YEAR1_LPJG=1871 hardcoded reset at
+#                         climatemodel.cpp:1189-1197; B45 NEW filed for v1.1+
+#                         source-edit cleanup). REQUIRES --coupling-mode
+#                         prescribed (the only mode where this mechanism makes
+#                         sense; loose bypasses LPJG handshake at the input
+#                         module not the engine; tight remains F-10-deadlocked).
+#                         When set, the launcher's exit-99 messaging context-
+#                         switches to "engine-only-mode terminal" instead of
+#                         "F-10 deadlock workaround". Per notes/B44.md +
+#                         notes/B37.md sec 5 (B44 NEW filed at B37 close).
 #   --anaconda3-prefix P  Override conda env detection. If set, use
 #                         <P>/include and <P>/lib for NETCDF_INCLUDE_DIR /
 #                         NETCDF_C_LIBRARY. Default: auto-detect via
@@ -121,6 +152,7 @@ RUN_MODE="smoke"
 DO_BUILD=1
 DO_INTERMEDIARY=1
 DO_ADAPTER=1
+ENGINE_ONLY_MODE=0
 ANACONDA3_PREFIX_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
@@ -133,6 +165,7 @@ while [[ $# -gt 0 ]]; do
     --no-build)         DO_BUILD=0; shift ;;
     --no-intermediary)  DO_INTERMEDIARY=0; shift ;;
     --no-adapter)       DO_ADAPTER=0; shift ;;
+    --engine-only-mode) ENGINE_ONLY_MODE=1; shift ;;
     --anaconda3-prefix) ANACONDA3_PREFIX_OVERRIDE="$2"; shift 2 ;;
     -h|--help)
       # Extract the leading comment block (until the first non-#-prefixed
@@ -155,6 +188,32 @@ case "$BACKBONE" in static-iiasa|intermediary-py) ;;
   *) _err "--backbone must be static-iiasa | intermediary-py; got '$BACKBONE'"; exit 2 ;; esac
 case "$RUN_MODE" in smoke|production) ;;
   *) _err "--smoke/--production conflict; got '$RUN_MODE'"; exit 2 ;; esac
+
+# [B44 NEW 2026-05-19 evening session 7 continuation: --engine-only-mode flag
+#  validation. The flag productises the path-iv launcher-side `done`-marker
+#  sidecar mechanism empirically confirmed at B37 DR1 (per notes/B37.md sec 5).
+#  Required combination is `--coupling-mode prescribed`: (a) `loose` bypasses
+#  LPJG handshake at the input-module layer (imogenoutput.cpp:269-274 + 473-478
+#  early-return when mode=='loose'), not at the engine layer — so the sidecar
+#  is unnecessary; (b) `tight` is the F-10-deadlocked mode the sidecar is
+#  designed to work around, but in v1.0 tight-mode-with-sidecar produces
+#  identical behavior to prescribed-mode-with-sidecar because LPJG main loop
+#  never runs in either case (per imogencfx::init inline RUN_IMOGEN_ENGINE
+#  call). prescribed is the canonical v1.0 production-IMOGEN mode per the
+#  v1.0 paper-publication architecture decision (B43; F-12 deferred to v1.1+).
+#  Reject other combinations with explicit error.]
+if [ "${ENGINE_ONLY_MODE}" = "1" ]; then
+  case "$COUPLING_MODE" in
+    prescribed) ;;
+    *) _err "--engine-only-mode requires --coupling-mode prescribed; got '$COUPLING_MODE'."
+       _err "  Rationale: --engine-only-mode productises the path-iv launcher-side done-marker sidecar"
+       _err "  per B37 DR1. It only makes sense with prescribed mode (the v1.0 paper-publication"
+       _err "  default). loose bypasses LPJG handshake at input-module not engine; tight is the"
+       _err "  F-10-deadlocked mode the sidecar works around (but tight = prescribed in v1.0 since"
+       _err "  LPJG main loop never runs either way). See notes/B44.md + notes/B37.md sec 5."
+       exit 2 ;;
+  esac
+fi
 
 # -----------------------------------------------------------------------------
 # Paths
@@ -565,15 +624,72 @@ _ok "[5/7] Stale outputs cleared."
 # =============================================================================
 # Step 6: Launch LPJ-GUESS in coupled mode
 # =============================================================================
+# [B44 NEW 2026-05-19 evening session 7 continuation: --engine-only-mode flag
+#  productises the path-iv launcher-side `done`-marker sidecar mechanism per
+#  notes/B37.md sec 5 + notes/B44.md. When ENGINE_ONLY_MODE=1, spawn a
+#  background bash sidecar that touches <HSHAKE>/done every 1 second BEFORE
+#  invoking ./guess; trap-on-EXIT cleans up the sidecar PID on any exit path
+#  (normal/error/signal/timeout). The engine's per-iter polling loop at
+#  climatemodel.cpp:347-401 sees the `done` marker on every cycle (engine
+#  sleeps 3s between polls; sidecar touches every 1s so the file mostly
+#  exists; engine deletes done at line 578 after consuming flux files; sidecar
+#  re-creates within 1s). Engine progresses through all years until
+#  YEAR1==2100 hardcoded KEEPRUNNING=false at climatemodel.cpp:1189-1190, then
+#  over-shoots by 1 iter (engine tries year 2101 outside NYR_EMISS=201; falls
+#  back to ./IMOGEN/output/1871/T_anom.dat per the brittle YEAR1_LPJG=1871
+#  hardcoded reset at climatemodel.cpp:1197; exits 99). For YEAR1=1900/IYEND=
+#  2100 production-IMOGEN runs, this produces ~200-202 year-dirs (1900-2099/
+#  2100/2101 with the over-shoot empty placeholder). Empirically validated
+#  at B37 DR1 (2026-05-19; ~12.6 min wall on smoke 4-cell; ~3.78 sec/year
+#  scaling; ~63 min total local for all 5 SSP-RCPs). B45 NEW filed for v1.1+
+#  source-edit cleanup of the brittle year sentinels.]
+SIDECAR_PID=""
+cleanup_sidecar() {
+  if [ -n "${SIDECAR_PID}" ]; then
+    kill "${SIDECAR_PID}" 2>/dev/null || true
+    wait "${SIDECAR_PID}" 2>/dev/null || true
+    SIDECAR_PID=""
+  fi
+}
+trap cleanup_sidecar EXIT
+
+if [ "${ENGINE_ONLY_MODE}" = "1" ]; then
+  _info "[6a/7] --engine-only-mode active: spawning path-iv done-marker sidecar (touches ${HSHAKE_DIR}/done every 1s)..."
+  ( while true; do touch "${HSHAKE_DIR}/done" 2>/dev/null; sleep 1; done ) &
+  SIDECAR_PID=$!
+  _ok "[6a/7] Sidecar PID=${SIDECAR_PID} (cleaned up via trap-on-EXIT on any exit path)."
+fi
+
 _info "[6/7] Launching LPJ-GUESS coupled run (-input imogencfx)..."
 cd "${RUN_DIR}"
 "${GUESS_BIN}" -input imogencfx main.ins 2>&1 | tee -a "${LOG_FILE}" || {
   EC=$?
-  _warn "guess exit code: ${EC} (this is EXPECTED in v1.0 due to F-10 architectural deadlock)"
-  _warn "  The engine reaches a polling loop on the year-N+1 handshake that LPJG can't supply."
-  _warn "  Engine outputs at Common-directory/IMOGEN/output/<YYYY>/ are still produced."
-  _warn "  See notes/STEP_9.md sec 4.4 for full diagnosis."
+  if [ "${ENGINE_ONLY_MODE}" = "1" ]; then
+    _warn "guess exit code: ${EC} (this is EXPECTED in --engine-only-mode v1.0 due to engine over-shoot at YEAR1==2100 hardcoded boundary)"
+    _warn "  The engine ran through to the YEAR1==2100 KEEPRUNNING=false trigger at"
+    _warn "  climatemodel.cpp:1189-1190, then over-shot by 1 iter trying year 2101"
+    _warn "  (outside NYR_EMISS=201) and fell back to ./IMOGEN/output/1871/T_anom.dat"
+    _warn "  per the brittle YEAR1_LPJG=1871 hardcoded reset at climatemodel.cpp:1197."
+    _warn "  Engine outputs at Common-directory/IMOGEN/output/<YYYY>/ are produced for"
+    _warn "  ALL years 1900-2100 + 1 over-shoot empty placeholder (2101; ignorable)."
+    _warn "  See notes/B37.md sec 2 + notes/B44.md for the path-iv sidecar mechanism;"
+    _warn "  B45 NEW filed for v1.1+ source-edit cleanup of the brittle year sentinels."
+  else
+    _warn "guess exit code: ${EC} (this is EXPECTED in v1.0 due to F-10 architectural deadlock)"
+    _warn "  The engine reaches a polling loop on the year-N+1 handshake that LPJG can't supply."
+    _warn "  Engine outputs at Common-directory/IMOGEN/output/<YYYY>/ are still produced"
+    _warn "  for the productive-year-ceiling window per the closed-form formula at"
+    _warn "  notes/B37.md sec 2.3 (4 years for YEAR1=1900; 32 years for YEAR1=1871; etc.)."
+    _warn "  See notes/STEP_9.md sec 4.4 + notes/B37.md for full diagnosis."
+    _warn "  TIP: pass --engine-only-mode to enable the path-iv sidecar that produces"
+    _warn "  all ~200 years 1900-2100 for production-IMOGEN runs without F-12 fix."
+  fi
 }
+
+# Clean up sidecar promptly (the trap-on-EXIT is the safety net; this call
+# is the happy-path cleanup so the rest of the launcher's step 7 runs without
+# the background process touching files).
+cleanup_sidecar
 
 # =============================================================================
 # Step 7: Collect summary
