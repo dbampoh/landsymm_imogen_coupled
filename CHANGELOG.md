@@ -14,6 +14,64 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7 continuation) — B36 ✅ DONE — Fortran IMOGEN background-emission audit at `imogen/code/imogen_lpjg.f` CLOSED with verdict NO DOUBLE-COUNTING DEFECTS FOUND; all 4 sub-item audit criteria PASS (a: zero hardcoded emission-rate DATA statements; b: zero default-filename fallback strings; c: zero `BLOCK DATA` subroutines anywhere across 4700 LOC; d: empirical cross-reference confirms intermediary_py Component A + B outputs feed the 4 active FILE_* channels via Option B per B31 launcher auto-rewrite); NEW `notes/B36.md` canonical landing record (~270 LOC); ZERO source-code change at this commit (audit is investigation-only; canonical Fortran engine is clean on B36 dimensions); B36 is the SECOND item closed in the local v1 verification window after B37 close at commit `75811c0`; NO new audit items filed; Rule #9 + Rule #10 at 9th consecutive datapoint each — **5 in-tree doc surfaces (1 NEW + 4 updates) + 1 sibling Part 4 of session5_post_b19 handoff on `main` working branch directly; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: B36 close-out doc cascade. Audit completed without any source-code change to `imogen/code/imogen_lpjg.f` (the canonical Fortran IMOGEN engine source shared with `trunk_r13078/`). Bridges the gap between (a) the user-raised concern at B19 Phase 3 (2026-05-17 ~17:30 evening) that the legacy IMOGENCXX C++ refactor may have replaced background land-GHG-emission rates embedded in the original Fortran with what the legacy `intermediary` supplied — raising potential overlap-with-current-input-channels risk — and (b) the audit-result verification that no such defect exists in the current rebuild's Fortran engine.
+
+**Audit dimensions + verdicts** (per `notes/FOLLOWUPS.md` B36 row's 4-sub-item criteria):
+
+| Sub-item | Audit dimension | Verdict | Evidence |
+|---|---|---|---|
+| (a) | DATA statements with embedded emission-rate constants | ✅ NONE | grep + classification of 28 DATA statements: only RF-level `Q_NON_CO2(300)` fallback (overridden when `FILE_NON_CO2=.TRUE.` which v1.0 sets); ocean physical params (`K_G/H/C` at lines 3775-3777, Joos 2-D); calendar/filesystem metadata (`MTHDAY`, `DRIVE_MONTH`); saturation vapour pressure lookup (`ES(IES)` 1553 values); B33(c) SAVE guards (`WARNED_FLUX`, `WARNED_CH4`) |
+| (b) | Default-filename fallback strings | ✅ NONE | `SUBROUTINE SETTIN` at lines 1635-1879 initialises ALL 6 `FILE_*` + 3 `DIR_*` string vars to single space `' '` at lines 1699-1707 BEFORE parsing `imogen_settings.txt`; missing FILE_* params cause `OPEN(...)` errors rather than silent fallback |
+| (c) | `BLOCK DATA` subroutines | ✅ NONE | `grep -i "^\s*BLOCK DATA"` returns zero matches across all 4700 LOC |
+| (d) | Cross-reference vs intermediary_py Component A | ✅ CLEAN | DR1 launcher banner ("NATURAL flux source: intermediary_py-derived (Option B; adapter outputs from runs/SSP1-2.6/inputs/)") + `imogen_intermediary.ins` line 141 `!FILE_SCEN_EMITS` commented-out + lines 189-192 active intermediary_py paths + 4-file inventory all 201 lines matching `NYR_*=201` + file-content magnitude plausibility (1900: CO2 0.49 PgC/yr + CH4 87.6 Tg + N2O 1.36 Tg; 2100: CO2 -1.56 PgC/yr SSP1-2.6 net-negative + CH4 199.4 Tg + N2O 11.5 Tg) |
+
+**Two engine-source-level PRINT warnings** at `imogen_lpjg.f:655` + `:742` document the user-data design invariants that prevent double-counting at the .ins layer (mirrored at `docs/scientific_framework.md` §5.3 from B32):
+
+- `imogen_lpjg.f:655` (in the LPJG-flux read block, when `NONCO2_EMISSIONS_LPJG=TRUE`): `'Reading CH4 and N2O fluxes from LPJ-GUESS - ensure FILE_CH4_N2O_EMITS only contains anthropogenic emissions'`
+- `imogen_lpjg.f:742` (in the per-iter RF combination block, when `NONCO2_EMISSIONS=TRUE`): `'Including CH4 and N2O emissions directly - ensure FILE_NON_CO2 does not include them'`
+
+These form a **multi-layer no-double-counting defense** at the v1.0 architecture's docs + launcher + engine + .ins layers.
+
+**Bottom line for v1.0 paper publication**: ✅ the v1.0 architecture's no-double-counting invariant is honoured at the engine source layer. The 4 input channels (`FILE_SCEN_EMITS` + `FILE_CH4_N2O_EMITS` + `FILE_LPJG_FLUX` + `FILE_LPJG_CH4_N2O_FLUX`) are the SOLE emission/flux sources consumed by the engine; no hidden background-emission defaults exist; intermediary_py Component A + B outputs feed these channels via Option B routing in v1.0 prescribed mode.
+
+**Rule-#10 self-correction during writeup phase**: the initial B36 writeup draft (pre-cascade) proposed folding a `docs/scientific_framework.md` §5.3 doc-drift fix into this commit — claimed to update an `RF_NONCO2_GHG_IS92A.dat` reference to the actual v1.0 CMIP6 `nonco2_ch4_n2o_RF_historical_ssp<XXX>.txt` family path. A `grep -E "RF_NONCO2_GHG_IS92A|IS92A|FILE_NON_CO2_VALS|Non-Co2-CH4-N2O" docs/scientific_framework.md` during the cascade-authoring phase returned **zero matches** confirming the IS92A reference does NOT appear in `docs/scientific_framework.md` at all — the IS92A reference appears in `notes/FOLLOWUPS.md` B36 row's pre-audit framing language (preserved as historical context per audit-trail discipline). Honest retraction made in `notes/B36.md` §4 + this entry; NO doc-fix folded into commit. This is the **9th consecutive clean Rule-#10 operating datapoint**.
+
+**Audit-item state matrix at this commit**:
+- **B36 ✅ DONE** (audit-only; clean negative finding; canonical engine source is clean on all 4 sub-item dimensions)
+- All other audit items unchanged from B37 close at `75811c0`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (B36 is investigation; no source-code change to `lpjguess/` or `imogen/` trees; doc-cascade surfaces are per-fork; NEW `notes/B36.md` is per-fork). Cumulative B19+B20+B41+B42+B43+B37+B36 backport-debt UNCHANGED at **+145 LOC** eligible-for-backport.
+
+**v1.0 % done estimate UNCHANGED at ~95-97%** (B36 is investigation-only; v1.0 architecture is unchanged; the audit retires the "is there hidden Fortran-engine background-emission double-counting?" uncertainty class with a clean verdict).
+
+**Rule #9 + Rule #10 datapoints at this commit**:
+- **Rule #9 (harness-authoring routinely surfaces latent defects)** — 9th consecutive datapoint: the B36 source-reading exercise itself surfaced the (initially-mistakenly-attributed-to-scientific_framework.md) IS92A doc-drift that turned out to be in the FOLLOWUPS B36 row pre-audit framing; an empirical reminder that documentation references can drift and grep-verification matters.
+- **Rule #10 (verification-integrity discipline)** — 9th consecutive clean operating datapoint: see Rule-#10 self-correction narrative above (initial draft's IS92A-in-scientific_framework.md claim was honestly retracted via `grep` verification during writeup, before the cascade-commit landed).
+
+**Verification window NEXT** (~3-6 h remaining of original 6-13 h budget):
+- **B39** (~1-2 h CO2_INIT_PPMV per-YEAR1 configurability fix; option α: declare configurable + maintenance directive + cross-reference table for common YEAR1 baselines)
+- **B40** (~2-4 h modern-decade N2O hump explanatory study; paper-stage analytical work)
+
+Then 17c.1+ cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative).
+
+**Actual effort**: ~30 min (vs ~2-4 h estimate per FOLLOWUPS B36 row; decisive at first reconnaissance because of the engine's clean architecture: zero `BLOCK DATA`, zero default-filename fallbacks, only RF-fallback for non-CO2 forcing that is overridden by v1.0 .ins). This frees ~1.5-3.5 h budget for B39 + B40.
+
+**5-surface in-tree doc cascade + 1 sibling-narrative at this commit**:
+
+- _doc_: NEW `notes/B36.md` canonical landing record (~270 LOC; full source-reading + empirical cross-reference + audit verdict + Rule-#10 self-correction narrative)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B36 close entry + B36 row → ✅ DONE)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B36-status prepend)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B36 entry; cumulative state UNCHANGED at +145 LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B36 ✅ DONE → B39 ACTIVE NEXT)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 4 (B36 narrative; appends to session 7 evening Part 3 B37 narrative)
+
+No tag at this commit (B36 close is an audit-only milestone retiring an uncertainty class; not itself release-worthy; the next tag candidate is at the local v1 verification window close-out after B39 + B40 complete).
+
+**Files** (6 doc; 0 source): `notes/B36.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md`.
+
 ### 2026-05-19 (evening, session 7) — B37 ✅ DONE — productive-year-ceiling explanatory study CLOSED; root cause IDENTIFIED + closed-form formula derived + Run B + Run C + DR2 empirical match exact; PATH (iv) launcher-side `done`-marker sidecar surfaced + EMPIRICALLY CONFIRMED in DR1 (202 year-dirs 1900-2101 produced in 12 min 48 sec wall); v1.0 paper-publication production-IMOGEN-engine runs (full 1900-2100 × 5 SSP-RCP scenarios) ✅ FEASIBLE WITHOUT F-12 architectural fix; B44 NEW filed (productise path-iv sidecar in `scripts/run_coupled.sh`; MEDIUM priority; TRUNK-IRRELEVANT-by-novelty); B45 NEW filed (parametrise the 3 hardcoded year sentinels in `lpjguess/modules/climatemodel.cpp::updateImogenControlData()`; LOW priority; TRUNK-RELEVANT for canonical engine source); NEW `notes/B37.md` canonical landing record (~340 LOC) + sibling acceptance evaluation; **B37 is the FIRST item closed in the local v1 verification window — investigation-only commit; ZERO source-code change** — **6 in-tree doc surfaces (1 NEW + 5 updates) + 1 sibling Part 3 of session5_post_b19 handoff + audit-evidence bundle on `main` working branch directly; 3-remote-converge pending at this commit**
 
 **Scope of this commit**: B37 close-out doc cascade. Investigation completed without any source-code change to the C++ engine (`lpjguess/modules/climatemodel.cpp`) or the Fortran twin (`imogen/code/imogen_lpjg.f`) per the B-item lifecycle discipline (B37 is investigation; B45 source-edit fix deferred). Bridges the gap between (a) the prior B19 Phase 3 + 3-ADDENDUM empirical observations of an 8× discrepancy in productive-year ceiling (Run B 1871-start → 32 years; Run C 1900-start → 4 years; classified as "interesting, hypothesized but not verified" at filing time) and (b) the rigorous source-reading + empirical-validation answer required by the session 6 morning paper-publication-critical-path priority bump.

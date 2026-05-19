@@ -2094,6 +2094,16 @@ Pre-existing build state preserved from `d9c90d5` Phase 0 commit (verified clean
 
 ---
 
+### B36 ✅ DONE — Fortran IMOGEN background-emission audit CLOSED with verdict NO DOUBLE-COUNTING DEFECTS FOUND (this commit, 2026-05-19 evening session 7 continuation, immediately after B37 close at `75811c0`): 5 in-tree doc-cascade surfaces (1 NEW `notes/B36.md` ~270 LOC canonical landing record + 4 updates) + sibling Part 4 of session5_post_b19 handoff; ZERO source-code change — **TRUNK-IRRELEVANT-by-finding** (audit confirms no defect requiring source-code fix; canonical Fortran engine source `imogen/code/imogen_lpjg.f` shared with `trunk_r13078/` is clean on B36 dimensions); ZERO eligible LOC contributed for backport at this commit.
+
+**Audit outcome**: all 4 sub-item criteria PASS — (a) zero hardcoded emission-rate DATA statements; (b) zero default-filename fallback strings; (c) zero `BLOCK DATA` subroutines anywhere across 4700 LOC; (d) empirical cross-reference confirms intermediary_py Component A + B outputs feed the 4 active FILE_* channels via Option B per B31 launcher auto-rewrite. NO new audit items filed at B36 close.
+
+**Backport-Sprint relevance**: ZERO. The canonical Fortran engine source `imogen/code/imogen_lpjg.f` is verified clean on the B36 audit dimensions. No B36-related future LOC are anticipated. The audit's authoritative findings + cross-references are preserved at `notes/B36.md` for any future maintainer re-auditing this dimension (e.g., during the post-step-19 Backport Sprint when both forks' `imogen/code/imogen_lpjg.f` are compared).
+
+**Cumulative backport-debt state at B36 close (this commit)**: UNCHANGED at **+145 LOC** eligible-for-backport (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`).
+
+---
+
 ### B37 ✅ DONE — productive-year-ceiling explanatory study CLOSED (this commit, 2026-05-19 evening session 7): 6 in-tree doc-cascade surfaces (1 NEW `notes/B37.md` ~340 LOC canonical landing record + 5 updates) + sibling Part 3 of session5_post_b19 handoff + audit-evidence bundle at `_chat_artifacts/b37_diagnostic_run_2026-05-19/`; ZERO source-code change — **TRUNK-IRRELEVANT-by-novelty in entirety**; ZERO eligible LOC contributed for backport at this commit.
 
 **Investigation outcome**: root cause IDENTIFIED + closed-form formula derived + Run B/C/DR2/DR1 empirical match exact. Per-path verdicts: (i) configurable productive-year ceiling = VIABLE (5-15 LOC source-edit needed) → filed as **B45 NEW**; (ii) `--coupling-mode loose` bypass = NOT VIABLE; (iii) `skip_inprocess_engine_run` two-step = PARTIALLY VIABLE; **(iv) NEW launcher-side `done`-marker sidecar = ✅✅ VIABLE, empirically confirmed** (DR1 produced 202 year-dirs 1900-2101 in 12 min 48 sec wall on smoke 4-cell config; all 201 paper-target years 1900-2100 have valid CO2.dat with physically-sensible SSP1-2.6 trajectory) → filed as **B44 NEW** for productisation in `scripts/run_coupled.sh`.
