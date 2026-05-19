@@ -14,6 +14,56 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (morning, session 6) — B41 + B42 + B43 ✅ DONE FILING + decisions-recorded — production-config consolidated reference document `notes/PRODUCTION_RUN_CONFIG.md` authored (~300 LOC initial draft); B37 priority BUMPED to paper-publication critical-path dependency; v1.0 paper publication pipeline architecture + Track 1 vs Track 2 ecosystem comparison design + smoke→production parameter delta + updated `_peatland` LU forcing path map + `cf` → `cfx` → `imogencfx` input-module evolution + tight-coupling roadmap (F-12 → v1.1+) all locked in — **6 in-tree doc surfaces (5 within `lpj-guess_imogen_landsymm/` + sibling Part 2 of session5_post_b19 handoff) on `main` working branch directly; small surgical doc-cascade commit before local v1 verification window kickoff; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: production-run configuration reference authoring + B41/B42/B43 audit-item filing + B37 priority bump to paper-publication critical-path dependency. Documentation-only: ZERO source-code change. Bridges the gap between (a) the smoke-test live LPJG run configuration in `runs/SSP1-2.6/main.ins` (4-cell `gridlist_test2.txt`; `nyear_spinup 1`; `npatch 1`; basic LU; NO SimFire BLAZE; NO popdens; basic ndep; `firsthistyear`/`lasthistyear` 1900/1901) and (b) the v1.0 paper-publication production-style run configuration (full 62892-cell gridlist; `nyear_spinup 500`; `npatch 25`; updated `_peatland` LU; SimFire BLAZE binary; popdens NetCDF; 4-NetCDF wet/dry NHx + NOy ndep; full 1900-2100 envelope across all 5 SSP-RCPs).
+
+**B41/B42/B43 audit-item rationale**:
+
+- **B41** ✅ DONE — smoke→production parameter delta documentation gap. The user-raised concern (session 5 evening + session 6 morning) that the rebuild project documentation surface had no consolidated reference for the dramatic configuration delta between smoke-test runs (committed) and production-style runs (existing only in `~/Desktop/landsymm_lpjg/landsymm_mat/lpjg_landsymm_integration/integrated-4.1-ins2_landsymm_{hist,ssp126}/main.ins` reference directories + on the cluster) was at risk of knowledge-loss as session context fragmented. **Fix**: NEW `notes/PRODUCTION_RUN_CONFIG.md` consolidated reference document with 8 sections covering: (i) why the document exists; (ii) smoke→production parameter delta (3 sub-tables: main.ins / landcover.ins+crop.ins / auxiliary input files); (iii) updated LU forcing dataset map with local-mirror + cluster-path equivalence; (iv) input-module evolution (`cf` → `cfx` → `imogencfx`); (v) two-track architecture for the v1.0 paper publication (Track 1 = LPJG-cfx-ISIMIP3b baseline already-existing-from-prior-cluster-runs; Track 2 = LPJG-imogencfx-IMOGEN NEW for v1.0 paper); (vi) v1.0 paper publication readiness checklist with B36+B37+B39+B40 dependency graph + cluster-side prerequisites; (vii) tight-coupling roadmap for v1.1+ (F-12 deferred per B43); (viii) cross-references to all related audit items + framework documents. Iteratively refined as B36+B37+B39+B40 outcomes inform the readiness checklist + the cluster phases inform the data-staging recipe.
+
+- **B42** ✅ DONE — legacy-vs-updated-vs-peatland LU choice for v1.0 paper publication production runs. **Decision recorded**: updated `_peatland` LU variant chosen for v1.0 paper publication production runs because (a) it covers historical 1900-2020 via HILDA+ remapping (Winkler et al. 2021 Nature Comms; more recent + better-validated than legacy LU); (b) includes peatland as a separate LU class important for LPJG carbon + CH4 budget; (c) gridded at the 62892-cell production resolution from the start; (d) past Track 1 cluster runs already used `_peatland` per user 2026-05-19 morning confirmation, so Track 2 using `_peatland` keeps the comparison clean (LU held constant; only climate/CO2 driver differs). Three sub-decisions (α historical LU file naming + β historical-period crop+nfert matching files + γ SSP-period crop+nfert+irrig matching files) all confirmed. Documented in NEW `notes/PRODUCTION_RUN_CONFIG.md` §3 LU forcing subsection.
+
+- **B43** ✅ DONE — F-12 / tight-coupling timeline decision for v1.0 paper publication. **Decision recorded**: F-12 architectural deadlock-resolution work (which would enable LIVE-LPJG-handshake natural-flux flow direct to IMOGEN, replacing the current `intermediary_py`-mediated indirect handshake) is **DEFERRED to v1.1+** for the v1.0 paper publication. The v1.0 paper publication uses the prescribed-mode coupled-model architecture: `intermediary_py` coordinates BOTH anthropogenic (Component A: RCMIP/CMIP6 substitution) AND natural (Component B: from prior cluster LPJG-cfx-ISIMIP3b runs, post-processed) channels into IMOGEN; IMOGEN produces atmospheric concentrations + climate; LPJG (Track 2) consumes IMOGEN climate + CO2 via `-input imogencfx` (Track 1 baseline LPJG-cfx-ISIMIP3b ecosystem outputs already exist). Rationale: (i) F-12 is a substantial multi-week effort; (ii) the v1.0 paper publication scientific narrative is fully sound under prescribed mode (validation triad is methodologically clean + reviewer-defensible); (iii) defending F-12 fix in v1.0 paper would require additional verification cycles + risk schedule slippage; (iv) v1.1+ paper(s) post-v1.0 can showcase tight-coupling with the F-12 fix as the headline new capability + validate against the v1.0 prescribed-mode baseline. Documented in NEW `notes/PRODUCTION_RUN_CONFIG.md` §7 Tight-coupling roadmap subsection.
+
+**B37 priority bump** (in-place): from MEDIUM (F-10 caveat documentation completeness) → **HIGH (paper-publication critical-path dependency)**. The bump reflects that B37's outcome determines whether the v1.0 paper publication's production-IMOGEN-engine runs (full 1900-2100 × 5 SSP-RCP scenarios; required to produce the IMOGEN climate + CO2 inputs that drive Track 2 LPJG-imogencfx production runs per B41 + B43) can complete without the F-12 architectural fix. 3 candidate paths surfaced for B37's investigation: (i) configurable productive-year ceiling; (ii) `coupling_mode loose` bypass that disables LPJG-handshake polling loop entirely; (iii) `skip_inprocess_engine_run` two-step workflow viability per `lpjguess/modules/imogencfx.cpp:365` (parameter exists; was added for "F-12 sub-step 7.3.2 cross-validation"). If B37 surfaces ANY of these, production-IMOGEN runs are feasible without F-12. If not, production-IMOGEN runs require F-12 fix first OR cluster-orchestration with state-staging. **Local v1 verification window order revised**: B37 FIRST (was 4th), then B36 + B39 + B40.
+
+**User-confirmed decisions baked in at this commit**:
+- (a) Track 1 LU = `_peatland` per past cluster runs → Track 2 also uses `_peatland`
+- (b) paper scenario coverage = all 5 SSP-RCPs (SSP1-2.6 + SSP2-4.5 + SSP3-7.0 + SSP4-6.0 + SSP5-8.5)
+- (c) production-IMOGEN run timing = whichever-is-fastest (local during verification window OR cluster during 17c.1+ phases); contingent on B37 outcome
+- (d) production input module = `-input imogencfx` for Track 2 (uses IMOGEN climate + CO2; preserves all `-input cfx` auxiliary inputs); `-input cfx` for Track 1 (ISIMIP3b climate; baseline already exists)
+
+**Audit-item state matrix at this commit**:
+- B41 ✅ DONE (filing + initial draft); B42 ✅ DONE (LU choice rationale documented); B43 ✅ DONE (F-12 timeline decision recorded)
+- B37 priority BUMPED in-place (no row state change; remains pending)
+- All other audit items unchanged from B20 close-out at `9a78df0`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (NEW `notes/PRODUCTION_RUN_CONFIG.md` is per-fork; no production-config doc in `trunk_r13078`; doc-cascade surfaces are per-fork; sibling handoff is outside-repo). Cumulative B19+B20+B41+B42+B43 backport-debt UNCHANGED at +145 LOC eligible-for-backport (still entirely from B19 Phase 2 Commit 3 `6862d03`'s `imogen/code/imogen_lpjg.f::WARN_POSIX_CONCAT_COLLAPSE`).
+
+**v1.0 % done estimate UNCHANGED at ~95-97%** (this commit is documentation-only; no source changes; no new milestones reached). The commit's value is risk-mitigation: protects against knowledge-loss across session boundaries by consolidating the production-config picture in a versioned in-tree document.
+
+**Local v1 verification window NEXT** (~6-13 h cumulative):
+- **B37 FIRST** (~1-3 h): productive-year-ceiling explanatory study; paper-publication critical-path dependency per priority bump
+- **B36** (~2-4 h): Fortran IMOGEN background-emission audit
+- **B39** (~1-2 h): CO2_INIT_PPMV per-YEAR1 configurability
+- **B40** (~2-4 h): modern-decade N2O hump explanatory study (paper-stage)
+
+Then: 17c.1+ cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative; production-scale runs + paper-stage data generation per `notes/STEP_17c.md` §1.7.8).
+
+**6-surface in-tree doc cascade + 1 sibling-narrative at this commit**:
+
+- _doc_: NEW `notes/PRODUCTION_RUN_CONFIG.md` (~300 LOC initial draft; the consolidated production-config reference; will be iteratively refined as B36+B37+B39+B40 outcomes inform the readiness checklist)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B41+B42+B43 close entry + B41 NEW row + B42 NEW row + B43 NEW row + B37 row priority bump in-place + dashboard refresh)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B41+B42+B43 status update)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B41+B42+B43 entry; cumulative state UNCHANGED at +145 LOC)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 2 (NEW; production-config narrative; opens session 6 morning)
+
+No tag at this commit (production-config docs are not a release-tag-worthy milestone in themselves; the next tag will be at the local v1 verification window close-out OR at v1.0.0-paper-publication-ready).
+
+---
+
 ### 2026-05-18 (late evening, session 5 continuation) — B20 ✅ DONE — literature-comparison sanity check for global LPJG-natural CH4 + N2O magnitudes; verdict WITHIN_ENVELOPE_MEAN_WITH_TIME_VARIATION; full 1900-2100 time-means of both species WITHIN published Saunois 2020 + Tian 2020 envelopes; tag `v0.20.0-b20-literature-sanity-checked` (annotated + 3-remote-pushed); B40 NEW filed (modern-decade N2O hump explanatory follow-up; LOW priority paper-stage work) — **5 in-tree doc surfaces + 1 source touch (NEW `scripts/b20_literature_validate.py`) + 1 sibling-narrative on `main` working branch (B19 already merged + tagged + 3-remote-converged at commit `7543c1e`); 3-remote-converge pending at this commit**
 
 **Scope of this commit**: B20 literature-comparison sanity check. Closes the NEXT-TASK CLUSTER (B19 + B20) per the user-authorised 2026-05-15 night ordering at 17c.0.8 PREP close-out. Distinct from B19 Phase 4 (intra-codebase consistency vs legacy A/B references — pivoted to literature comparison vs Law Dome ice core); B20 is **extra-codebase scientific plausibility check** comparing LPJG-natural-only fluxes against published global natural budgets.
