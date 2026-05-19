@@ -1100,9 +1100,45 @@ The original 17c.0 PREP forecast (per session-3 handoff §0.4 → 5-phase plan i
 
 No stash this sub-phase. 17c.0.8 is pure book-keeping; no pre-existing WIP exists.
 
-#### 1.7.8 What's next (POST-B39 status update at 2026-05-19 evening session 7 continuation)
+#### 1.7.8 What's next (POST-B40 status update at 2026-05-19 evening session 7 continuation — LOCAL V1 VERIFICATION WINDOW IS NOW ✅ FULLY COMPLETE)
 
-Per the user-authorised next-task cluster (originally locked-in 2026-05-15 night at 17c.0.8 PREP close-out; updated at B19 close 2026-05-18 evening; updated at B37 close + B36 close 2026-05-19 evening session 7; **further updated at B39 close 2026-05-19 evening session 7 continuation to reflect the `CO2_INIT_PPMV` per-YEAR1 configurability fix landing + the empirical STRICT_PASS confirmation at B19 Phase 4 re-validation against Law Dome MacFarling Meure 2006**):
+Per the user-authorised next-task cluster (originally locked-in 2026-05-15 night at 17c.0.8 PREP close-out; updated at B19 close 2026-05-18 evening; updated at B37 + B36 + B39 close-outs in session 7; **further updated at B40 close 2026-05-19 evening session 7 continuation to reflect the COMPLETION of the local v1 verification window**):
+
+**LOCAL V1 VERIFICATION WINDOW SUMMARY (B37 + B36 + B39 + B40; all 4 items closed in session 7)**:
+
+| Item | Commit | Effort estimate | Actual | One-line verdict |
+|---|---|---|---|---|
+| B37 Productive-year-ceiling explanatory study | `75811c0` | ~1-3 h | ~2 h | Root cause identified; path (iv) sidecar empirically confirmed; v1.0 paper-publication production-IMOGEN runs FEASIBLE without F-12 |
+| B36 Fortran IMOGEN background-emission audit | `a77ea8f` | ~2-4 h | ~30 min | NO DOUBLE-COUNTING DEFECTS FOUND; all 4 sub-item criteria PASS |
+| B39 CO2_INIT_PPMV per-YEAR1 configurability fix | `8026740` | ~1-2 h | ~45 min | STRICT_PASS empirically confirmed; CO2 drift -3.5 to -4.2% → -0.09 to -0.80%; CH4 also improved |
+| B40 Modern-decade N2O hump explanatory study | **THIS commit** | ~2-4 h | ~30 min | Methodological characteristic NOT defect; Saikawa-aligned channel scope; paper §2.4.4 paragraph drafted |
+| **TOTAL** | — | **6-13 h estimate** | **~4 h actual** | Significantly faster than estimate; all 4 items decisive at first-or-second reconnaissance |
+
+**NEW post-v1.0 audit items filed across the window**: B44 (productise path-iv sidecar; MEDIUM; TRUNK-IRRELEVANT) + B45 (parametrise 3 hardcoded year sentinels in updateImogenControlData; LOW; TRUNK-RELEVANT) + B46 (split N2O_SOIL into separately-attributed channels; LOW; TRUNK-RELEVANT if option α). All POST-V1.0 enhancements; NONE v1.0-blocking.
+
+**Cumulative backport-debt UNCHANGED at +145 LOC throughout the entire window** (none of the 4 window items touched canonical engine source).
+
+**Rule #9 + Rule #10 datapoints**: clean operation across all 4 window items; ≥11 consecutive datapoints each since promotion at B19 Phase 5 close-out.
+
+**What's next (post-window)**:
+
+| Order | Item | Effort estimate | Priority |
+|---|---|---|---|
+| (optional) -3. | Local v1 verification window CLOSE-OUT tag candidate (e.g., `v0.21.0-local-v1-verification-window-complete`) + dedicated close-out doc cascade | ~30-60 min | OPTIONAL per the prompt's §"Suggested first action sequence" item 8 |
+| (optional) -3b. | **B44** Productise path-iv sidecar in `scripts/run_coupled.sh` as new `--engine-only-mode` flag | ~20-30 min | MEDIUM (operational convenience for 17c.1+ cluster-orchestration sbatch) |
+| 1. | **17c.1+ cluster phases** on KIT IMK-IFU `owl` (production-scale runs + paper-stage data generation per `notes/STEP_17c.md` §1.7.8) | ~1-2 weeks SSH-iterative | HIGH (paper-publication critical-path) |
+| 2. | **Track 2 production runs** (5 SSP-RCPs; 1900-2100; 62538-cell gridlist; `-input imogencfx`; using B37 path-iv sidecar OR cluster-side workflow) | ~1-2 weeks compute + iteration | HIGH |
+| 3. | **Validation triad execution + paper figures** (anthropogenic emissions plots + IMOGEN concentrations vs Law Dome / IPCC AR6 / Saunois / Tian + ISIMIP3b climate vs IMOGEN-emulator difference maps + Track 1 vs Track 2 LPJG ecosystem comparison) | ~1 week | HIGH |
+| 4. | **Paper amendments + writing** (intro + methods + results + discussion + conclusion + §2.4.4 sector-ownership rule paragraph per B40 §4) | ongoing in parallel | HIGH |
+| 5. | **v1.0 paper submission** to GMD or similar venue | target | TERMINAL |
+
+Per `notes/PRODUCTION_RUN_CONFIG.md` §6.2 effort estimate: total estimated calendar time from this commit to v1.0 paper submission is **~6-10 weeks**.
+
+---
+
+**Per-item detailed close-out narratives** (chronological, most recent first):
+
+-3. **B40 ✅ FULLY CLOSED 2026-05-19 evening session 7 continuation** (canonical landing record at `notes/B40.md`; no tag — investigation-only milestone). Actual elapsed time ~30 min (vs ~2-4 h estimate; faster because source-level smoking-gun decisively confirmed FOLLOWUPS hypothesis without empirical run). Verdict: **METHODOLOGICAL CHARACTERISTIC NOT DEFECT**. Source-level smoking gun at `lpjguess/modules/somdynam.cpp:1689-1691`: monthly N-input to soil mineral N pool SUMS atmospheric NHx + NOy deposition + biological N-fixation WITHOUT source-discrimination; `lpjguess/modules/ntransform.cpp:179-467` runs Xu-Ri 2008 + Ma 2022 JAMES nitrification + denitrification kinetics on combined pool producing aggregated `Fluxes::N2O_SOIL`; `lpjguess/modules/imogenoutput.cpp:221-223` propagates single channel to IMOGEN handshake. LPJG's N2O channel scope is Saikawa-2014-aligned (~14-24 TgN2O/yr modern decade; includes N-deposition-influenced natural pathway) rather than Tian-2020-narrow (~9-12 TgN2O/yr "purely natural" only). Full 1900-2100 time-mean (11.18 TgN2O/yr) WITHIN Tian envelope [8.3-11.5]. NEW B46 filed (optional v1.5+ source-edit; LOW priority). Paper §2.4.4 sector-ownership rule paragraph drafted (per `notes/B40.md` §4). NO new defect-class audit items filed. Classification: TRUNK-IRRELEVANT-by-finding. Rule #9 + Rule #10 at 11th consecutive datapoint each.
 
 -2. **B39 ✅ FULLY CLOSED 2026-05-19 evening session 7 continuation** (canonical landing record at `notes/B39.md`; no tag — small functional-improvement milestone; cumulative backport-debt UNCHANGED at +145 LOC). Actual elapsed time ~45 min (vs ~1-2 h estimate per FOLLOWUPS B39 row; faster because the parameter was already configurable; only .ins values + cross-reference table + acceptance-test re-run needed). Verdict: **CO2_INIT_PPMV per-YEAR1 configurability fix (option α) APPLIED + EMPIRICALLY CONFIRMED STRICT_PASS**. Pre-fix CO2 drift -3.5 to -4.2% pre-fix → -0.09 to -0.80% post-fix across all 4 smoke-window years (1900-1903); ~5× tightening; STRICT_PASS achieved. User-authorized at session 7 q_b39_ch4_scope option A bundled CH4_INIT_PPBV 865.0 → 875.6 fix as B39 (α)' minor extension (also improved to STRICT_PASS +0.07 to +0.39%; sign-flipped + magnitude reduced). N2O_INIT_PPBV unchanged at 277.4 per user preference (already within 0.07% of Law Dome 1900 277.2; -0.18 to -1.37% drift unchanged from pre-fix). Per-cell breakdown: 8 of 12 STRICT_PASS pre-fix → **11 of 12 STRICT_PASS post-fix** (only 1903 N2O remains BALLPARK at -1.37%). 1 git-committed .ins file touched (main `runs/SSP1-2.6/imogen_intermediary.ins`) + 1 Python script POST-B39-NOTE prepend (Rule-#10 self-correction: 3 xval parallel `.ins` files are git-IGNORED + auto-inherit post-B39 main .ins via setup_run.sh copy mechanism at next xval re-activation; no separate xval source-edit needed); NEW `docs/scientific_framework.md` §6.1 cross-reference table (1850/1900/2005 Law Dome / Meinshausen 2017 / Mauna Loa baselines) + NEW row in `notes/PRODUCTION_RUN_CONFIG.md` §2.1 cross-referencing the §6.1 table. ZERO source-code change to `lpjguess/` or `imogen/` engine trees (per option α prescription). Classification: TRUNK-IRRELEVANT-by-novelty. NO new audit items filed. Rule #9 + Rule #10 at 10th consecutive datapoint each. Audit-item state at B39 close: B39 ✅ DONE; all other items unchanged from B36 close at `a77ea8f`.
 

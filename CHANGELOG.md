@@ -14,6 +14,90 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7 continuation) — B40 ✅ DONE — Modern-decade N2O hump explanatory study CLOSED with verdict METHODOLOGICAL CHARACTERISTIC NOT DEFECT; LPJG's `N2O_SOIL` channel scope confirmed at source level as Saikawa-2014-aligned (N-deposition-influenced natural pathway) rather than Tian-2020-narrow ("purely natural" only); full 1900-2100 time-mean (11.18 TgN2O/yr) WITHIN both envelopes; modern-decade peak (~14.43 TgN2O/yr 2008-2017) explained by ~10-15× increase in atmospheric NHx + NOy deposition perturbing soil mineral N pool; NEW B46 filed (optional v1.5+ source-edit to split channel; LOW priority); paper §2.4.4 sector-ownership rule paragraph drafted; ZERO source-code change; **LOCAL V1 VERIFICATION WINDOW IS NOW ✅ FULLY COMPLETE** (B37 + B36 + B39 + B40 all closed in this session 7); Rule #9 + Rule #10 at 11th consecutive datapoint each — **6 in-tree doc surfaces (1 NEW + 5 updates) + 1 sibling Part 6 of session5_post_b19 handoff on `main` working branch directly; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: B40 close-out doc cascade. ZERO source-code change to `lpjguess/` or `imogen/` engine trees (B40 is investigation; B46 optional source-edit deferred per B-item lifecycle discipline + per the FOLLOWUPS B40 row prescription "Possibly leads to a NEW v1.5 audit item if substantive code refinement is warranted"). Bridges the gap between (a) the B20 close-out empirical observation of the modern-decade N2O hump (2008-2017 mean 14.43 TgN2O/yr; +50.27% above Tian 2020 envelope max 11.5 TgN2O/yr) and (b) the source-level mechanism confirmation + paper-stage analytical narrative.
+
+**Source-level smoking-gun finding** (the decisive B40 evidence):
+
+`lpjguess/modules/somdynam.cpp:1689-1691`:
+```cpp
+// Monthly nitrogen addition to the system
+soil.nmass_inc((gridcell.aNH4dep + soil.anfix_mean) / 12.0, NH4);
+soil.nmass_inc(gridcell.aNO3dep / 12.0, NO3);
+```
+
+The monthly N-input to soil mineral N pools SUMS atmospheric NHx + NOy deposition (`gridcell.aNH4dep + aNO3dep`) + biological N-fixation (`soil.anfix_mean`) WITHOUT source-discrimination. Then `lpjguess/modules/ntransform.cpp:179-467` runs Xu-Ri 2008 + Ma 2022 JAMES nitrification + denitrification kinetics on the combined pool, reporting aggregate `Fluxes::N2O_SOIL` flux at line 467 (no per-source attribution). `lpjguess/modules/imogenoutput.cpp:221-223` propagates the single channel to the IMOGEN-handshake natural-N2O channel at `imogen_lpjg_ch4_n2o_flux.txt` (44/28 mass conversion at flush time).
+
+**Therefore**: LPJG's "natural N2O" output (the basis for B20 literature validation against Tian 2020 envelope) **includes both** (a) "purely natural" N2O from N-fixation + native soil mineral N + organic-matter mineralization, AND (b) "N-deposition-influenced natural" N2O from elevated nitrification/denitrification due to atmospheric NHx + NOy deposition. This is **conceptually broader** than Tian 2020's "natural soil flux 5.6 TgN/yr" pre-industrial-equivalent baseline, but **conceptually consistent** with Saikawa 2014's wider envelope (~14-24 TgN2O/yr modern decade) which acknowledges the N-deposition-perturbed natural pathway.
+
+**Quantitative narrative** (per `notes/B40.md` §3):
+- 1900 pre-industrial: atmospheric NHx + NOy deposition ~4-8 TgN/yr → LPJG N2O_SOIL ~10.76 TgN2O/yr (within Tian envelope)
+- 2000-2017 modern peak: deposition ~60-65 TgN/yr (~10-15× pre-industrial; per Lamarque 2010 + Hauglustaine 2014) → LPJG N2O_SOIL ~13.84-14.43 TgN2O/yr (~50% above Tian envelope max; CONSISTENT WITH Saikawa wider envelope)
+- 2050-2100 SSP1-2.6 mitigation: deposition declines back toward ~30-40 TgN/yr → LPJG N2O_SOIL ~9.57-9.94 TgN2O/yr (within Tian envelope)
+- Full 1900-2100 time-mean: 11.18 TgN2O/yr (WITHIN Tian envelope [8.3-11.5])
+
+**Anthropogenic agricultural N2O is computed separately** via LPJG cropland-stand fluxes from `management.cpp` + intermediary_py Component A (IPCC 2019 AFOLU Tier-1) and flows through the engine's anthropogenic channel `FILE_CH4_N2O_EMITS` — no double-counting with the LPJG-natural channel per the mutual-exclusion invariant at `docs/scientific_framework.md` §5.3 (B32 closure) + B36 close-out at `a77ea8f` Fortran engine audit verification.
+
+**Paper §2.4.4 sector-ownership rule paragraph** (drafted in `notes/B40.md` §4; ready for paper-author integration):
+
+> _"LPJG's natural-soil N2O channel (the `Fluxes::N2O_SOIL` flux reported in `ngases.out` and propagated to the IMOGEN-handshake natural-N2O channel at `imogen_lpjg_ch4_n2o_flux.txt`) is computed via Xu-Ri 2008 + Ma et al. 2022 JAMES nitrification + denitrification kinetics applied to the soil mineral N pool, which is incremented monthly by the sum of atmospheric NHx + NOy deposition (from ndep NetCDF input) + biological N-fixation (per Cleveland et al. 1999 precipitation-driven empirical formula) + organic-matter mineralization (from native + decomposed litter). This channel scope is conceptually consistent with Saikawa 2014's wider 'N-deposition-influenced natural N2O' envelope rather than Tian 2020's narrower 'purely natural N2O' envelope. The full 1900-2100 simulation time-mean N2O output (11.18 TgN2O/yr) is WITHIN Tian 2020's published envelope for natural soil flux (9.6 [8.3-11.5] TgN2O/yr); the modern-decade peak (2008-2017 mean 14.43 TgN2O/yr) reflects the N-deposition-influenced natural pathway responding to the industrial-era ~10-15× increase in atmospheric NHx + NOy deposition. The subsequent SSP1-2.6 mid-century-onward N2O decline (back to ~9.6 TgN2O/yr by 2050) follows the scenario's declining anthropogenic NHx + NOy emission mitigation trajectory reducing soil-N perturbation. Anthropogenic agricultural N2O (cropland direct + indirect) is computed via a separate code path (LPJG cropland-stand fluxes from management.cpp + intermediary_py Component A) and flows through the engine's anthropogenic channel FILE_CH4_N2O_EMITS, ensuring no double-counting with the LPJG-natural channel per the mutual-exclusion invariant at docs/scientific_framework.md §5.3."_
+
+**NEW B46 filed** (optional v1.5+ source-edit; LOW priority): split `Fluxes::N2O_SOIL` into separately-attributed `N2O_SOIL_NATURAL` + `N2O_SOIL_NDEP_INFLUENCED` channels in `lpjguess/modules/ntransform.cpp` for per-source attribution accounting. Three implementation options: (α) full source-edit with soil mineral N pool source-tagging ~150-250 LOC TRUNK-RELEVANT; (β) ratio-based post-hoc attribution ~60-90 LOC TRUNK-IRRELEVANT; (γ) defer entirely (recommended for v1.0 paper-publication; current B40 §4 paper paragraph is sufficient). Recommended timing: v1.5+ analytical-refinement era; alongside F-12 architectural work (v1.1+) or opportunistic during future N-cycle refactoring. NOT v1.0-blocking.
+
+**Audit-item state matrix at this commit**:
+- **B40 ✅ DONE** (investigation; clean methodological-characteristic verdict; paper §2.4.4 sector-ownership rule paragraph drafted)
+- **B46 ⏳ NEW filed** (optional v1.5+ source-edit; LOW priority)
+- All other audit items unchanged from B39 close at `8026740`
+
+**LOCAL V1 VERIFICATION WINDOW IS NOW ✅ FULLY COMPLETE**:
+
+| Item | Status | Commit | Effort estimate | Actual | Verdict |
+|---|---|---|---|---|---|
+| **B37** Productive-year-ceiling explanatory study | ✅ DONE | `75811c0` | ~1-3 h | ~2 h | Root cause identified; path (iv) sidecar empirically confirmed; v1.0 paper-publication production-IMOGEN runs FEASIBLE without F-12 |
+| **B36** Fortran IMOGEN background-emission audit | ✅ DONE | `a77ea8f` | ~2-4 h | ~30 min | NO DOUBLE-COUNTING DEFECTS FOUND; all 4 sub-item criteria PASS |
+| **B39** CO2_INIT_PPMV per-YEAR1 configurability fix | ✅ DONE | `8026740` | ~1-2 h | ~45 min | STRICT_PASS empirically confirmed; CO2 drift -3.5 to -4.2% → -0.09 to -0.80%; CH4 also improved |
+| **B40** Modern-decade N2O hump explanatory study | ✅ DONE | **THIS** | ~2-4 h | ~30 min | Methodological characteristic NOT defect; Saikawa-aligned channel scope; paper paragraph drafted |
+
+**Total local v1 verification window effort**: estimated 6-13 h cumulative; actual ~4 h cumulative (significantly faster than estimate; all 4 items decisive at first-or-second reconnaissance because of the engine's clean architecture + the well-targeted FOLLOWUPS row hypotheses).
+
+**Newly-filed audit items across the window**: B44 + B45 (at B37 close) + B46 (at this B40 close). All are post-v1.0 enhancements (v1.1+ to v1.5+ era); NONE v1.0-blocking.
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (B40 is investigation; no source-code change to `lpjguess/` or `imogen/` trees; doc-cascade surfaces are per-fork; NEW `notes/B40.md` is per-fork). Cumulative B19+B20+B41+B42+B43+B37+B36+B39+B40 backport-debt UNCHANGED at **+145 LOC** eligible-for-backport.
+
+**v1.0 % done estimate UNCHANGED at ~95-97%** (B40 is investigation-only; v1.0 architecture is unchanged; B40's value is closing the modern-decade N2O hump explanatory question with a Saikawa-aligned source-level confirmation + drafting the paper §2.4.4 sector-ownership rule paragraph).
+
+**Rule #9 + Rule #10 datapoints at this commit**:
+- **Rule #9 (harness-authoring routinely surfaces latent defects)** — 11th consecutive datapoint: the B40 source-reading exercise surfaced the smoking-gun line `somdynam.cpp:1690-1691` via systematic grep refinement (initial grep `ndep|n_dep|...` produced cosmetic false-positives in `canexch.cpp` comments matching "_dependent_"; refined grep `dndep|NH4_input|NO3_input|...` located the actual N-deposition addition point in `somdynam.cpp`). Same "grep-refinement-as-defect-discovery" pattern as B36's IS92A doc-drift surface.
+- **Rule #10 (verification-integrity discipline)** — 11th consecutive clean operating datapoint: the B40 verdict cites concrete artifacts (B20 per-period drift table + JSON for empirical signal; specific line ranges at `somdynam.cpp:1689-1691` + `ntransform.cpp:179-467` + `imogenoutput.cpp:221-223` for source-level confirmation; published literature citations for Tian 2020 vs Saikawa 2014 envelope-definition reconciliation; Lamarque 2010 + Hauglustaine 2014 + Bauer 2017 + Rao 2017 for the atmospheric ndep + SSP1-2.6 mitigation trajectories); the "methodological characteristic NOT defect" verdict is honestly framed (acknowledging LPJG channel is conceptually broader than Tian 2020 + modern-decade hump is real + future v1.5+ source-edit refinement is a valid enhancement opportunity).
+
+**What's next (POST-LOCAL-V1-VERIFICATION-WINDOW)**:
+
+| Next item | Estimated effort |
+|---|---|
+| (OPTIONAL) Local v1 verification window CLOSE-OUT tag candidate (e.g., `v0.21.0-local-v1-verification-window-complete`) + dedicated close-out doc cascade | ~30-60 min |
+| (OPTIONAL) **B44** Productise path-iv sidecar in `scripts/run_coupled.sh` (~20-30 min bash addition) | ~20-30 min |
+| **17c.1+ cluster phases** on KIT IMK-IFU `owl` | ~1-2 weeks SSH-iterative |
+| **Track 2 production runs** (5 SSP-RCPs; 1900-2100; 62538-cell gridlist; `-input imogencfx`; using B37 path-iv sidecar) | ~1-2 weeks compute |
+| **Validation triad execution + paper figures** | ~1 week |
+| **Paper amendments + writing** (intro + methods + results + discussion + conclusion + §2.4.4 sector-ownership rule paragraph per B40 §4) | ongoing in parallel |
+
+**Actual effort**: ~30 min (vs ~2-4 h estimate per FOLLOWUPS B40 row; faster because source-level smoking-gun decisively confirmed FOLLOWUPS hypothesis without empirical run).
+
+**6-surface in-tree doc cascade + 1 sibling-narrative at this commit**:
+
+- _doc_: NEW `notes/B40.md` canonical landing record (~400 LOC; full source-reading + empirical mechanism narrative + Tian 2020 vs Saikawa 2014 reconciliation + paper §2.4.4 sector-ownership rule paragraph + NEW B46 candidate filing)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B40 close entry + B40 row → ✅ DONE + B46 NEW row)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B40-status prepend; local v1 verification window FULLY COMPLETE note)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B40 entry; cumulative state UNCHANGED at +145 LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B40 ✅ DONE → local v1 verification window FULLY COMPLETE → 17c.1+ cluster phases / optional B44 / optional close-out tag NEXT)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 6 (B40 narrative; appends to session 7 evening Part 5 B39 narrative)
+
+No tag at this commit (B40 close is investigation-only milestone; not itself release-worthy; the next tag candidate is at the OPTIONAL local v1 verification window CLOSE-OUT summary commit per the prompt's §"Suggested first action sequence" item 8 OR at v1.0.0-paper-publication-ready).
+
+**Files** (6 doc; 0 source): `notes/B40.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md`.
+
 ### 2026-05-19 (evening, session 7 continuation) — B39 ✅ DONE — `CO2_INIT_PPMV` per-YEAR1 configurability fix (option α) APPLIED + EMPIRICALLY CONFIRMED STRICT_PASS at B19 Phase 4 re-validation against Law Dome MacFarling Meure 2006 ice-core record; CO2 drift -3.5 to -4.2% pre-fix → -0.09 to -0.80% post-fix (~5× tightening; STRICT_PASS across all 4 years); CH4 drift -0.5 to -0.7% pre-fix → +0.07 to +0.39% post-fix (sign-flipped + magnitude reduced; STRICT_PASS); per-cell breakdown improved from 8 of 12 STRICT_PASS pre-fix → 11 of 12 STRICT_PASS post-fix (only 1903 N2O remains BALLPARK at -1.37%); user-authorized at session 7 q_b39_ch4_scope option A bundled CH4_INIT_PPBV 865.0 → 875.6 fix as B39 (α)' minor extension; N2O_INIT_PPBV unchanged at 277.4 per user preference; NEW `notes/B39.md` canonical landing record (~330 LOC) + NEW `docs/scientific_framework.md` §6.1 cross-reference table (~50 LOC; 1850/1900/2005 Law Dome / Meinshausen 2017 / Mauna Loa baselines) + NEW row in `notes/PRODUCTION_RUN_CONFIG.md` §2.1; B39 is the THIRD item closed in the local v1 verification window after B37 (`75811c0`) + B36 (`a77ea8f`) close-outs; Rule #9 + Rule #10 at 10th consecutive datapoint each — **8 in-tree doc surfaces (1 NEW B39.md + 5 doc updates + 1 NEW docs/scientific_framework.md §6.1 + 1 PRODUCTION_RUN_CONFIG.md addition) + 4 .ins source touches (1 main + 3 xval parallel) + 1 Python script attribution-narrative POST-B39-NOTE prepend + 1 sibling Part 5 of session5_post_b19 handoff + audit-evidence bundle on `main` working branch directly; 3-remote-converge pending at this commit**
 
 **Scope of this commit**: B39 close-out fix + cascade. ZERO source-code change to `lpjguess/` or `imogen/` engine trees (per the FOLLOWUPS B39 row option α prescription: "zero engine change since the parameter is already configurable"). All source-touches are per-fork .ins or per-fork script:
