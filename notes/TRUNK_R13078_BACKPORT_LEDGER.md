@@ -5,6 +5,34 @@ made in our `lpjguess/` tree (and the related Fortran IMOGEN
 `imogen/code/` tree) that will need to be **replicated in
 `trunk_r13078`** for working-paper Stage-1/Stage-2 consistency.
 
+---
+
+## 🔧 STRATEGIC NOTE raised at session 7 close (2026-05-19 12:53 AM) — possible direction inversion + scope upgrade
+
+The original framing of this ledger (per §1 below) assumed the backport sprint would happen **after** v1.0 release / paper submission — i.e., the rebuild repo runs the v1.0 paper-publication runs, and the ledger entries get replicated to `trunk_r13078` later as a follow-up cleanup so both forks are switchable.
+
+**User raised an alternative at session 7 close** (per `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §0.2): use `trunk_r13078` (minimally updated) for the v1.0 paper-publication Track 2 runs themselves, for **paper-reviewer-defensibility** — the Track 1 vs Track 2 comparison (validation triad Axis 4 per `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4) is much cleaner if LPJG version is held constant + only climate-driver source varies.
+
+If user chooses **Option T** at session 8.0 strategic decision (per CLUSTER_SETUP §0.2):
+
+- **Backport direction flips**: from "rebuild → trunk_r13078 for upstream contribution post-paper" to "**trunk_r13078 ← minimal-rebuild-additions for Track 2 paper-publication consistency PRE-paper**"
+- **Backport timing brings forward**: from "post-step-19 release" to "session 8 (immediate)"
+- **Backport scope upgrades to BLOCKING**: the cumulative +145 LOC eligible-for-backport (and any other rebuild improvements to `imogen*` files that diverged) become **pre-paper-publication blockers** for Track 2 instead of post-paper niceties
+- **The §3-ledger entries should be re-classified**: any entry currently classified TRUNK-RELEVANT becomes a **pre-paper-publication backport** rather than a post-paper backport sprint; TRUNK-IRRELEVANT entries are unchanged
+
+**Session 8.0 verification checklist (per CLUSTER_SETUP §0.2 C0-C5)** will produce the concrete backport delta enumeration + decide Option R (current default; no inversion) vs Option T (inversion; backport-sprint-equivalent done at session 8 pre-Track-2). Watch the C5 decision outcome to know whether to act on this strategic note.
+
+If Option R chosen at session 8.0: this strategic note becomes informational + the ledger continues as originally framed.
+
+If Option T chosen at session 8.0: this strategic note becomes the **new operational frame**; the §1 policy below should be updated accordingly + the backport sprint enumeration + verification proceeds at session 8.0-8.X (before block 8.4 production-config authoring).
+
+Cross-references for this strategic note:
+- `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §0.2 (full discussion + 3 Option-T sub-options + C0-C5 checklist)
+- `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4 (Axis 4 validation interpretation; LPJG version dimension)
+- `notes/FOLLOWUPS.md` top-of-dashboard session-7-close note
+
+---
+
 **Why this exists:** see policy section below; in short, our v1.0
 rebuild operates on `LandSyMM_LPJ-GUESS/` (which the user also calls
 the "integrated LTS" per the integration-project terminology

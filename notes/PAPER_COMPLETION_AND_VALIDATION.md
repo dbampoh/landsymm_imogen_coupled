@@ -67,6 +67,8 @@ Per `paper/README.md` §"Comparative-analysis framework" + `notes/PRODUCTION_RUN
 
 **Purpose**: document the propagated effect of climate-driver pipeline choice (ISIMIP3b in Track 1 vs IMOGEN-engine-derived in Track 2) on LPJ-GUESS ecosystem outputs (cflux, cmass, anpp, mch4, ngases, etc.) with all other inputs (LU, popdens, ndep, SimFire, soilmap, gridlist) held identical between the two tracks. The science the paper is ultimately about.
 
+**🔧 STRATEGIC CAVEAT raised at session 7 close (2026-05-19 12:53 AM)**: this Axis 4 framing tacitly assumes Track 2 uses the rebuild repo's LPJ-GUESS. **For paper-reviewer-defensibility, Track 1 vs Track 2 is much cleaner if LPJG version is held constant** — i.e., Track 2 also runs on `trunk_r13078` (the version that produced Track 1) with minimalist backport from the rebuild rather than the rebuild's later-4.1-base. The session 8.0 strategic decision per `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §0.2 (Option R vs Option T) materially affects this Axis 4 validation interpretation. **Preliminary recommendation: Option T** (trunk_r13078 minimally updated; ~150-300 LOC backport; Track 1 vs Track 2 isolates climate driver as the only variable; cleaner paper story); subject to session 8.0 C0-C5 verification.
+
 **Tools**:
 - Predecessor `carbon_comparison.py` (~370 LOC at `version_{A,B}/.../comparative_analysis/analysis/`) — to be ported + enhanced
 - New scripting for non-carbon ecosystem variables (anpp; ngases for CH4/N2O; landcover; firert; nflux; etc.) — may need new scripts beyond the carbon-only predecessor scope

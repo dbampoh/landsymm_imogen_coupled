@@ -24,6 +24,64 @@
 
 ---
 
+## 0.2 STRATEGIC QUESTION raised at session 7 close (2026-05-19 12:53 AM) — Track 2 LPJG version: rebuild repo vs `trunk_r13078` minimally updated
+
+**TL;DR**: Before block 8.1, **session 8.0 needs a ~1-2 hour strategic decision** on which LPJ-GUESS version runs Track 2 (and therefore the cluster phase 1-3). Two options; the decision fundamentally reshapes the §1.2 8-block plan.
+
+### Why this question is being raised
+
+- **Track 1 used `trunk_r13078`** (earlier LPJ-GUESS 4.1 base + the user's prior IMOGEN integration; produced the LPJG-natural-flux outputs that feed `intermediary_py` Component B)
+- **The rebuild repo uses LATER-LPJ-GUESS-4.1 base + ported trunk_r13078 features** (best-effort forward-port during the rebuild)
+- **For paper-reviewer-defensibility**: "we held LPJ-GUESS constant + varied ONLY the climate-driver source between Track 1 and Track 2" is materially cleaner than "we used LPJG revision A for Track 1 + revision B for Track 2"; the Track 1 vs Track 2 comparison (validation triad Axis 4 per `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4) is confounded by 2 variables if LPJG version differs
+- **trunk_r13078 already has `imogencfx`** integration (located at `~/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/version_{A,B}/LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK/Integrations/trunk/trunk_r13078/modules/imogencfx.{cpp,h}` + `imogen_input.{cpp,h}` + `imogenlogger.{cpp,h}`); it is NOT a vanilla LPJ-GUESS 4.1 — it's the version the user actually used in production (Track 1 used `-input cfx` but the IMOGEN files are present)
+- **The minimalist backport scope is therefore bounded**: not "port `imogencfx` from scratch" but "verify trunk_r13078's existing `imogencfx` works with rebuild IMOGEN engine outputs + apply ONLY the deltas that diverged during rebuild iteration (~150-300 LOC; see `notes/TRUNK_R13078_BACKPORT_LEDGER.md`)"
+
+### Two options at session 8.0
+
+| Option | Use this LPJG for Track 2 | Cluster work targets | Backport effort | Compatibility risk |
+|---|---|---|---|---|
+| **Option R** (rebuild) — current default | `lpj-guess_imogen_landsymm/` (rebuild repo) | `lpj-guess_imogen_landsymm/scripts/cluster/` + `runs/SSP1-2.6/main.ins` (production-config delta per §6) | ZERO (rebuild already integrated) | Paper integrity: Track 1 vs Track 2 confounded by LPJG version |
+| **Option T** (trunk_r13078 minimally updated) — user proposal at session-7 close | `version_{A,B}/.../trunk_r13078/` minimally updated for Track 2 IMOGEN engine reads | `~/Desktop/landsymm_lpjg/landsymm_mat/lpjg_landsymm_integration/integrated-4.1-ins2_landsymm_*` `.ins` files (already production-grade per `notes/PRODUCTION_RUN_CONFIG.md` §7) + the legacy cluster scripts at `~/Desktop/landsymm_lpjg/landsymm_mat/owl_hpc_cluster_scripts/scripts/` (the prior-art that worked for Track 1) | ~150-300 LOC well-bounded port (per `notes/TRUNK_R13078_BACKPORT_LEDGER.md` accumulator + session 8.0 enumeration); few-hour to ~1-day work | Paper integrity: LPJG version held constant; Track 1 vs Track 2 isolates climate driver as the ONLY variable |
+
+### Three Option-T sub-options for HOW Track 2 reads rebuild IMOGEN engine outputs
+
+| Sub-option | Mechanism | trunk_r13078 source-edit | Engine location | Compatibility risk |
+|---|---|---|---|---|
+| **T1** | Apply minimalist backport delta to trunk_r13078; trunk_r13078 runs `-input imogencfx` reading rebuild-IMOGEN-engine per-year ASCII directly (engine runs in-process via B44-style sidecar) | ~150-300 LOC backport + B44 sidecar mechanism into trunk_r13078's launcher | In-process | Low — both `imogencfx` lineages from same family |
+| **T2** | Apply minimalist backport + add skip-engine flag (per CLUSTER_SETUP §4.3 Option α′/β′); rebuild's IMOGEN engine runs separately (locally via B44 `--engine-only-mode`); per-year ASCII library staged for trunk_r13078 to read | ~150-300 LOC backport + ~50-100 LOC skip-engine flag in trunk_r13078's `imogencfx.cpp` | Decoupled (engine local; LPJG on cluster) | Low — adds small interface; reuses existing code paths |
+| **T3** | Convert rebuild IMOGEN engine output to ISIMIP3b-style daily NetCDFs; trunk_r13078 runs `-input cfx` (same as Track 1) | ZERO source-edit to trunk_r13078 | Decoupled | **Higher** — temporal-resolution conversion (IMOGEN monthly anomalies → ISIMIP3b daily) requires careful disaggregation logic; introduces a translation layer that could distort the IMOGEN climate signal we're trying to compare; **probably not worth the integrity risk** |
+
+### Preliminary recommendation (subject to session 8.0 verification)
+
+**Option T (trunk_r13078), with T1 or T2 sub-option.**
+
+- **T1 is the simplest**: minimalist backport + B44 sidecar into trunk_r13078's launcher; engine and LPJG run together; matches the current rebuild operational pattern
+- **T2 decouples cleanly**: minimalist backport + skip-engine flag; engine runs locally (smaller, faster, can use B44 `--engine-only-mode` directly); LPJG runs on cluster with no engine dependency
+- **T3 is high-risk + low-elegance**: avoid unless T1/T2 prove infeasible
+
+### Session 8.0 verification checklist (before block 8.1)
+
+| Check | Question | Method |
+|---|---|---|
+| C0 | Does trunk_r13078's `imogencfx.cpp` accept the rebuild's IMOGEN engine per-year ASCII output format (same `T_anom.dat`, `CO2.dat`, etc. file names + columns)? | Diff `version_A/.../trunk_r13078/modules/imogencfx.cpp` vs `lpj-guess_imogen_landsymm/lpjguess/modules/imogencfx.cpp` |
+| C1 | What's the actual backport delta size (LOC + commits) needed to bring trunk_r13078's `imogen*` files up to rebuild equivalence? | Enumerate via `notes/TRUNK_R13078_BACKPORT_LEDGER.md` accumulator + a clean `diff` between the trunk_r13078 + rebuild `lpjguess/modules/imogen*.{cpp,h}` and `imogen/code/imogen_lpjg.f` |
+| C2 | Does trunk_r13078 have an equivalent of B19 + B20 + B36 + B39 fixes that v1.0 paper validation passed against? | Check `notes/B19.md`, `notes/B20.md`, `notes/B36.md`, `notes/B39.md` for files touched + verify whether trunk_r13078 has the equivalent fixes |
+| C3 | Does trunk_r13078's launcher pattern (legacy `~/Desktop/landsymm_lpjg/landsymm_mat/owl_hpc_cluster_scripts/scripts/`) support the B44 path-iv sidecar (T1) OR have a clean way to support the skip-engine flag (T2)? | Read the launcher + decide insertion point for sidecar OR skip-flag |
+| C4 | Effort estimate: backport + verification + cluster integration for trunk_r13078 — ~1-2 days vs ~1-2 days for rebuild Option R cluster integration. Which is actually shorter? | Per-option timing breakdown after C0-C3 |
+| C5 | **Decision**: Option R (rebuild; current default) or Option T (trunk_r13078; cleaner paper consistency) | User after C0-C4 evidence presented |
+
+**Estimated session 8.0 effort**: ~1-2 hours reconnaissance + decision. Then sessions 8.1+ proceed per chosen option.
+
+### Cross-references for this strategic question
+
+- `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4 (Axis 4 validation interpretation; previously tacitly assumed Option R; now flagged for Option T consideration)
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (the backport direction may **invert** from "rebuild → trunk_r13078 for upstream contribution" to "trunk_r13078 ← minimal-rebuild-additions for Track 2 paper consistency"; per session-7-close note added to that ledger)
+- `notes/PRODUCTION_RUN_CONFIG.md` §7 (production-style `.ins` examples; the `lpjg_landsymm_integration/integrated-4.1-ins2_landsymm_*` paths already production-grade; would be the canonical .ins for Option T)
+- `notes/B44.md` (the path-iv `--engine-only-mode` mechanism; would need port-equivalent into trunk_r13078 under T1, or accompanying skip-engine flag under T2)
+- `notes/FOLLOWUPS.md` top-of-dashboard session-7-close note
+
+---
+
 ## 1. Recommended session-8+ ordering (the operational plan)
 
 ### 1.1 Headline strategy — local-first with cluster reconnaissance in parallel
@@ -40,6 +98,7 @@ So the operational plan parallelises cluster reconnaissance (which is gated only
 
 | Block | Effort | Mode | What |
 |---|---|---|---|
+| **8.0** | ~1-2 h | source-diff + decision | **STRATEGIC DECISION** per §0.2: Option R (rebuild repo for Track 2; current default) vs Option T (trunk_r13078 minimally updated for Track 2; cleaner paper consistency). Execute C0-C5 verification checklist; user decides. **All subsequent blocks depend on this outcome** — they describe Option R below; under Option T they retarget to `version_{A,B}/.../trunk_r13078/` + `lpjg_landsymm_integration/integrated-4.1-ins2_landsymm_*` + legacy `owl_hpc_cluster_scripts/scripts/` |
 | 8.1 — Cluster reconnaissance | ~30-60 min | SSH + paste-back | You SSH to `owl`; `module avail` for the module families; `sinfo` for partition names + max walltime + per-partition node specs; `sacct` for your recent LPJG run examples + their resource footprint; `df -h /bg/data/lpj/` for storage; we refine `scripts/cluster/env_owl.sh` + commit |
 | 8.2 — Your LPJG-on-owl workflow walkthrough | ~30 min | screen-share narrative + paste-back | You show me how you submit + monitor + post-process a typical LPJG cluster run; I take notes on conventions; this informs how I should adapt `scripts/cluster/run_coupled.sbatch` to fit your familiar workflow + your `imogen` cluster-orchestration intuitions |
 | 8.3 — `-input imogencfx` cluster-feasibility investigation | ~30-60 min | source-read + design-doc | Investigate the open question in §4 below (does `-input imogen` handle the production auxiliaries? does cluster + `-input imogencfx` require the B44 sidecar mechanism per rank?); recommend concrete cluster sbatch wrapper update plan; record findings here |
