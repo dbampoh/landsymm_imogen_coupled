@@ -14,6 +14,79 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-19 (evening, session 7 continuation) — B39 ✅ DONE — `CO2_INIT_PPMV` per-YEAR1 configurability fix (option α) APPLIED + EMPIRICALLY CONFIRMED STRICT_PASS at B19 Phase 4 re-validation against Law Dome MacFarling Meure 2006 ice-core record; CO2 drift -3.5 to -4.2% pre-fix → -0.09 to -0.80% post-fix (~5× tightening; STRICT_PASS across all 4 years); CH4 drift -0.5 to -0.7% pre-fix → +0.07 to +0.39% post-fix (sign-flipped + magnitude reduced; STRICT_PASS); per-cell breakdown improved from 8 of 12 STRICT_PASS pre-fix → 11 of 12 STRICT_PASS post-fix (only 1903 N2O remains BALLPARK at -1.37%); user-authorized at session 7 q_b39_ch4_scope option A bundled CH4_INIT_PPBV 865.0 → 875.6 fix as B39 (α)' minor extension; N2O_INIT_PPBV unchanged at 277.4 per user preference; NEW `notes/B39.md` canonical landing record (~330 LOC) + NEW `docs/scientific_framework.md` §6.1 cross-reference table (~50 LOC; 1850/1900/2005 Law Dome / Meinshausen 2017 / Mauna Loa baselines) + NEW row in `notes/PRODUCTION_RUN_CONFIG.md` §2.1; B39 is the THIRD item closed in the local v1 verification window after B37 (`75811c0`) + B36 (`a77ea8f`) close-outs; Rule #9 + Rule #10 at 10th consecutive datapoint each — **8 in-tree doc surfaces (1 NEW B39.md + 5 doc updates + 1 NEW docs/scientific_framework.md §6.1 + 1 PRODUCTION_RUN_CONFIG.md addition) + 4 .ins source touches (1 main + 3 xval parallel) + 1 Python script attribution-narrative POST-B39-NOTE prepend + 1 sibling Part 5 of session5_post_b19 handoff + audit-evidence bundle on `main` working branch directly; 3-remote-converge pending at this commit**
+
+**Scope of this commit**: B39 close-out fix + cascade. ZERO source-code change to `lpjguess/` or `imogen/` engine trees (per the FOLLOWUPS B39 row option α prescription: "zero engine change since the parameter is already configurable"). All source-touches are per-fork .ins or per-fork script:
+
+| File | Pre-fix | Post-fix change | Rationale |
+|---|---|---|---|
+| `runs/SSP1-2.6/imogen_intermediary.ins:266-268` | `CO2_INIT_PPMV 286.085 / CH4_INIT_PPBV 865.0 / N2O_INIT_PPBV 277.4` | + ~16-LOC inline maintenance directive (comment block); CO2 → **296.1**; CH4 → **875.6**; N2O unchanged 277.4 | main .ins; YEAR1=1900; Law Dome 1900 per MacFarling Meure 2006; matches `scripts/b19_phase4_literature_validate.py:74` reference for year 1900 |
+| `runs/SSP1-2.6/parallel_work_xval_mpi/{loose,prescribed,tight}_4cell_runs/imogen_intermediary.ins` | (same triple) | **NO B39 FUNCTIONAL CHANGE** — initial cascade-authoring attempted directive edits, reverted per Rule #10 self-correction after `git check-ignore` verification revealed git-IGNORED status | xval parallel files are git-IGNORED per `.gitignore`'s `runs/*/parallel_work_xval_mpi/...` rule; regenerable by `scripts/cross_validate_mpi_4rank.sh` calling `setup_run.sh` which COPIES the main `runs/SSP1-2.6/imogen_intermediary.ins` into per-rank dirs at xval-harness run-time → xval rank dirs auto-inherit post-B39 main .ins values at next xval re-activation |
+| `scripts/b19_phase4_literature_validate.py:238-260` (attribution-narrative report template) | PRE-B39 attribution text describing the 286.085 init-seed issue + fix-forward candidate ("re-set CO2_INIT_PPMV to 296.1 (Law Dome 1900) for 1900-start runs") | POST-B39 NOTE prepended documenting the fix HAS BEEN applied; PRE-B39 attribution preserved as historical context per Rule #10 corollary ("preserve original for forensic value") | the validate script's report-template was hardcoded with PRE-B39 narrative; without this update post-B39 reports would falsely state CO2_INIT_PPMV is still 286.085 |
+| **NEW** `docs/scientific_framework.md` §6.1 "Per-YEAR1 atmospheric-concentration seed table (B39 close-out 2026-05-19 session 7)" | (didn't exist) | + ~50 LOC NEW subsection with 3-row cross-reference table for 1850 / 1900 / 2005 Law Dome / Meinshausen 2017 / Mauna Loa baselines + maintenance directive for any YEAR1 not in table | canonical per-YEAR1 *_INIT_* value reference per FOLLOWUPS B39 row prescription ("plus a small cross-reference table in `docs/scientific_framework.md` for common YEAR1 baseline values"); reviewer-defensible; cross-referenced from all 4 .ins files + PRODUCTION_RUN_CONFIG.md |
+| **NEW row** `notes/PRODUCTION_RUN_CONFIG.md` §2.1 | (didn't include the 3 `*_INIT_*` params) | + 1-row table addition for `CO2_INIT_PPMV / CH4_INIT_PPBV / N2O_INIT_PPBV` engine seed; cross-references `docs/scientific_framework.md` §6.1 | makes the per-YEAR1 fix visible from the production-config user's primary reference document per user session-7 q_b39_doc_location "both" option |
+
+**Empirical acceptance test (per FOLLOWUPS B39 row + Rule #10)**:
+1. Pre-clean `runs/SSP1-2.6/Common-directory/IMOGEN/output/`
+2. Smoke run: `timeout 600 scripts/run_coupled.sh --backbone intermediary-py --coupling-mode prescribed --scenario SSP1-2.6 --smoke --no-build --no-intermediary --no-adapter` → engine produced 4 year-dirs (1900-1903) in ~10 min wall; timeout-killed at F-10 case-α 4-year ceiling per B37 formula prediction (exit 124 expected)
+3. B19 Phase 4 re-validation: `python3 scripts/b19_phase4_literature_validate.py --engine-output-dir runs/SSP1-2.6/Common-directory/IMOGEN/output --report-out _chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_literature_validation_2026-05-19.md`
+
+**Per-year per-species drift envelope (post-B39 vs pre-B39 at commit `82a1bc8`)**:
+
+| Year | Species | v1.0 (pre-fix) | v1.0 (post-fix) | Law Dome | Δ_rel (post) | Verdict (post) |
+|---|---|---|---|---|---|---|
+| 1900 | CO2 ppm | (~285.83) | **295.844** | 296.100 | **-0.09%** | **STRICT_PASS** (was BALLPARK -3.47%) |
+| 1901 | CO2 ppm | (~285.58) | **295.593** | 296.200 | **-0.20%** | **STRICT_PASS** (was BALLPARK -3.59%) |
+| 1902 | CO2 ppm | (similar) | **294.932** | 296.400 | **-0.50%** | **STRICT_PASS** (was BALLPARK -3.87%) |
+| 1903 | CO2 ppm | (similar) | **294.326** | 296.700 | **-0.80%** | **STRICT_PASS** (was BALLPARK -4.18%) |
+| 1900-1903 | CH4 ppb | (~869-880) | **879-887** | 875-887 | **+0.07 to +0.39%** | **STRICT_PASS** (was STRICT -0.5 to -0.7%; magnitude reduced + sign-flipped) |
+| 1900-1903 | N2O ppb | unchanged | 276.7, 276.0, 275.3, 274.5 | 277.2, 277.4, 277.8, 278.3 | -0.18 to -1.37% | STRICT_PASS / 1 BALLPARK (unchanged from pre-fix; N2O_INIT not touched) |
+
+**Aggregate**: pre-fix 8 of 12 STRICT_PASS / 4 of 12 BALLPARK_PASS → **post-fix 11 of 12 STRICT_PASS / 1 of 12 BALLPARK_PASS**. Drift envelope reduction: CO2 ~5× tighter; CH4 ~50% tighter; N2O unchanged.
+
+**FOLLOWUPS B39 row acceptance criterion**: "expect CO2 drift to drop from -3.5-4.2% to <1% (STRICT_PASS); CH4 + N2O drift unchanged" → ✅ **PASS** for CO2 (achieved STRICT_PASS across all 4 years); CH4 IMPROVED (bundled scope; user-authorized); N2O UNCHANGED (per row prediction).
+
+**Audit-item state matrix at this commit**:
+- **B39 ✅ DONE** (option α fix applied + acceptance test PASS empirically confirmed)
+- All other audit items unchanged from B36 close at `a77ea8f`
+
+**Backport classification**: TRUNK-IRRELEVANT-by-novelty in entirety this commit (.ins files + scripts/Python tooling + per-fork docs all per-fork; no canonical engine source change). Cumulative B19+B20+B41+B42+B43+B37+B36+B39 backport-debt UNCHANGED at **+145 LOC** eligible-for-backport.
+
+**v1.0 % done estimate UNCHANGED at ~95-97%** (B39 is small functional improvement removing the 1850s-era init-seed drift; v1.0 architecture is unchanged; B39's value is tightening the literature-comparison verdict from BALLPARK_PASS toward STRICT_PASS at the per-cell level + adding the cross-reference table for future production runs at other YEAR1 anchors).
+
+**Rule #9 + Rule #10 datapoints at this commit**:
+- **Rule #9 (harness-authoring routinely surfaces latent defects)** — 10th consecutive datapoint: the B39 acceptance-test re-run surfaced (a) the stale PRE-B39 attribution text in `scripts/b19_phase4_literature_validate.py` lines 242-249 (worth its own cosmetic POST-B39-NOTE prepend bundled into this commit); (b) the initial run with `--co2-dat-template` arg failed because the actual arg is `--engine-output-dir` — small reminder to sanity-check validate-script arg names.
+- **Rule #10 (verification-integrity discipline)** — 10th consecutive clean operating datapoint: the B39 acceptance test cites concrete artifacts (per-year-per-species drift table from actual post-fix CO2.dat values + canonical Markdown report at `_chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_literature_validation_2026-05-19.md` + JSON summary + raw smoke-run log); the PRE-B39 attribution narrative was honestly preserved (not erased) in the validate script with a POST-B39-NOTE prepend per Rule #10's "preserve original for forensic value" corollary; N2O_INIT_PPBV's non-update was honestly framed (acknowledging the residual ~0.18-1.37% N2O drift that's not addressed by B39); bundled CH4 update was clearly scoped as "user-authorized at session 7 q_b39_ch4_scope option A; treated as B39 (α)' minor extension" not as silent scope-creep.
+
+**Verification window NEXT** (~2-4 h remaining of original 6-13 h budget):
+- **B40** (~2-4 h modern-decade N2O hump explanatory study; paper-stage analytical work) — the only remaining item; LOW priority
+
+Then optional **B44** productisation of path-iv sidecar in `scripts/run_coupled.sh` (~20-30 min) + verification window close-out + 17c.1+ cluster phases on KIT IMK-IFU `owl` (~1-2 weeks SSH-iterative).
+
+**Actual effort**: ~45 min (vs ~1-2 h estimate per FOLLOWUPS B39 row; faster because the parameter was already configurable, only .ins values + cross-reference table + acceptance-test re-run needed).
+
+**6-surface in-tree doc cascade + 4 source-touched files + 1 sibling-narrative + audit-evidence bundle at this commit**:
+
+- _doc_: NEW `notes/B39.md` canonical landing record (~330 LOC; full pre/post-fix per-year per-species drift table + acceptance-test methodology + scope decisions + Rule #9/#10 datapoints)
+- _doc_: `notes/FOLLOWUPS.md` (NEW top-of-dashboard B39 close entry + B39 row → ✅ DONE)
+- _doc_: `CHANGELOG.md` (this entry)
+- _doc_: `EXECUTION_PLAN.md` (row 17c B39-status prepend)
+- _doc_: `notes/TRUNK_R13078_BACKPORT_LEDGER.md` (NEW B39 entry; cumulative state UNCHANGED at +145 LOC)
+- _doc_: `notes/STEP_17c.md` (§1.7.8 update for B39 ✅ DONE → B40 ACTIVE NEXT)
+- _doc_: `docs/scientific_framework.md` (NEW §6.1 cross-reference table)
+- _doc_: `notes/PRODUCTION_RUN_CONFIG.md` (NEW row in §2.1)
+- _source_: `runs/SSP1-2.6/imogen_intermediary.ins` (CO2/CH4 numeric update + ~16-LOC maintenance directive)
+- _source_: `scripts/b19_phase4_literature_validate.py` (POST-B39-NOTE prepend to attribution-narrative report template; PRE-B39 attribution preserved)
+- _NOT-committed_: 3 xval parallel `.ins` files at `runs/SSP1-2.6/parallel_work_xval_mpi/{loose,prescribed,tight}_4cell_runs/` — git-IGNORED per `.gitignore`'s `runs/*/parallel_work_xval_mpi/...` rule (regenerable by `setup_run.sh` copy-from-main; auto-inherit post-B39 main .ins at next xval re-activation; Rule-#10 self-correction reverted initial directive edits)
+- _sibling_: `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 5 (B39 narrative; appends to session 7 evening Part 4 B36 narrative)
+- _audit_: `_chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_smoke_run_20260519_213618.log` (~178 KB; raw smoke-run log)
+- _audit_: `_chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_literature_validation_2026-05-19.md` (~6.6 KB; canonical post-fix validation Markdown report)
+- _audit_: `_chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_literature_validation_2026-05-19.md.json` (~2.9 KB; machine-readable summary)
+
+No tag at this commit (B39 close is small functional-improvement milestone but not itself release-worthy; next tag candidate is at local v1 verification window close-out after B40 completes).
+
+**Files** (8 doc + 2 git-committed source [1 main .ins + 1 Python script]; 0 engine source): `notes/B39.md` + `notes/FOLLOWUPS.md` + `CHANGELOG.md` + `EXECUTION_PLAN.md` + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` + `notes/STEP_17c.md` + `docs/scientific_framework.md` + `notes/PRODUCTION_RUN_CONFIG.md` + `runs/SSP1-2.6/imogen_intermediary.ins` + `scripts/b19_phase4_literature_validate.py` + sibling `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` + audit bundle at `_chat_artifacts/b39_acceptance_test_2026-05-19/`. (Rule-#10 self-correction: 3 xval parallel .ins files at `runs/SSP1-2.6/parallel_work_xval_mpi/{loose,prescribed,tight}_4cell_runs/imogen_intermediary.ins` are git-IGNORED + NOT in commit; auto-inherit post-B39 main .ins values via setup_run.sh copy mechanism at next xval re-activation.)
+
 ### 2026-05-19 (evening, session 7 continuation) — B36 ✅ DONE — Fortran IMOGEN background-emission audit at `imogen/code/imogen_lpjg.f` CLOSED with verdict NO DOUBLE-COUNTING DEFECTS FOUND; all 4 sub-item audit criteria PASS (a: zero hardcoded emission-rate DATA statements; b: zero default-filename fallback strings; c: zero `BLOCK DATA` subroutines anywhere across 4700 LOC; d: empirical cross-reference confirms intermediary_py Component A + B outputs feed the 4 active FILE_* channels via Option B per B31 launcher auto-rewrite); NEW `notes/B36.md` canonical landing record (~270 LOC); ZERO source-code change at this commit (audit is investigation-only; canonical Fortran engine is clean on B36 dimensions); B36 is the SECOND item closed in the local v1 verification window after B37 close at commit `75811c0`; NO new audit items filed; Rule #9 + Rule #10 at 9th consecutive datapoint each — **5 in-tree doc surfaces (1 NEW + 4 updates) + 1 sibling Part 4 of session5_post_b19 handoff on `main` working branch directly; 3-remote-converge pending at this commit**
 
 **Scope of this commit**: B36 close-out doc cascade. Audit completed without any source-code change to `imogen/code/imogen_lpjg.f` (the canonical Fortran IMOGEN engine source shared with `trunk_r13078/`). Bridges the gap between (a) the user-raised concern at B19 Phase 3 (2026-05-17 ~17:30 evening) that the legacy IMOGENCXX C++ refactor may have replaced background land-GHG-emission rates embedded in the original Fortran with what the legacy `intermediary` supplied — raising potential overlap-with-current-input-channels risk — and (b) the audit-result verification that no such defect exists in the current rebuild's Fortran engine.

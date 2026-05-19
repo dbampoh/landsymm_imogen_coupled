@@ -484,6 +484,37 @@ NEE sign convention: **positive = source to atmosphere** (per
 Year indexing: **LPJG year-N flux drives IMOGEN year-(N+1) climate**
 (`imogen_lpjg.f:802`: `IF (YR_LPJG(N).EQ.IYEAR-1) THEN ...`).
 
+### 6.1 Per-YEAR1 atmospheric-concentration seed table (B39 close-out 2026-05-19 session 7)
+
+_Origin: B39 (CO2_INIT_PPMV per-YEAR1 configurability fix; option α). Empirical attribution at B19 Phase 4 BALLPARK_PASS commit `82a1bc8`: Run C 1900-1903 showed uniform CO2 negative bias of -3.47% (1900) → -4.18% (1903) vs Law Dome MacFarling Meure 2006 — fully attributable to `CO2_INIT_PPMV 286.085` being a 1850s/1860s-era value used as the engine's iteration-1 seed for the 1900-start sim. Same pattern at smaller magnitude for `CH4_INIT_PPBV 865.0` (~10 ppb below Law Dome 1900 875.6; explains -0.5 to -0.7% CH4 drift)._
+
+The IMOGEN engine seeds its iteration-1 atmospheric concentrations from 3 `.ins` parameters declared in `runs/<SCEN>/imogen_intermediary.ins`:
+
+- `CO2_INIT_PPMV` — atm CO2 in ppm at year YEAR1
+- `CH4_INIT_PPBV` — atm CH4 in ppb at year YEAR1
+- `N2O_INIT_PPBV` — atm N2O in ppb at year YEAR1
+
+**These values MUST be set to historically-accurate concentrations for the specific YEAR1 of the run** (per option α; the engine source treats them as the iteration-1 seed and propagates forward via the FAIR non-CO2 + Joos ocean modules + the per-iter flux integrations). For any YEAR1 != the seed-table entries below, consult the cited Law Dome MacFarling Meure 2006 NOAA archive spline-fit data + Meinshausen 2017 CMIP6 historical concentration timeseries for the appropriate values.
+
+#### Cross-reference table — common YEAR1 baseline values
+
+| YEAR1 | `CO2_INIT_PPMV` | `CH4_INIT_PPBV` | `N2O_INIT_PPBV` | Source + notes |
+|---|---|---|---|---|
+| **1850** | **284.3** | **815** | **273.0** | Meinshausen 2017 CMIP6 historical pre-industrial baseline; also Law Dome MacFarling Meure 2006 spline-fit start-of-series |
+| **1900** | **296.1** | **875.6** | **277.2** | Law Dome MacFarling Meure 2006 NOAA archive spline-fit; matches `scripts/b19_phase4_literature_validate.py:74` reference for year 1900; **this is the v1.0 paper-publication default (YEAR1=1900 per main `runs/SSP1-2.6/imogen_intermediary.ins`)** |
+| **2005** | **379.0** | **1774** | **319.0** | Mauna Loa / NOAA GAGE observational era (mid-2000s baseline); useful for 2005-start scenario runs (e.g., SSP-RCP scenario phase starts) |
+
+**Maintenance directive**: when configuring a new `imogen_intermediary.ins` for any YEAR1 not in the table above, EITHER (a) extend this table with the new YEAR1 epoch row + citation, OR (b) interpolate the 3 *_INIT_* values between the nearest tabulated epochs using the source data (Law Dome MacFarling Meure 2006 NOAA archive for pre-1958; Mauna Loa / NOAA observational record for 1958-present). The v1.0 production-IMOGEN-engine runs use YEAR1=1900 per `notes/PRODUCTION_RUN_CONFIG.md` §2.1 + the main `runs/SSP1-2.6/imogen_intermediary.ins`.
+
+**Empirical validation acceptance**: post-B39 (this commit), re-running `scripts/b19_phase4_literature_validate.py` against the smoke window (1900-1903) is expected to show CO2 drift drop from -3.5 to -4.2% (B19 Phase 4 pre-fix) → near 0% (STRICT_PASS); CH4 drift drop from -0.5 to -0.7% → near 0%; N2O drift unchanged (N2O_INIT_PPBV unchanged at 277.4, within 0.07% of Law Dome 1900 277.2).
+
+**Cross-references**:
+- `notes/B39.md` (B39 canonical landing record; full source-reading + acceptance-test result)
+- `notes/B19.md` §6.4.1 attribution #1 (original empirical observation of the CO2 negative bias)
+- `runs/SSP1-2.6/imogen_intermediary.ins` lines 266-268 (the 3 `*_INIT_*` parameter site with inline maintenance directive)
+- `notes/PRODUCTION_RUN_CONFIG.md` §2.1 (smoke→production parameter delta; references this §6.1 table)
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 5 (B39 session-7 evening close-out narrative)
+
 ---
 
 ## 7. References

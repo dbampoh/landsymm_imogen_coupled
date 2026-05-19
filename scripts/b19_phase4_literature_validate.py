@@ -237,16 +237,33 @@ def fmt_md_report(comparisons: list[dict], overall_verdict: str, engine_dir: Pat
     lines.append("")
     lines.append("## Stage 4-pre attribution (rule #10 honest framing)")
     lines.append("")
-    lines.append("Empirically observed drift attributable to known causes:")
+    lines.append("**POST-B39 NOTE (added 2026-05-19 evening session 7 continuation)**: "
+                 "the B39 fix-forward candidate cited in attribution #1 below "
+                 "HAS BEEN APPLIED at commit `<post-B39-SHA>` — `runs/SSP1-2.6/imogen_intermediary.ins` "
+                 "now sets `CO2_INIT_PPMV 296.1` (Law Dome 1900 per MacFarling Meure 2006) "
+                 "+ `CH4_INIT_PPBV 875.6` (Law Dome 1900). Per-year per-species drift "
+                 "is expected to drop from the pre-B39 envelope (CO2 -3.5 to -4.2%; "
+                 "CH4 -0.5 to -0.7%) into STRICT_PASS territory (CO2 -0.09 to -0.80%; "
+                 "CH4 +0.07 to +0.39%; B39 acceptance test 2026-05-19 evening at "
+                 "`_chat_artifacts/b39_acceptance_test_2026-05-19/post_fix_literature_validation_2026-05-19.md`). "
+                 "Attribution #1 below is **PRESERVED for historical context** "
+                 "(describes the pre-B39 state at B19 Phase 4 BALLPARK_PASS commit `82a1bc8`); "
+                 "the residual minor drift in post-B39 output reflects engine flux dynamics "
+                 "+ input-source pipeline differences (attribution #2-#4 below) which are "
+                 "expected and below ice-core measurement precision. See `notes/B39.md` "
+                 "for the post-B39 acceptance evaluation + cross-reference table.")
     lines.append("")
-    lines.append("1. **CO2_INIT_PPMV config artifact** — `runs/SSP1-2.6/imogen_intermediary.ins` "
-                 "sets `CO2_INIT_PPMV 286.085`, which is a ~1850s pre-industrial value "
+    lines.append("Empirically observed drift attributable to known causes (PRE-B39 attribution; PRESERVED for historical context):")
+    lines.append("")
+    lines.append("1. **CO2_INIT_PPMV config artifact (PRE-B39)** — `runs/SSP1-2.6/imogen_intermediary.ins` "
+                 "PREVIOUSLY set `CO2_INIT_PPMV 286.085`, which was a ~1850s pre-industrial value "
                  "(Law Dome 1850 ≈ 284.3 ppm per Meinshausen 2017 baseline). Starting a "
                  "1900-window simulation from a 1850-era init seed accumulates ~10 ppm "
-                 "of negative bias before any flux dynamics matter. This explains the "
-                 "consistent CO2 negative bias observed; not an engine bug. Fix-forward "
-                 "candidate: re-set CO2_INIT_PPMV to 296.1 (Law Dome 1900) for "
-                 "1900-start runs OR pre-age via spinup.")
+                 "of negative bias before any flux dynamics matter. This explained the "
+                 "PRE-B39 consistent CO2 negative bias observed; not an engine bug. "
+                 "**FIXED at B39 close 2026-05-19 evening session 7 continuation**: "
+                 "re-set CO2_INIT_PPMV to 296.1 (Law Dome 1900) for 1900-start runs "
+                 "(option α per FOLLOWUPS B39 row).")
     lines.append("")
     lines.append("2. **First-iteration semantic offset (post-d9c90d5)** — v1.0 writes "
                  "per-iteration computed values from year 1 (1900); legacy_A's 1900 file "

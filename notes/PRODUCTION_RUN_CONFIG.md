@@ -56,6 +56,7 @@ This document captures the full smoke→production migration delta, the updated 
 | `file_temp` etc. (climate) | empty (cf reader not used) | (cfx mode) ISIMIP3b NetCDFs OR (imogencfx mode) IMOGEN-engine ASCII per-year | depends on input module |
 | `file_co2` | empty (cf reader not used) | (cfx mode) `co2_histssp126_annual_1850_2100.txt` OR (imogencfx mode) IMOGEN-engine `CO2.dat` per-year | depends on input module |
 | `state_path` / `save_state` / `restart` | not used (smoke) | historical run saves at year 2020; SSP runs restart from the historical state | per integrated-4.1-ins2_landsymm_{hist,ssp126} |
+| **`CO2_INIT_PPMV` / `CH4_INIT_PPBV` / `N2O_INIT_PPBV`** (engine seed; in `imogen_intermediary.ins`) | 296.1 / 875.6 / 277.4 (B39 ✅ DONE 2026-05-19 evening session 7 continuation — set to Law Dome 1900 per MacFarling Meure 2006 + Meinshausen 2017; CO2 fix removes the -3.5 to -4.2% drift observed at B19 Phase 4) | **MUST match the production YEAR1 epoch** — for 1900-start production runs (the v1.0 paper-publication default), use 296.1 / 875.6 / 277.4 as in smoke; for 1850-start spinup runs, use 284.3 / 815 / 273.0 per `docs/scientific_framework.md` §6.1 cross-reference table; for 2005-start scenario runs, use 379.0 / 1774 / 319.0 per same table | **`docs/scientific_framework.md` §6.1 per-YEAR1 atmospheric-concentration seed table (NEW B39)** + `notes/B39.md` canonical landing record |
 
 ### 2.2 landcover.ins + crop.ins
 

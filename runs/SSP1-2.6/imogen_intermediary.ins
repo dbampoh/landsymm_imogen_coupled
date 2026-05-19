@@ -263,9 +263,25 @@ MU              1.78    ! Land/ocean temp anomaly ratio
 Q2CO2           3.74    ! 2x CO2 radiative forcing (W/m^2)
 TAU_DECAY_CH4   9.3     ! Atmospheric CH4 lifetime (years)
 TAU_DECAY_N2O   121     ! Atmospheric N2O lifetime (years)
-CO2_INIT_PPMV   286.085
-CH4_INIT_PPBV   865.0
-N2O_INIT_PPBV   277.4
+! [B39 ✅ DONE 2026-05-19 evening session 7 continuation: per-YEAR1 configurability fix
+!  applied (option α). The 3 *_INIT_* parameters below seed the engine's iteration-1
+!  atmospheric concentrations for year YEAR1; for scientific fidelity they MUST be set
+!  to historically-accurate values for the specific YEAR1 used. PRIOR VALUES were
+!  CO2_INIT_PPMV=286.085 (1850s/1860s-era; ~10 ppm BELOW Law Dome 1900 296.1; caused
+!  uniform -3.5 to -4.2% CO2 negative bias at B19 Phase 4 BALLPARK_PASS commit `82a1bc8`)
+!  + CH4_INIT_PPBV=865.0 (~10 ppb BELOW Law Dome 1900 875.6; caused uniform -0.5 to -0.7%
+!  CH4 negative bias at same Phase 4). NEW values below are Law Dome 1900 per
+!  MacFarling Meure 2006 + Meinshausen 2017 CMIP6 historical concentration timeseries
+!  (matches `scripts/b19_phase4_literature_validate.py:74` reference for year 1900).
+!  N2O_INIT_PPBV=277.4 left UNCHANGED (already within 0.07% of Law Dome 1900 277.2;
+!  no functional improvement from a change). For ANY YEAR1 != 1900 (e.g., production
+!  runs that re-spin to 1850, 2005, etc.), CONSULT `docs/scientific_framework.md` §6.1
+!  "Per-YEAR1 *_INIT_* atmospheric-concentration seed table" for the appropriate values.
+!  Cross-reference: `notes/B39.md` (canonical landing record); `notes/B19.md` §6.4.1
+!  attribution #1; `notes/FOLLOWUPS.md` B39 row.]
+CO2_INIT_PPMV   296.1   ! Law Dome 1900 per MacFarling Meure 2006 (was 286.085 = 1850s; B39 fix)
+CH4_INIT_PPBV   875.6   ! Law Dome 1900 per MacFarling Meure 2006 (was 865.0 = ~1880s; B39 fix)
+N2O_INIT_PPBV   277.4   ! Law Dome ~1901 per MacFarling Meure 2006 (Law Dome 1900 = 277.2; within 0.07%; left unchanged at B39 fix)
 
 ! Number-of-years parameters: smoke uses 2-year window. NYR_* are now LAUNCHER-MANAGED
 ! per backbone — see scripts/run_coupled.sh step 4.5 "BACKBONE-determined NYR_*
