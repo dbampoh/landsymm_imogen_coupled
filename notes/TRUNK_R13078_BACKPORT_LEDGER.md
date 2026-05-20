@@ -7,7 +7,47 @@ made in our `lpjguess/` tree (and the related Fortran IMOGEN
 
 ---
 
+## ✅ STRATEGIC RESOLUTION — Option T_seq adopted at session 8.0 C5 (2026-05-20 afternoon)
+
+**Per `notes/B47.md` canonical landing record (~400 LOC) + session 8.0 C0-C5 verification + U1-U4 pre-flight reconnaissance**: the strategic question raised at session 7 close (preserved verbatim below this section for forensic continuity) is **resolved in favor of Option T_seq** (sequential-standalone with minimal trunk_r13078 backport in two installments).
+
+**The two-installment backport trajectory under T_seq**:
+
+- **Installment 1 (pre-paper; blocks 8.0.1-8.0.3 at session 8.0)**: bring `trunk_r13078` into rebuild repo at `forks/trunk_r13078/` (sibling to `lpjguess/`); apply minimal ~180-310 LOC C++ source-edit (skip_inprocess_engine_run flag + B4 8-field consumer wiring for Rh/W/Tmin/Tmax + per-year CO2.dat reader option-α + 1-line `exit(200)` regression removal at line 483). Purpose: bare-minimum Track-2-runnable state for paper-publication runs in sequential-standalone workflow (rebuild engine standalone Step A → trunk-LPJG standalone Step B reading pre-baked library). The `exit(200)` removal here reduces the §2 baseline-diff from 6-file to 5-file.
+
+- **Installment 2 (post-paper Backport Sprint per §1.2 policy; UNCHANGED timing)**: full forward-port of remaining ~2900-3100 LOC of rebuild deltas to `forks/trunk_r13078/`:
+  - `imogencfx.cpp` year_outer scaffolding (~400 LOC: `preload_all_climate` + `getclimate_for_year`)
+  - `imogenoutput.cpp` + `imogenoutput.h` (~821 LOC NEW; LPJG-side handshake-writer for v1.1+ tight coupling)
+  - `climatemodel.cpp` engine-side delta (~263 LOC: B19 SPINUP/FIRSTCALL fix + B17(b) 4-LOC spinup_year_idx + Tmin/Tmax/Rh/W engine writers + B45 hardcoded year sentinels if fixed)
+  - `framework.cpp` year_outer code path (~50-100 LOC)
+  - Fortran `imogen_lpjg.f` ~562 LOC (step-3 ALLOCATABLE refactor + B10 alternating-year fix + B1/B2 Rh/W/Tmin/Tmax engine writers + B33(c) WARN_POSIX_CONCAT_COLLAPSE +145 LOC)
+  - Purpose: bring `forks/trunk_r13078/` to **full fork-parity** with `lpjguess/` so both forks are **switchable alternatives** per §1.1's two-fork policy
+
+**Two-fork long-term trajectory** (user-clarified at session 8.0 mid-discussion 2026-05-20 afternoon):
+
+- **Primary fork — `lpjguess/`** (the rebuild's LPJ-GUESS): the **active development surface** for all v1.0+ work going forward (B45, B46, F-10/F-12, v1.1+ tight coupling, v1.5+ refinements, v2.0+ PLUM embedding). All future scientific + architectural work lands here first. This is where rebuild iteration continues.
+
+- **Backport fork — `forks/trunk_r13078/`** (post-block-8.0.1): the **paper-publication Track 2 runs surface for v1.0** + the **long-term backport target** to be **eventually brought fully up to speed with `lpjguess/` so both forks are switchable alternatives** (not one replacing the other). T_seq Installment-1 is the first installment toward this end-state; Installment-2 completes the parity.
+
+**Cumulative backport-debt accounting under T_seq** (revised tracking):
+
+- **Direction (i)** — rebuild's `lpjguess/` → `forks/trunk_r13078/` (the new in-repo two-installment direction): Installment-1 ~180-310 LOC at block 8.0.2; Installment-2 ~2900-3100 LOC at post-paper Backport Sprint. Total at full-parity: ~3100-3400 LOC.
+- **Direction (ii)** — rebuild's `imogen/code/imogen_lpjg.f` → LANDSYMM_LPJ-GUESS upstream canonical Fortran engine at `version_A/.../IMOGEN-codebase/code/imogen_lpjg.f` (the original ledger §1.2 direction): UNCHANGED at +145 LOC (B19 Phase 2 Commit 3 `6862d03`'s `WARN_POSIX_CONCAT_COLLAPSE`); deferred to post-paper sprint per original framing. The rebuild's engine at `lpj-guess_imogen_landsymm/imogen/code/imogen_lpjg.f` IS what runs in T_seq Step A so this protection IS exercised in T_seq runs.
+
+**Cross-references for the T_seq resolution**:
+- `notes/B47.md` (~400 LOC canonical landing record with C0-C4 evidence + U1-U4 pre-flight verification + sub-decisions)
+- `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §0.2 (the strategic question framing + C0-C5 checklist; this resolution closes that decision gate)
+- `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4 (Axis 4 validation interpretation; T_seq resolves the LPJG-version-confounding concern)
+- `notes/FOLLOWUPS.md` top-of-dashboard + B47 row
+- `notes/STEP_17c.md` §1.7.8 (17c.1+ cluster phases now target `forks/trunk_r13078/`)
+- `EXECUTION_PLAN.md` row 17c (status update)
+- `CHANGELOG.md` `[Unreleased]` dated entry
+
+---
+
 ## 🔧 STRATEGIC NOTE raised at session 7 close (2026-05-19 12:53 AM) — possible direction inversion + scope upgrade
+
+_(Preserved verbatim below for forensic continuity per Rule #10 amendment-vs-rewrite corollary. The session-7-close framing was the preliminary; the session 8.0 C5 decision above is the resolution.)_
 
 The original framing of this ledger (per §1 below) assumed the backport sprint would happen **after** v1.0 release / paper submission — i.e., the rebuild repo runs the v1.0 paper-publication runs, and the ledger entries get replicated to `trunk_r13078` later as a follow-up cleanup so both forks are switchable.
 

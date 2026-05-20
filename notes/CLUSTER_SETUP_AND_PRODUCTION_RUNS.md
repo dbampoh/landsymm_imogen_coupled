@@ -24,7 +24,72 @@
 
 ---
 
+## ✅ 0.2 STRATEGIC RESOLUTION at session 8.0 C5 (2026-05-20 afternoon) — Option T_seq adopted
+
+**Per `notes/B47.md` canonical landing record (~400 LOC) + session 8.0 C0-C5 verification + U1-U4 pre-flight reconnaissance**: the strategic question raised at session 7 close (preserved verbatim below this banner for forensic continuity per Rule #10 amendment-vs-rewrite corollary) is **resolved in favor of Option T_seq** — a sequential-standalone refinement of the original Option T family that wasn't in the original 4-options-list (R/T1/T2/T3) at session 7 close.
+
+### Resolution summary
+
+**Option T_seq**: bring `trunk_r13078` into rebuild repo at `forks/trunk_r13078/` (sibling to `lpjguess/`) → apply minimal source-edit (~180-310 LOC C++) to make trunk's `imogencfx` consume the rebuild engine's per-year ASCII climate library + skip the in-process engine call → run Track 2 in **sequential-standalone** mode (Step A: rebuild engine standalone via `scripts/run_coupled.sh --engine-only-mode` produces 1900-2100 × 8-field climate + per-year CO2 + non-CO2 atm-conc library; Step B: `scp -r` library to cluster ~2.5 GB; Step C: trunk-T_seq LPJG runs on cluster as pure pre-baked-library consumer using legacy `owl_hpc_cluster_scripts/scripts/` pattern).
+
+**Total effort**: ~2-3 working days across blocks 8.0.1 (~0.5 d structural import) + 8.0.2 (~1-1.5 d source-edit + .ins authoring) + 8.0.3 (~0.5-1 d acceptance test).
+
+**Sub-decisions adopted at C5**:
+- (i) **Landing path**: `forks/trunk_r13078/` (cleaner organization per LEDGER §1.1's two-fork policy)
+- (ii) **CO2 bridge**: option-α (in-source per-year CO2.dat reader; ~30-50 LOC trunk source-edit; matches existing T_anom.dat pattern); option-β Python aggregator deferred as fallback
+
+**Two-fork long-term trajectory** (user-clarified at session 8.0 afternoon): `lpjguess/` (rebuild) = primary active-dev for v1.0+; `forks/trunk_r13078/` = backport fork brought to bare-minimum Track-2-runnable state at T_seq Installment-1 + eventually full fork-parity at post-paper Backport Sprint Installment-2 (~2900-3100 LOC remaining); both forks switchable alternatives, not replacements.
+
+### Why T_seq vs the original 4-options (R / T1 / T2 / T3)
+
+The session-7-close 4-options-list assumed the strategic question was **in-process trunk-imogencfx-with-engine** (T1 = with sidecar; T2 = with skip-flag; T3 = via NetCDF translation; R = rebuild). User's session 8.0 mid-discussion refinement reframed to **sequential-standalone trunk-LPJG-only-consumer-of-pre-baked-library** (T_seq) which drops out:
+
+| Concern in T1/T2 | T_seq resolution |
+|---|---|
+| Per-rank in-process engine sidecar (~30-50 LOC bash) | N/A — engine has already finished standalone before LPJG runs |
+| year_outer scaffolding (~400 LOC) | N/A — trunk runs gridcell_outer mode; year_outer never exercised |
+| `imogenoutput.cpp` + `imogenoutput.h` (~821 LOC NEW) | N/A — LPJG never writes handshake files in T_seq (no engine waiting) |
+| `climatemodel.cpp` engine-side delta (~263 LOC) | N/A — trunk's `RUN_IMOGEN_ENGINE` never executed (skip-engine flag bypasses it) |
+| Fortran `imogen_lpjg.f` ~562 LOC delta (incl. B33(c) +145 LOC) | N/A — trunk has no Fortran; rebuild's engine (with all its Fortran fixes) is what runs |
+
+**Net**: T_seq scope is ~180-310 LOC (Installment-1; first installment toward eventual full fork-parity in Installment-2 post-paper).
+
+### Session-7-close preliminary estimate vs post-C0-C4 honest re-baselining (Rule #10 self-correction)
+
+The session-7-close "~150-300 LOC; few-hour to ~1-day" preliminary T-estimate was **over-optimistic by ~5-10× when interpreted as in-process T1/T2** (actual C0-C4 measurement: ~1300-1600 LOC). User's T_seq refinement at session 8.0 mid-discussion brought scope back down close to the original session-7-close estimate (~180-310 LOC). Per Rule #10 amendment-vs-rewrite corollary, both the preliminary estimate and the C0-C4 honest re-baselining are preserved (preliminary at the section below this banner; honest re-baselining in `notes/B47.md` §2-§4).
+
+### Cluster integration story under T_seq
+
+Simpler than T1/T2 per §4.3 — the §4.3 architectural options table (Options α/α′/β/β′/γ) was framed for in-process engine + LPJG concurrent execution. Under T_seq:
+
+- **Step A** (engine standalone): runs locally via B44 `--engine-only-mode`; ~12.5 min × 5 SSPs = ~1 h; produces 8-field climate library + per-year CO2.dat + non-CO2 atm-conc per-year files at `runs/<SCEN>/Common-directory/IMOGEN/output/<year>/`
+- **Step B** (SCP/rsync to cluster): ~2.5 GB total (~500 MB per SSP × 5 SSPs; per U3 inspection of B44 acceptance-test output; 246 KB × 10 climate files × ~200 years per SSP + small CO2/done/internal files)
+- **Step C** (trunk-LPJG on cluster): legacy `owl_hpc_cluster_scripts/scripts/mpi_run_guess_on_tmp.sh` + `setup_run_owl_with_scratch_lpj_work.sh` pattern with `INPUTMETHOD=imogencfx`; per-rank gridcell split; no per-rank sidecar; no in-process engine; no F-10 deadlock concern
+
+**Blocks 8.1-8.7 retargeted under T_seq** (originally framed for in-process integration options under §4.3 + §5):
+- 8.1 cluster reconnaissance + 8.2 LPJG-on-owl walkthrough: cover trunk-build module dependencies for `forks/trunk_r13078/build_owl/` (alongside rebuild's `lpj-guess_imogen_landsymm/build_owl/`)
+- 8.3 source-read of trunk's imogencfx confirms T_seq integration works (NO need to investigate `-input imogen` auxiliary handling since T_seq uses `-input imogencfx`)
+- 8.4 production-config delta authoring targets `forks/trunk_r13078_runs/SSP*/` (or similar structure-decision at 8.4 start)
+- 8.5 local 100-cell production test for trunk-T_seq with full production knobs (BLAZE, popdens, ndep, _peatland LU)
+- 8.6 local Track-1 paired 100-cell sample run with trunk's `-input cfx`
+- 8.7 cluster sbatch wrapper update for trunk-T_seq (or use legacy launcher as-is)
+
+### Cross-references for the T_seq resolution
+
+- `notes/B47.md` (canonical landing record; ~400 LOC; full C0-C4 evidence + U1-U4 verification + design + acceptance gates)
+- `notes/TRUNK_R13078_BACKPORT_LEDGER.md` ✅ STRATEGIC RESOLUTION section at top (two-installment trajectory + dual-fork lifestyle)
+- `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1.4 (Axis 4 LPJG-version concern now resolved)
+- `notes/FOLLOWUPS.md` top-of-dashboard + B47 row
+- `EXECUTION_PLAN.md` row 17c (status update)
+- `CHANGELOG.md` `[Unreleased]` dated entry for this commit
+- `_chat_artifacts/b47_tseq_decision_2026-05-20/` (audit-evidence bundle: C0-C4 source-diff outputs + U1-U4 verification logs + this decision-record commit message)
+- `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` Part 9 (sibling session-8 narrative)
+
+---
+
 ## 0.2 STRATEGIC QUESTION raised at session 7 close (2026-05-19 12:53 AM) — Track 2 LPJG version: rebuild repo vs `trunk_r13078` minimally updated
+
+_(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The session 8.0 C5 resolution in the banner above is the operational answer.)_
 
 **TL;DR**: Before block 8.1, **session 8.0 needs a ~1-2 hour strategic decision** on which LPJ-GUESS version runs Track 2 (and therefore the cluster phase 1-3). Two options; the decision fundamentally reshapes the §1.2 8-block plan.
 
