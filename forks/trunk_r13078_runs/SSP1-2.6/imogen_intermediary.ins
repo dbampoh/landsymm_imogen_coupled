@@ -118,14 +118,25 @@ CO2_RF_FAIR 0      	!IN Whether to use the CO2 radiative forcing calculation fro
 
 
 !//////////////OFFLINE IMOGEN RElATED PARAMS////////////////////////
-param "file_temp" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\T_anom.dat") 	! imogen temperature data ! For parallel runs, has to be ".\IMOGEN\output\YYYY\T_anom.dat"
-param "file_prec" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\P_anom.dat")  	! imogen precipitation data
-param "file_insol" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\SW_anom.dat")  	! imogen insolation data
-param "file_wetdays" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\WET.dat")  	! imogen wet-days data
-param "file_dtr" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\DTEMP_anom.dat")       !imogen-dtemp
-param "file_co2" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\CO2.dat")! imogen CO2 data !imogen co2
-param "file_wind" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\W_anom.dat")  !imogen wind
-param "file_relhum" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\Rh_anom.dat") !imogen rh
+! [Block 8.0.3 hygiene cleanup (DKB 2026-05-20): the 8 Windows-style path lines below
+!  (predecessor-era leftovers from Windows-developed predecessor framework era;
+!  superseded by the corresponding ./Common-directory/IMOGEN/output/YYYY/*.dat paths
+!  in forks/trunk_r13078_runs/SSP1-2.6/main.ins lines 66-76 which override these
+!  per .ins "latest-param-wins" parser semantics) are CLEANED UP for maintainer
+!  hygiene. Engine output paths now declared cleanly in main.ins only. Same fix
+!  pattern as block 8.0.2 imogen_intermediary.ins Windows-path cleanup at the
+!  DIR_COMMON + FILE_*_EMITS block; this block was missed at that pass.]
+!param "file_temp" (str "<DIR_COMMON>/IMOGEN/output/YYYY/T_anom.dat")     ! See main.ins:66 for current authoritative override
+!param "file_prec" (str "<DIR_COMMON>/IMOGEN/output/YYYY/P_anom.dat")     ! See main.ins:67
+!param "file_insol" (str "<DIR_COMMON>/IMOGEN/output/YYYY/SW_anom.dat")   ! See main.ins:68
+!param "file_wetdays" (str "<DIR_COMMON>/IMOGEN/output/YYYY/WET.dat")     ! See main.ins:69
+!param "file_dtr" (str "<DIR_COMMON>/IMOGEN/output/YYYY/DTEMP_anom.dat")  ! See main.ins:70
+!param "file_co2" (str "<DIR_COMMON>/IMOGEN/output/YYYY/CO2.dat")         ! See main.ins:71
+!param "file_wind" (str "<DIR_COMMON>/IMOGEN/output/YYYY/W_anom.dat")     ! See main.ins:74 (B4 8-field wiring)
+!param "file_relhum" (str "<DIR_COMMON>/IMOGEN/output/YYYY/Rh_anom.dat")  ! See main.ins:73 (B4 8-field wiring)
+! Note: file_tmin + file_tmax (B4 wiring; only declared in main.ins:75-76; not declared here in
+! predecessor era because trunk's imogencfx.h didn't have file_tmin/file_tmax members pre-T_seq;
+! added at block 8.0.2 surgical site (d).
 
 
 

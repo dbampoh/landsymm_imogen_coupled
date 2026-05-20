@@ -34,14 +34,16 @@
 ! Standard LPJG PFT definitions + run config (B12-defensive ifcalccton 1 + ifcalcsla 1)
 import "global.ins"
 
-! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports crop.ins → landcover.ins transitively;
+! do NOT add a direct `import "landcover.ins"` here — that would trigger a "Duplicate group name"
+! parser error at landcover.ins:103 `crop_management` group. The transitive chain
+! main.ins → crop_n.ins → crop.ins → landcover.ins is the canonical pattern; matches rebuild's
+! runs/SSP1-2.6/main.ins:34. Block 8.0.3 acceptance-test pre-launch caught the duplicate-import
+! bug; fix applied at this commit. - DKB 2026-05-20 block 8.0.3)
 import "crop_n.ins"
 
 ! Wetland PFTs (required for natural CH4 — IMOGEN consumed wetland CH4 at engine time)
 import "wetlandpfts.ins"
-
-! Land-cover config (LU files + peatland; overridden below with local _peatland paths)
-import "landcover.ins"
 
 ! IMOGEN-coupling parameters (DIR_COMMON, FILE_*, skip_inprocess_engine_run, etc.)
 import "imogen_intermediary.ins"
@@ -101,12 +103,14 @@ FILE_LPJG_CH4_N2O_FLUX  ""
 ! CLUSTER overrides documented inline per `notes/PRODUCTION_RUN_CONFIG.md` §3.2
 !///////////////////////////////////////////////////////////////////////////////////////
 
-! Gridlist — start with production gridlist (62538 cells); override for smoke/test
-param "file_gridlist"     (str "gridlist_in_62892_and_climate.txt")
-param "file_gridlist_cf"  (str "gridlist_in_62892_and_climate.txt")
-! For 4-cell smoke acceptance test (block 8.0.3) use rebuild's matching gridlist:
-!param "file_gridlist"    (str "../../../data/gridlist/gridlist_test2.txt")
-!param "file_gridlist_cf" (str "../../../data/gridlist/gridlist_test2.txt")
+! Gridlist — block 8.0.3 acceptance test: rebuild's 4-cell smoke gridlist (the
+! engine library at runs/SSP1-2.6/Common-directory/IMOGEN/output/ was produced
+! on this 4-cell gridlist at B44 acceptance test; production-grade testing on
+! larger gridlists requires re-running rebuild engine with larger gridlist first).
+!param "file_gridlist"    (str "gridlist_in_62892_and_climate.txt")    ! Production (62538 cells; cluster-target)
+!param "file_gridlist_cf" (str "gridlist_in_62892_and_climate.txt")
+param "file_gridlist"     (str "../../../data/gridlist/gridlist_test2.txt")
+param "file_gridlist_cf"  (str "../../../data/gridlist/gridlist_test2.txt")
 
 ! Soil map (LOCAL: predecessor mirror; CLUSTER: /bg/data/lpj/bampoh-d/soil/...)
 param "file_soildata"     (str "/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/output_hildaplus_remap_10b_3/remaps_v10_old_62892_gL/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
@@ -118,19 +122,24 @@ param "file_ndep"         (str "")
 param "ndep_timeseries"   (str "RCP26")
 
 ! 4-NetCDF wet/dry NHx + NOy ndep (production forcing per PRODUCTION_RUN_CONFIG.md §2.3)
-param "file_mNHxdrydep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_drynhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
-param "file_mNOydrydep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_drynoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
-param "file_mNHxwetdep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_wetnhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
-param "file_mNOywetdep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_wetnoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+! [Block 8.0.3 — user-confirmed canonical local mirror at /media/bampoh-d/ISIMIP/inputs/
+!  (NOT /media/bampoh-d/lpjg_input/input/ndep/ which doesn't have these files;
+!  PRODUCTION_RUN_CONFIG.md §3.2 will be updated in a future cascade to reflect
+!  the actual canonical local mirror path). - DKB 2026-05-20 block 8.0.3]
+param "file_mNHxdrydep"   (str "/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/ndep_drynhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNOydrydep"   (str "/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/ndep_drynoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNHxwetdep"   (str "/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/ndep_wetnhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNOywetdep"   (str "/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/ndep_wetnoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
 param "variable_mNHxdrydep" (str "drynhx")
 param "variable_mNOydrydep" (str "drynoy")
 param "variable_mNHxwetdep" (str "wetnhx")
 param "variable_mNOywetdep" (str "wetnoy")
-! CLUSTER OVERRIDE: change /media/bampoh-d/lpjg_input/input/ndep/ to
-!                   /bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/
+! CLUSTER OVERRIDE: change /media/bampoh-d/ISIMIP/inputs/n-deposition/ to
+!                   /bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/
 
 ! Population density NetCDF (for SimFire BLAZE ignition)
-param "file_popdens"      (str "/media/bampoh-d/lpjg_input/input/pop_dens/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+! [Block 8.0.3 — user-confirmed canonical local mirror at /media/bampoh-d/ISIMIP/inputs/pop/lpjg-popd/]
+param "file_popdens"      (str "/media/bampoh-d/ISIMIP/inputs/pop/lpjg-popd/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
 param "variable_popdens"  (str "popd")
 ! CLUSTER OVERRIDE: param "file_popdens" (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
 
@@ -157,35 +166,59 @@ run_landcover             1            ! Enable LU forcing (production: 1)
 run_peatland              1            ! Enable peatland subgrid (B40 / paper §2.4.4 sector-ownership rule)
 
 !///////////////////////////////////////////////////////////////////////////////////////
-! Year range — historical phase 1900-2020 (per PRODUCTION_RUN_CONFIG.md §2.1)
-! For full 1900-2100 single-phase, set lasthistyear 2100 + scenario LU/ndep paths above
+! Year range — block 8.0.3 acceptance test: window 1900-1930 (extended from 1903 after
+! first-launch SEGFAULT diagnosis surfaced a latent constraint in trunk's imogencfx.cpp::init():
+!     nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1;  // line ~484
+! With FIRST_SPINUP_YEAR=1900 (block 8.0.3 surgical site (h)) + lasthistyear=1903 →
+! nyears=4 storage slots. But during spinup, imogencfx cycles imogen_year through
+! NYEAR_SPINUP=30 values (FIRST_SPINUP_YEAR + 0..29 = 1900..1929); attempting to store
+! year 1904 (5th distinct imogen_year) into stored_years[last_store_index=4] →
+! OUT-OF-BOUNDS write → SEGFAULT at first cell's spinup_year_idx=4 iteration.
+! Latent constraint: lasthistyear >= FIRST_SPINUP_YEAR + NYEAR_SPINUP - 1 = 1929.
+! Original trunk's FIRST_SPINUP_YEAR=1871 + rebuild smoke lasthistyear=1901 → nyears=31
+! (just barely fit; coincidentally satisfied this constraint). NEW B49 (extension to
+! the original B49 FIRST_SPINUP_YEAR parametrize) tracks the proper fix:
+! `nyears = max(lasthistyear - FIRST_SPINUP_YEAR + 1, NYEAR_SPINUP);` in trunk +
+! rebuild's imogencfx.cpp::init() (~1-LOC). For block 8.0.3 acceptance, extending
+! lasthistyear to 1930 is the operational workaround that satisfies the constraint
+! without source-edit + only adds ~27 years to history (~minimal wall impact since
+! spinup dominates).
+! For production runs (cluster Track 2): lasthistyear 2020 → nyears=121 >> 30; constraint
+! comfortably satisfied; restore the full historical window.
 !///////////////////////////////////////////////////////////////////////////////////////
 firsthistyear             1900
-lasthistyear              2020
+lasthistyear              1930       ! Block 8.0.3 acceptance: 1930 (satisfies constraint); production: 2020
 firstoutyear              1900
-lastoutyear               2020
+lastoutyear               1930       ! Block 8.0.3 acceptance: 1930 (matches lasthistyear); production: 2020
 
 !///////////////////////////////////////////////////////////////////////////////////////
-! save_state / restart — historical run saves at year 2020; SSP scenario phase
+! save_state / restart — historical run normally saves at year 2020; SSP scenario phase
 ! restarts from this state per docs/scientific_framework.md §4 (Decision #10).
-! For block 8.0.3 4-cell acceptance test: save disabled (smoke); enable for production.
+! Block 8.0.3 acceptance test: save DISABLED (avoid state-dir creation complications + this
+! is acceptance gate verification not production save); ENABLE for production runs.
 !///////////////////////////////////////////////////////////////////////////////////////
-save_state                1            ! Save state at year_save (production: 1)
-save_years                "2020"
-state_path                "./state/"   ! Local; CLUSTER: change to a writable scratch path
+save_state                0            ! Block 8.0.3 acceptance: 0; production: 1
+!save_years                "2020"     ! Uncomment for production (with save_state 1)
+!state_path                "./state/" ! Uncomment for production
 !restart                  0            ! Set 1 for SSP scenario phase (with restart_year)
 !restart_year             2020
 
 !///////////////////////////////////////////////////////////////////////////////////////
-! Production knobs (most already set in global.ins; restated for visibility + smoke
-! overrides at block 8.0.3 acceptance test will alter selectively)
+! Production knobs (most already set in global.ins; block 8.0.3 acceptance test overrides
+! the 3 loop-size parameters to match rebuild smoke pattern for ~10-20 min wall vs ~1-4 h
+! at full production; ALL OTHER production knobs stay ON — BLAZE + _peatland LU +
+! ifcalccton/sla 1 + 4-NetCDF ndep + popdens + LandSyMM full crop pipeline). RESTORE
+! the production values (500/100/25) for cluster Track 2 production runs in block 8.4+.
 !///////////////////////////////////////////////////////////////////////////////////////
-! nyear_spinup   500    (set in global.ins line 95)
-! freenyears     100    (set in global.ins; for N-pool buildup)
-! firemodel     "BLAZE" (set in global.ins line 100; needs file_simfire + file_relhum + file_wind set above)
-! npatch         25     (set in global.ins line 103)
-! ifcalccton     1      (set in global.ins line 98; B12 defensive)
-! ifcalcsla      1      (set in global.ins line 96; B12 defensive)
+! BLOCK 8.0.3 ACCEPTANCE-TEST OVERRIDES (revert to production for cluster runs):
+nyear_spinup              100    ! Block 8.0.3 acceptance: 100; production: 500
+freenyears                50     ! Block 8.0.3 acceptance: 50;  production: 100  (LPJG requires freenyears < nyear_spinup)
+npatch                    5      ! Block 8.0.3 acceptance: 5;   production: 25
+
+! Production-grade knobs inherited from cp'd global.ins (unchanged for block 8.0.3):
+! firemodel     "BLAZE" (global.ins line 100; needs file_simfire + file_relhum + file_wind set above)
+! ifcalccton     1      (global.ins line 98; B12 defensive)
+! ifcalcsla      1      (global.ins line 96; B12 defensive)
 
 !///////////////////////////////////////////////////////////////////////////////////////
 ! Output directory

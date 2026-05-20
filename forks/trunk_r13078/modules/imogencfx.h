@@ -221,7 +221,31 @@ private:
 	//static const int FIRST_HIST_YEAR = 2012;
 	static const int NYEAR_RUN = 200;
 
-	static const int FIRST_SPINUP_YEAR = 1871;
+	// [Block 8.0.3 T_seq Installment-1 surgical site (h) — added at session 8.0.3
+	//  acceptance-test execution per `notes/B47.md` §4.2 amendment:
+	//  FIRST_SPINUP_YEAR was 1871 (legacy era; assumed engine produces
+	//  1871-1900 climate library for the spinup cycle). Under T_seq, the
+	//  rebuild's engine library starts at year 1900 (no pre-1900 dirs —
+	//  intermediary_py covers 1900-2100 only per B34(β); engine YEAR1=1900);
+	//  trunk's spinup logic at imogencfx.cpp::getclimate uses
+	//  `imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx` which would
+	//  attempt to open <DIR_COMMON>/IMOGEN/output/1871/T_anom.dat etc.
+	//  → file-not-found failure. Mismatch surfaced at session 8.0.3
+	//  pre-flight (classic Rule #9 datapoint — harness-authoring + pre-flight
+	//  inventory surfaces latent defect dormant pre-T_seq because F-10
+	//  deadlock blocked rebuild's LPJG main loop + trunk's exit(200) regression
+	//  blocked trunk's). Fix: align FIRST_SPINUP_YEAR with engine library
+	//  coverage (1900). Spinup now cycles imogen_year in [1900..1929]; all
+	//  years in engine library coverage; physically reasonable (spinup against
+	//  1900-1929 climate = 30 distinct early-historical years).
+	//  NEW B49 filed for long-term parametrize-as-.ins fix (analogous to
+	//  B45 for the 1900/1901/2100/1871 sentinels in climatemodel.cpp;
+	//  TRUNK-RELEVANT to BOTH forks — rebuild's lpjguess/modules/imogencfx.h:294
+	//  has same hardcoded 1871 + will need same fix in Installment-2 era
+	//  when rebuild's LPJG main loop eventually runs against pre-baked library
+	//  post-F-12 tight-coupling resolution).
+	//  - DKB 2026-05-20 block 8.0.3]
+	static const int FIRST_SPINUP_YEAR = 1900;  // was 1871; aligned with engine library coverage under T_seq
 	static const int NYEAR_SPINUP = 30;
 
 	int spinup_year_idx; // year index for spinup (0..NYEAR_SPINUP-1)
