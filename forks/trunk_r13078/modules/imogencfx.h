@@ -143,6 +143,17 @@ private:
 	/// Wind for current gridcell and current year
 	double dwind[Date::MAX_YEAR_LENGTH];
 
+	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+	//  Tmin / Tmax per-day arrays for IMOGEN engine's Tmin_anom.dat /
+	//  Tmax_anom.dat outputs (per-year ASCII files written by the rebuild
+	//  engine post-step-9.5-B2 / step-17b-B4 work). Backport from rebuild's
+	//  lpjguess/modules/imogencfx.h lines 254-257.
+	//  - DKB 2026-05-20 block 8.0.2]
+	/// Tmin (daily minimum temperature) for current gridcell and current year (deg C; K->C conversion applied in get_climate_for_gridcell)
+	double dtmin[Date::MAX_YEAR_LENGTH];
+	/// Tmax (daily maximum temperature) for current gridcell and current year (deg C; K->C conversion applied in get_climate_for_gridcell)
+	double dtmax[Date::MAX_YEAR_LENGTH];
+
 	/// Daily N deposition for one year
 	double dNH4dep[Date::MAX_YEAR_LENGTH], dNO3dep[Date::MAX_YEAR_LENGTH];
 
@@ -185,6 +196,17 @@ private:
 	//	int historic_timestep_specifichum;
 	xtring file_relhum;
 	xtring file_wind;
+
+	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+	//  file_tmin / file_tmax paths for IMOGEN engine's Tmin_anom.dat /
+	//  Tmax_anom.dat per-year outputs. Backport from rebuild's
+	//  lpjguess/modules/imogen_input.h lines 308-309 + corresponding
+	//  imogencfx-side wiring. Set in .ins via file_tmin / file_tmax
+	//  parameters pointing at <DIR_COMMON>/IMOGEN/output/YYYY/Tmin_anom.dat
+	//  and Tmax_anom.dat. Empty path => engine output not consumed (graceful
+	//  no-op in readenv per existing pattern). - DKB 2026-05-20 block 8.0.2]
+	xtring file_tmin;
+	xtring file_tmax;
 
 	/// Nitrogen deposition forcing for current gridcell
 	Lamarque::NDepData ndep;
@@ -231,6 +253,13 @@ private:
 	std::vector< std::vector< std::vector<double> > > all_dtr;
 	std::vector< std::vector< std::vector<double> > > all_drelhum;
 	std::vector< std::vector< std::vector<double> > > all_dwind;
+	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+	//  Tmin / Tmax 3D storage [year][grid][month|day]. Same shape as all_temp
+	//  etc. Backport from rebuild's lpjguess/modules/imogencfx.h
+	//  lines (analogous all_dtmin / all_dtmax addition).
+	//  - DKB 2026-05-20 block 8.0.2]
+	std::vector< std::vector< std::vector<double> > > all_dtmin;
+	std::vector< std::vector< std::vector<double> > > all_dtmax;
 
 	// Timers for keeping track of progress through the simulation
 	Timer tprogress, tmute;

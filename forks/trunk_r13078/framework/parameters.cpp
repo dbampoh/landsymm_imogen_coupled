@@ -263,6 +263,17 @@ namespace IMOGENConfig {
 	 bool CO2_RF_FAIR;
 	 bool FILE_NON_CO2;
 
+	 // [Block 8.0.2 T_seq Installment-1: skip_inprocess_engine_run gate.
+	 //  Default `false` preserves LTS-equivalent behaviour (RUN_IMOGEN_ENGINE
+	 //  fires in IMOGENCFXInput::init() per the existing prescribed-mode flow).
+	 //  Set true in the .ins to use T_seq sequential-standalone workflow
+	 //  (engine pre-baked externally; trunk-LPJG reads pre-staged climate).
+	 //  See parameters.h same-named comment block + notes/B47.md §0/§4.
+	 //  Backport from rebuild's lpjguess/framework/parameters.cpp line 300
+	 //  (originally Step 17a sub-step 7.3.2; 2026-05-10).
+	 //  - DKB 2026-05-20 block 8.0.2]
+	 bool skip_inprocess_engine_run = false;
+
 	 //Other booleans
 	 bool print_imogen_output=true; //default true
 	 bool include_feedback = true; //defaut true

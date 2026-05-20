@@ -1,0 +1,193 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! forks/trunk_r13078_runs/SSP1-2.6/main.ins — T_seq Installment-1 production-config
+!
+! T_seq sequential-standalone workflow for v1.0 paper-publication Track 2 runs
+! per `notes/B47.md` §4. Authored at block 8.0.2 (2026-05-20 afternoon session 8).
+!
+! WORKFLOW:
+!   Step A (LOCAL): rebuild engine via `scripts/run_coupled.sh --engine-only-mode`
+!                   per B44 productisation produces per-year ASCII climate library
+!                   at runs/SSP1-2.6/Common-directory/IMOGEN/output/<year>/*.dat
+!                   (~12.5 min × 5 SSPs = ~1 h total local)
+!   Step B (LOCAL → CLUSTER, one-time):
+!                   scp -r runs/SSP1-2.6/Common-directory/IMOGEN/output/ \
+!                          <user>@<cluster>:<scen-dir>/Common-directory/IMOGEN/
+!                   (~500 MB per SSP)
+!   Step C (LOCAL or CLUSTER): launched with
+!                   `<repo>/forks/trunk_r13078/build/guess -input imogencfx main.ins`
+!                   from this directory; trunk-T_seq LPJG runs as standalone consumer
+!                   of pre-baked engine library
+!
+! PRE-RUN SETUP (LOCAL):
+!   ln -s ../../../runs/SSP1-2.6/Common-directory ./Common-directory
+!   (symlinks the rebuild's engine library into this run dir; LOCAL only)
+!
+! CLUSTER deployment: copy this directory + the engine library to the cluster;
+!   the path overrides below have CLUSTER variants documented in inline comments
+!   per `notes/PRODUCTION_RUN_CONFIG.md` §3.2 path-equivalence table.
+!
+! Run:  ./guess -input imogencfx main.ins
+!
+! - DKB, block 8.0.2 of session 8 (2026-05-20)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard LPJG PFT definitions + run config (B12-defensive ifcalccton 1 + ifcalcsla 1)
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+import "crop_n.ins"
+
+! Wetland PFTs (required for natural CH4 — IMOGEN consumed wetland CH4 at engine time)
+import "wetlandpfts.ins"
+
+! Land-cover config (LU files + peatland; overridden below with local _peatland paths)
+import "landcover.ins"
+
+! IMOGEN-coupling parameters (DIR_COMMON, FILE_*, skip_inprocess_engine_run, etc.)
+import "imogen_intermediary.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! T_seq overrides — engine library + production paths + production knobs
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! T_seq enabler: skip in-process RUN_IMOGEN_ENGINE() call in IMOGENCFXInput::init().
+! Engine has already been run standalone by rebuild's `scripts/run_coupled.sh
+! --engine-only-mode` (B44 productised); trunk-T_seq LPJG is pure pre-baked-library
+! consumer. (Set in imogen_intermediary.ins too; restated here for visibility.)
+skip_inprocess_engine_run 1
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Climate input: per-year ASCII files from rebuild IMOGEN engine library
+!   <DIR_COMMON>/IMOGEN/output/<year>/*.dat (8-field; produced by B44 acceptance test)
+!
+! YYYY-templated filename substitution per IMOGENCFXInput::gen_filename pattern.
+! Paths are relative to CWD (the run dir); symlink Common-directory in place pre-run.
+!///////////////////////////////////////////////////////////////////////////////////////
+param "file_temp"         (str "./Common-directory/IMOGEN/output/YYYY/T_anom.dat")
+param "file_prec"         (str "./Common-directory/IMOGEN/output/YYYY/P_anom.dat")
+param "file_insol"        (str "./Common-directory/IMOGEN/output/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "./Common-directory/IMOGEN/output/YYYY/WET.dat")
+param "file_dtr"          (str "./Common-directory/IMOGEN/output/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "./Common-directory/IMOGEN/output/YYYY/CO2.dat")
+! B4 8-field consumer wiring (backported at block 8.0.2 source-edit):
+param "file_relhum"       (str "./Common-directory/IMOGEN/output/YYYY/Rh_anom.dat")
+param "file_wind"         (str "./Common-directory/IMOGEN/output/YYYY/W_anom.dat")
+param "file_tmin"         (str "./Common-directory/IMOGEN/output/YYYY/Tmin_anom.dat")
+param "file_tmax"         (str "./Common-directory/IMOGEN/output/YYYY/Tmax_anom.dat")
+
+! cfx-style climate variables (NOT NEEDED in imogencfx mode; provide empty for safety)
+param "file_pres"         (str "")
+param "variable_pres"     (str "")
+param "file_specifichum"  (str "")
+param "variable_specifichum" (str "")
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Engine-side FILE_*_EMITS / FILE_LPJG_* — all set empty in T_seq.
+! Rationale: engine has already integrated these at Step A (rebuild engine run); trunk
+! does NOT run engine + LPJG does NOT write handshake files (no engine waiting).
+! Leaving the values syntactically declared (via imogen_intermediary.ins) but null'd
+! here so trunk's init() can parse them without complaint.
+!///////////////////////////////////////////////////////////////////////////////////////
+FILE_SCEN_EMITS         ""
+FILE_NON_CO2_VALS       ""
+FILE_CH4_N2O_EMITS      ""
+FILE_LPJG_FLUX          ""
+FILE_LPJG_CH4_N2O_FLUX  ""
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Auxiliaries: soil + gridlist + ndep + popdens + SimFire BLAZE + LU forcing
+!
+! LOCAL paths (default; workstation `/media/bampoh-d/lpjg_input/...`)
+! CLUSTER overrides documented inline per `notes/PRODUCTION_RUN_CONFIG.md` §3.2
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Gridlist — start with production gridlist (62538 cells); override for smoke/test
+param "file_gridlist"     (str "gridlist_in_62892_and_climate.txt")
+param "file_gridlist_cf"  (str "gridlist_in_62892_and_climate.txt")
+! For 4-cell smoke acceptance test (block 8.0.3) use rebuild's matching gridlist:
+!param "file_gridlist"    (str "../../../data/gridlist/gridlist_test2.txt")
+!param "file_gridlist_cf" (str "../../../data/gridlist/gridlist_test2.txt")
+
+! Soil map (LOCAL: predecessor mirror; CLUSTER: /bg/data/lpj/bampoh-d/soil/...)
+param "file_soildata"     (str "/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/output_hildaplus_remap_10b_3/remaps_v10_old_62892_gL/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+! CLUSTER OVERRIDE: param "file_soildata" (str "/bg/data/lpj/bampoh-d/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition forcing (Lamarque CRUNCEP fallback path; leave empty to use 4-NetCDF
+! production wet/dry NHx + NOy below)
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP26")
+
+! 4-NetCDF wet/dry NHx + NOy ndep (production forcing per PRODUCTION_RUN_CONFIG.md §2.3)
+param "file_mNHxdrydep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_drynhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNOydrydep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_drynoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNHxwetdep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_wetnhx_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "file_mNOywetdep"   (str "/media/bampoh-d/lpjg_input/input/ndep/ndep_wetnoy_histsoc_ssp126_monthly_1850_2100_lpjg.nc4")
+param "variable_mNHxdrydep" (str "drynhx")
+param "variable_mNOydrydep" (str "drynoy")
+param "variable_mNHxwetdep" (str "wetnhx")
+param "variable_mNOywetdep" (str "wetnoy")
+! CLUSTER OVERRIDE: change /media/bampoh-d/lpjg_input/input/ndep/ to
+!                   /bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-ssp126soc-wetdry-lpjguess/
+
+! Population density NetCDF (for SimFire BLAZE ignition)
+param "file_popdens"      (str "/media/bampoh-d/lpjg_input/input/pop_dens/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+param "variable_popdens"  (str "popd")
+! CLUSTER OVERRIDE: param "file_popdens" (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+
+! SimFire BLAZE binary
+param "file_simfire"      (str "/media/bampoh-d/lpjg_input/input/fire/SimfireInput.bin")
+! CLUSTER OVERRIDE: param "file_simfire" (str "/bg/data/lpj/LPJ-GUESS/input/fire/SimfireInput.bin")
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! LU forcing — UPDATED `_peatland` variant per PRODUCTION_RUN_CONFIG.md §3.1
+! Historical phase 1900-2020 uses LU.remapv10_old_62892_gL_peatland.txt;
+! Scenario phase 2021-2100 uses landcover_peatland.txt from SSP1_RCP26 subdir.
+! For initial T_seq Track-2 historical-only smoke + acceptance test, use the
+! historical _peatland LU. Scenario phase uses save_state/restart workflow
+! per docs/scientific_framework.md §4 (TBD at block 8.0.3+ or later session).
+!///////////////////////////////////////////////////////////////////////////////////////
+param "file_lu"           (str "/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/output_hildaplus_remap_10b_3/remaps_v10_old_62892_gL/LU.remapv10_old_62892_gL_peatland.txt")
+param "file_lucrop"       (str "/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/output_hildaplus_remap_10b_3/remaps_v10_old_62892_gL/cropfracs.remapv10_old_62892_gL.txt")
+param "file_Nfert"        (str "/media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/output_hildaplus_remap_10b_3/remaps_v10_old_62892_gL/nfert.remapv10_old_62892_gL.txt")
+param "file_irrigintens"  (str "")  ! historical phase: no irrig file; scenario phase uses irrig.txt
+! CLUSTER OVERRIDE: change /media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/ to
+!                   /bg/data/lpj/bampoh-d/landsymm_lu/
+
+run_landcover             1            ! Enable LU forcing (production: 1)
+run_peatland              1            ! Enable peatland subgrid (B40 / paper §2.4.4 sector-ownership rule)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Year range — historical phase 1900-2020 (per PRODUCTION_RUN_CONFIG.md §2.1)
+! For full 1900-2100 single-phase, set lasthistyear 2100 + scenario LU/ndep paths above
+!///////////////////////////////////////////////////////////////////////////////////////
+firsthistyear             1900
+lasthistyear              2020
+firstoutyear              1900
+lastoutyear               2020
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! save_state / restart — historical run saves at year 2020; SSP scenario phase
+! restarts from this state per docs/scientific_framework.md §4 (Decision #10).
+! For block 8.0.3 4-cell acceptance test: save disabled (smoke); enable for production.
+!///////////////////////////////////////////////////////////////////////////////////////
+save_state                1            ! Save state at year_save (production: 1)
+save_years                "2020"
+state_path                "./state/"   ! Local; CLUSTER: change to a writable scratch path
+!restart                  0            ! Set 1 for SSP scenario phase (with restart_year)
+!restart_year             2020
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Production knobs (most already set in global.ins; restated for visibility + smoke
+! overrides at block 8.0.3 acceptance test will alter selectively)
+!///////////////////////////////////////////////////////////////////////////////////////
+! nyear_spinup   500    (set in global.ins line 95)
+! freenyears     100    (set in global.ins; for N-pool buildup)
+! firemodel     "BLAZE" (set in global.ins line 100; needs file_simfire + file_relhum + file_wind set above)
+! npatch         25     (set in global.ins line 103)
+! ifcalccton     1      (set in global.ins line 98; B12 defensive)
+! ifcalcsla      1      (set in global.ins line 96; B12 defensive)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Output directory
+!///////////////////////////////////////////////////////////////////////////////////////
+outputdirectory "./"

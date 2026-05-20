@@ -1,0 +1,158 @@
+!///////////////////////////////////////////////////////////////////////////////////////////////////////
+!INTERMEDIARY RELATED PARAMS
+!//////////////////////////////////////////////////////////////////////////////////////////////////////
+
+scenario "cmip6"
+firstyear 1850
+lastyear 2100
+lpjg_start_year 1901
+lpjg_end_year 2100
+baseDirectory "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\"
+pathToLogFile "Intermediary\Data\Emissions\log.txt"
+myPLUMDataFilePath "Intermediary\Data\PLUM_data\animals_sspSSP.txt"
+lpjgOutputDirectory "Data\LPJG_Output\NETCDF_RUNS_24_10_2023\lsa_stepsec_sspSSPRCP_ipsl\output-2023-10-24\"
+methaneEmissionOutputFilePath "Intermediary\Data\Emissions\methane_sspSSP.txt"
+entericFermentationMethaneOutputFilePath "Intermediary\Data\Emissions\enteric_fermentation_methane_sspSSP.txt"
+manureManagementMethaneOutputFilePath "Intermediary\Data\Emissions\manure_management_methane_sspSSP.txt"
+nitrogenEmissionOutputFilePath "Intermediary\Data\Emissions\nitrogen_sspSSP.txt"
+historic_nitrogen_fertiizer_file_path "Intermediary\Data\Input\n2ofertilizer.csv"
+arable_lands_nitrogen_fertilizer_path "Intermediary\Data\Input\arablelands.csv"
+methaneNitrogenTotalOutputFilePath "Intermediary\Data\Emissions\total_methane_nitrogen_rcpRCPsspSSP.txt"
+wetlandsAreaFilePath "Intermediary\Data\wetlands_CH4\Data\wetlands_2015_MaxWater.csv"
+wetlandsMethaneEmissionsOutputPath "Intermediary\Data\Emissions\CH4_wetlands_2015_MaxWater.txt"
+basePathPLUMdata "Intermediary\Data\PLUM_data\plum_land_use\"
+basePathPLUMdata_v2 "Intermediary\Data\PLUM_data\agg_land_use\"
+plumFertilizerOutputPath "Intermediary\Data\PLUM_fert\PLUM_Fertilizer_ssp"
+file_LPJG_IPCC_Path "Intermediary\Data\Emissions\ch4_n2o_annual_historical_sspSSPrcpRCP_lpjg_simulated_real.txt"
+plumFertlizerPath "Intermediary\Data\PLUM_fert\PLUM_Fertilizer_sspSSP.txt"
+lpjgMethane "Intermediary\Data\Emissions\lpjgmethane_sspSSPRCP.txt"
+lpjgNitrogen "Intermediary\Data\Emissions\lpjgnitrogen_sspSSPRCP.txt"
+lpjgCflux "Intermediary\Data\Emissions\lpjg_only_cfluxrcpRCP.txt"
+lpjgCflux_plus_IIASA_lpjg_co2 "Intermediary\Data\Emissions\lpjgcfluxrcpRCP.txt"
+IIASA_lpjg_co2_file_path "Intermediary\Data\Input\CMIP6\co2_emissions_annual_historical_rcpRCP_lpjg.txt"
+IIASA_non_lpjg_1850_2100 "Intermediary\Data\Input\CMIP6\ch4_n2o_annual_historical_rcpRCP_lpjg_simulated.txt"
+IIASA_lpjg_1850_2100 "Intermediary\Data\Input\CMIP6\ch4_n2o_annual_historical_rcpRCP_non_lpjg_simulated.txt"
+livestock_counts_path "Intermediary\Data\Input\livestock-counts.csv"
+fao_stats_path "Intermediary\Data\Input\FAOSTAT.csv"
+
+
+
+!//////////////////////////////////////
+!AUX PARAMS
+!/////////////////////////////////////
+ssprcp "245"
+print_imogen_output 1
+simulation_mode "offline" !(online, offline)
+feedback_mode "lpjg_offset"  !(lpjg_offset,moving_average,no_feedback) [does not work when simulation_mode is offline]
+interpolation_mode "NNC" !(NNC, NNP, IDWC, IDWP)
+param "searchradius" (num 50)         	!Search radius for imogen climate data
+
+
+
+!////////////////////////////////////////////////////////////////////////////////////////////////////////////
+!IMOGEN RELATED PARAMS
+!
+! [Block 8.0.2 T_seq Installment-1: paths converted from Windows (predecessor era)
+!  to Linux relative paths. Engine library is pre-baked by rebuild's
+!  `scripts/run_coupled.sh --engine-only-mode` per B44; trunk-T_seq LPJG just
+!  reads from <DIR_COMMON>/IMOGEN/output/<year>/*.dat. FILE_*_EMITS / FILE_LPJG_*
+!  are syntactically declared here but NULLED in main.ins (T_seq trunk-LPJG does
+!  not run engine + does not write handshake files). - DKB 2026-05-20 block 8.0.2]
+!////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+! T_seq sequential-standalone flag: skip in-process RUN_IMOGEN_ENGINE() call in
+! IMOGENCFXInput::init(). Engine has already run standalone via rebuild's
+! `--engine-only-mode`; trunk-T_seq LPJG is pure pre-baked-library consumer.
+skip_inprocess_engine_run 1
+
+DIR_COMMON     "./Common-directory"     !LOCAL: symlink to rebuild's runs/SSP1-2.6/Common-directory pre-run
+DIR_COMMON_OUT "./Common-directory"     !For T_seq parallel runs, must be ".\" per imogencfx pattern
+DIR_PATT       "./"                     !N/A in T_seq (engine not running); placeholder
+DIR_CLIM       "./"                     !N/A in T_seq (engine not running); placeholder
+FILE_SCEN_EMITS         ""              !N/A in T_seq; engine already integrated at Step A
+FILE_NON_CO2_VALS       ""              !N/A in T_seq
+FILE_CH4_N2O_EMITS      ""              !N/A in T_seq
+FILE_LPJG_FLUX          ""              !N/A in T_seq; LPJG main loop does not write handshake
+FILE_GRIDLIST           ""              !Set by main.ins file_gridlist override
+FILE_LPJG_CH4_N2O_FLUX  ""              !N/A in T_seq
+!FILE_SCEN_CO2_PPMV
+STEP_DAY 1		!IN Number of daily timesteps of IMPACTS_MODEL !NOTE: Formerly set to 24 - TP 13.07.15
+T_OCEAN_INIT 289.28	!IN Initial ocean temperature (K)
+KAPPA_O 280.0		!IN Ocean eddy diffusivity (W/m/K)
+F_OCEAN 0.71		!IN Fractional coverage of the ocean
+LAMBDA_L 0.4		!IN Inverse of climate sensitivity over land (W/m2/K)
+LAMBDA_O 1.9		!IN Inverse of climate sensitivity over ocean (W/m2/K)
+MU 1.78			!IN Ratio of land to ocean temperature anomalies
+Q2CO2 3.74		!IN Radiative forcing due to doubling CO2 (W/m2)
+TAU_DECAY_CH4 9.3       !IN Atmospheric lifetime of CH4 (years)
+TAU_DECAY_N2O 121       !IN Atmospheric lifetime of N2O (years)
+FILE_NON_CO2 1		!IN If true, then non-CO2 radiative forcings are contained within a file.
+NYR_NON_CO2 251		!IN Number of years for which NON_CO2 forcing is prescribed.
+NONCO2_EMISSIONS 1 	!IN If true, use FAIR model for CH4 and N2O forcing
+NONCO2_EMISSIONS_LPJG 1 !IN Whether to use LPJG to provide natural CH4 and N2O emissions (if NONCO2_EMISSIONS==T)
+!IN [Block 8.0.2 T_seq Installment-1: B39-corrected per-YEAR1 atmospheric
+!IN  concentration seed values per docs/scientific_framework.md §6.1 table
+!IN  (Law Dome MacFarling Meure 2006 + Meinshausen 2017 CMIP6 baseline) for
+!IN  YEAR1=1900 production-IMOGEN-engine starting epoch. These values were
+!IN  used by rebuild's engine at Step A; values must match for self-consistency
+!IN  even though engine doesn't re-run here (skip_inprocess_engine_run=1).
+!IN  - DKB 2026-05-20 block 8.0.2]
+CO2_INIT_PPMV 296.1	!IN Initial CO2 concentration (ppmv) [B39 Law Dome 1900 per MacFarling Meure 2006]
+CH4_INIT_PPBV 875.6	!IN Initial CH4 concentration (ppbv) [B39 Law Dome 1900]
+N2O_INIT_PPBV 277.4     !IN Initial N2O concentration (ppbv) [Law Dome 1900 spline-fit; within 0.07% of 277.2]
+NYR_EMISS_NONCO2 251    !IN Number of years of emission data in file.
+NYR_EMISS 251		!IN Number of years of emission data in file.
+NYR_LPJG_FLUX 251	!IN Number of years of emission data in LPJ-GUESS C flux file
+C_EMISSIONS 1		!IN If true, means CO2 concentration is calcula
+LPJG_CFLUX 1		!IN If true, take land C flux from LPJ-GUESS output file
+INCLUDE_CO2 1		!IN Are adjustments to CO2 values allowed?
+INCLUDE_NON_CO2 1	!IN Are adjustments to non-CO2 values allowed?
+DAILYOUT 0		!IN Are outputs daily (true) or monthly (false)?
+LAND_FEED 1		!IN Are land feedbacks allowed on atmospheric CO2?
+OCEAN_FEED 1		!IN Are ocean feedbacks allowed on atmospheric CO2?
+ANLG 1			!IN If true, then use the GCM analogue model
+ANOM 1			!IN If true, then use the GCM analogue model
+REGRID 0		!IN If true use nearest-neighbour regridding
+CO2_RF_FAIR 0      	!IN Whether to use the CO2 radiative forcing calculation from the FAIR model (T) or IMOGEN standard (F)
+!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+!//////////////OFFLINE IMOGEN RElATED PARAMS////////////////////////
+param "file_temp" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\T_anom.dat") 	! imogen temperature data ! For parallel runs, has to be ".\IMOGEN\output\YYYY\T_anom.dat"
+param "file_prec" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\P_anom.dat")  	! imogen precipitation data
+param "file_insol" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\SW_anom.dat")  	! imogen insolation data
+param "file_wetdays" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\WET.dat")  	! imogen wet-days data
+param "file_dtr" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\DTEMP_anom.dat")       !imogen-dtemp
+param "file_co2" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\CO2.dat")! imogen CO2 data !imogen co2
+param "file_wind" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\W_anom.dat")  !imogen wind
+param "file_relhum" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\Rh_anom.dat") !imogen rh
+
+
+
+!/////////////COUPLING PARAMS
+YEAR1 1871 !IN First year of the numerical experiment
+IYEND 1871  !IN Stop year of the ENTIRE run
+YEAR1_LPJG 1901 !IN First year of the whole LPJ - GUESS simulation
+SPINUP 1 !IN Are we in the spin - up phase of LPJ - GUESS?
+KEEPRUNNING 1	!IN control flag to keep imogen running
+FIRSTCALL 1 !IN Is this the very first call to IMOGEN from LPJ - GUESS(start of spin - up) ?
+
+
+!///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+!OUTPUT FILES
+file_t_anom "T_anom.out"
+file_wet "WET.out"
+file_sw_anom "SW_anom.out"
+file_p_anom "P_anom.out"
+file_fa_ocean "fa_ocean.out"
+file_dtemp_o "dtemp_o.out"
+file_dtemp_anom "DTEMP_anom.out"
+file_co2 "CO2.out"
+file_relhum_anom "Relhum_anom.out"
+file_tmin_anom "Tmin_anom.out"
+file_tmax_anom "Tmax_anom.out"
+file_wind_anom "wind_anom.out"
+!/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+

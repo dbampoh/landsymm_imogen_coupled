@@ -485,6 +485,21 @@ namespace IMOGENConfig {
     extern bool CO2_RF_FAIR;
     extern bool FILE_NON_CO2;
 
+    // [Block 8.0.2 T_seq Installment-1: skip_inprocess_engine_run flag.
+    //  Gates the in-process IMOGEN engine invocation in IMOGENCFXInput::init()
+    //  (the RUN_IMOGEN_ENGINE() call at imogencfx.cpp line 482). When true,
+    //  the engine call is skipped and the user is responsible for having
+    //  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via a separate
+    //  rebuild-engine run (e.g., rebuild's `scripts/run_coupled.sh
+    //  --engine-only-mode` per B44 productisation). This is the T_seq
+    //  sequential-standalone workflow per notes/B47.md §0 + §4.
+    //  Backport from rebuild's lpjguess/framework/parameters.h lines 530-548
+    //  (originally Step 17a F-12 sub-milestone C1.3 sub-step 7.3.2; 2026-05-10).
+    //  Default at parameters.cpp is `false` preserving LTS-equivalent
+    //  behaviour (engine runs in-process).
+    //  - DKB 2026-05-20 block 8.0.2]
+    extern bool skip_inprocess_engine_run;
+
     //Other booleans
     extern bool print_imogen_output;
 	extern bool include_feedback;

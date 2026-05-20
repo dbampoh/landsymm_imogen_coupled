@@ -22,7 +22,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <vector>
-#include <cstddef> // f¸r size_t 
+#include <cstddef> // fùr size_t 
 #include <iostream>
 #include "climatemodel.h"
 
@@ -260,6 +260,18 @@ IMOGENCFXInput::IMOGENCFXInput()
 	declare_parameter("REGRID", &IMOGENConfig::REGRID, "Enable nearest-neighbour regridding");
 	declare_parameter("CO2_RF_FAIR", &IMOGENConfig::CO2_RF_FAIR, "Use FAIR model for CO2 radiative forcing");
 
+	// [Block 8.0.2 T_seq Installment-1: skip_inprocess_engine_run flag.
+	//  When true, IMOGENCFXInput::init() skips the in-process RUN_IMOGEN_ENGINE()
+	//  call at line ~482 (which deadlocks per F-10 in single-process tight).
+	//  User must pre-stage climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via
+	//  rebuild's `scripts/run_coupled.sh --engine-only-mode` (B44 productised).
+	//  Default `false` preserves LTS-equivalent behaviour. Used for T_seq
+	//  sequential-standalone workflow per notes/B47.md ù0 + ù4. See
+	//  parameters.h / parameters.cpp same-named comment blocks for rationale.
+	//  Backport from rebuild's lpjguess/modules/imogencfx.cpp line 365.
+	//  - DKB 2026-05-20 block 8.0.2]
+	declare_parameter("skip_inprocess_engine_run", &IMOGENConfig::skip_inprocess_engine_run, "If true, skip in-process RUN_IMOGEN_ENGINE() call in init() (climate must be pre-staged externally via rebuild engine --engine-only-mode; for T_seq sequential-standalone workflow)");
+
 
 	//LPJG Coupling PARAMS -  similar to imogen_setings.txt
 	declare_parameter("YEAR1", &IMOGENConfig::YEAR1, 1850, 2100, "First year of the numerical experiment");
@@ -375,6 +387,22 @@ void IMOGENCFXInput::init() {
 	file_insol = param["file_insol"].str;
 	file_dtr = param["file_dtr"].str;
 
+	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+	//  wire the LPJG-side consumer for IMOGEN engine's Rh / wind / Tmin / Tmax
+	//  outputs. The rebuild's C++ engine (climatemodel.cpp) writes Rh_anom.dat
+	//  / W_anom.dat / Tmin_anom.dat / Tmax_anom.dat per year (post-step-9.5-B2 +
+	//  step-17b-B4 work). The 4 paths are normally set in the .ins file (see
+	//  forks/trunk_r13078_runs/SSP*/main.ins file_relhum + file_wind +
+	//  file_tmin + file_tmax param directives). If unset, the reads in
+	//  readenv() are skipped (path empty -> filename resolves empty ->
+	//  read_lines_from_file no-ops gracefully). Backport from rebuild's
+	//  lpjguess/modules/imogencfx.cpp lines 415-431.
+	//  - DKB 2026-05-20 block 8.0.2]
+	file_relhum = param["file_relhum"].str;
+	file_wind   = param["file_wind"].str;
+	file_tmin   = param["file_tmin"].str;
+	file_tmax   = param["file_tmax"].str;
+
 	ndep_timeseries = param["ndep_timeseries"].str;
 
 	spatial_resolution = parse_spatial_resolution();
@@ -478,9 +506,33 @@ void IMOGENCFXInput::init() {
 	}*/
 
 
-	//In a coupled IMOGEN-LPJG Run, IMOGEN climate data has to be first generated 
-	RUN_IMOGEN_ENGINE(); 
-	exit(200);
+	//In a coupled IMOGEN-LPJG Run, IMOGEN climate data has to be first generated
+	// [Block 8.0.2 T_seq Installment-1: gate the in-process engine invocation
+	//  on IMOGENConfig::skip_inprocess_engine_run + REMOVE the `exit(200);`
+	//  regression (the 1-line per LEDGER ù2 "6-file delta" ù LandSyMM_LPJ-GUESS
+	//  already has it removed; trunk's regression here short-circuits all
+	//  prescribed-mode runs after the engine completes). When skip flag is
+	//  true (per T_seq sequential-standalone .ins setting), the engine call
+	//  is skipped and the user is responsible for having pre-staged climate
+	//  at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via a separate rebuild engine
+	//  run (B44 productised `scripts/run_coupled.sh --engine-only-mode`).
+	//  Bypasses F-10 deadlock for the T_seq workflow per notes/B47.md ù4.
+	//  Backport from rebuild's lpjguess/modules/imogencfx.cpp lines 548-555.
+	//  - DKB 2026-05-20 block 8.0.2]
+	if (!IMOGENConfig::skip_inprocess_engine_run) {
+		RUN_IMOGEN_ENGINE();
+	} else {
+		dprintf("%s: skip_inprocess_engine_run=true; skipping in-process "
+		        "RUN_IMOGEN_ENGINE() call. User is responsible for having "
+		        "pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ "
+		        "via separate rebuild engine run (e.g., rebuild's "
+		        "scripts/run_coupled.sh --engine-only-mode per B44). "
+		        "T_seq sequential-standalone workflow per notes/B47.md ù0+ù4.\n",
+		        __FUNCTION__);
+	}
+	// (exit(200) regression removed per LEDGER ù2 6-file-delta correction;
+	//  matches LandSyMM_LPJ-GUESS upstream state; allows trunk to proceed
+	//  past the engine call to the LPJG main loop. - DKB 2026-05-20 block 8.0.2)
 
 	// allways allow space from 1st spinup year
 	nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1;
@@ -499,6 +551,21 @@ void IMOGENCFXInput::init() {
 	resize3DimVector(all_wetdays, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 	resize3DimVector(all_insol, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 	resize3DimVector(all_dtr, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+
+	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+	//  storage for IMOGEN engine's Rh / wind / Tmin / Tmax outputs. Same shape
+	//  as all_temp etc. so the read_lines_from_file calls in readenv() index
+	//  correctly when the corresponding file_* paths are set in the .ins file.
+	//  When paths are unset, these vectors are still resized but the file-read
+	//  is skipped (see readenv() guard); leaves all-zero storage which is
+	//  harmless for downstream code that doesn't consume the values (e.g.,
+	//  firemodel != BLAZE; LandSyMM stand list does not call for Tmin/Tmax).
+	//  Backport from rebuild's lpjguess/modules/imogencfx.cpp lines 584-587.
+	//  - DKB 2026-05-20 block 8.0.2]
+	resize3DimVector(all_drelhum, nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dwind,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmin,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
+	resize3DimVector(all_dtmax,   nyears, ngrid, monthly ? 12 : Date::MAX_YEAR_LENGTH);
 
 	all_co2.resize(nyears);
 
@@ -776,6 +843,32 @@ int IMOGENCFXInput::readenv(std::vector<double> lons, std::vector<double> lats, 
 			filename = gen_filename(file_dtr, calendar_year, false);
 			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtr[store_index], monthly);
 		}
+
+		// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+		//  read IMOGEN engine's Rh / wind / Tmin / Tmax outputs from per-year
+		//  ASCII files. Each path is YYYY-templated like the others
+		//  (e.g., "<DIR_COMMON>/IMOGEN/output/YYYY/Rh_anom.dat"). When path is
+		//  empty (parameter unset in .ins), gen_filename produces an empty
+		//  string and read_lines_from_file is skipped (path-empty guard).
+		//  Backport from rebuild's lpjguess/modules/imogencfx.cpp lines 866-888.
+		//  - DKB 2026-05-20 block 8.0.2]
+		if ((char*)file_relhum != NULL && file_relhum != "") {
+			filename = gen_filename(file_relhum, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_drelhum[store_index], monthly);
+		}
+		if ((char*)file_wind != NULL && file_wind != "") {
+			filename = gen_filename(file_wind, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dwind[store_index], monthly);
+		}
+		if ((char*)file_tmin != NULL && file_tmin != "") {
+			filename = gen_filename(file_tmin, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmin[store_index], monthly);
+		}
+		if ((char*)file_tmax != NULL && file_tmax != "") {
+			filename = gen_filename(file_tmax, calendar_year, false);
+			readfile = read_lines_from_file(filename, lons, lats, line_index, all_dtmax[store_index], monthly);
+		}
+
 		// already in init() determined, which grids have imogen climate coordinates lines
 		for (int i = 0; i < coord_line.size(); i++) {
 			if (coord_line[i] > 0)
@@ -789,9 +882,43 @@ int IMOGENCFXInput::readenv(std::vector<double> lons, std::vector<double> lats, 
 void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& seed) {
 
 	if (monthly) {
-		/*if (firemodel == BLAZE) {
-			fail("%s: sorry, imogencfx input not setup for firemodel BLAZE, needs extra climate data and GWGEN", __FUNCTION__);
-		}*/
+		// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+		//  BLAZE compatibility check RESTORED + REFRAMED. Previously commented
+		//  out because Rh + wind weren't yet wired (uncommenting would have
+		//  caused all coupled runs with firemodel=BLAZE to fail). After the
+		//  B4 wiring above (file_relhum / file_wind + read paths in readenv +
+		//  storage members in .h), BLAZE can run safely PROVIDED the user
+		//  supplies the corresponding IMOGEN engine output paths in the .ins
+		//  file. If the paths are empty, this check fires - correct: BLAZE
+		//  needs RH+wind, and if they weren't supplied, the run cannot proceed.
+		//  Backport from rebuild's lpjguess/modules/imogencfx.cpp lines 915-924.
+		//  - DKB 2026-05-20 block 8.0.2]
+		if (firemodel == BLAZE) {
+			if ((char*)file_relhum == NULL || file_relhum == "" ||
+			    (char*)file_wind == NULL || file_wind == "") {
+				fail("%s: imogencfx with firemodel=BLAZE requires file_relhum + "
+				     "file_wind .ins parameters pointing at the IMOGEN engine's "
+				     "Rh_anom.dat / W_anom.dat per-year output. None set; aborting. "
+				     "(See forks/trunk_r13078_runs/SSP*/main.ins for the canonical "
+				     ".ins-file layout under T_seq.)", __FUNCTION__);
+			}
+		}
+
+		// [Block 8.0.2 T_seq Installment-1: KELVIN -> CELSIUS conversion
+		//  applied here at the input-reading layer for temperature fields.
+		//  ROOT-CAUSE FIX: the IMOGEN engine writes T_anom.dat / Tmin_anom.dat /
+		//  Tmax_anom.dat in Kelvin; LPJG's Climate struct expects climate.temp
+		//  / .tmin / .tmax in degrees Celsius. Latent K-vs-C bug in trunk
+		//  never surfaced because LPJG main loop never ran in -input imogencfx
+		//  mode (F-10 deadlock at IMOGENCFXInput::init's RUN_IMOGEN_ENGINE
+		//  blocked before main loop could exercise getclimate's per-day driver).
+		//  Under T_seq with skip_inprocess_engine_run=1 bypassing F-10, LPJG
+		//  main loop runs and Soil::soil_temp_multilayer would hit T=169.393 K
+		//  (-104ùC) without this fix. Mirror of step-17a sub-step 7.3.2 fix
+		//  applied in rebuild. Backport from rebuild's
+		//  lpjguess/modules/imogencfx.cpp lines 926-963 + 971.
+		//  - DKB 2026-05-20 block 8.0.2]
+
 		// Interpolate monthly spinup data to quasi-daily values
 		double mtmp[12];
 		double mprec[12];
@@ -799,21 +926,62 @@ void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& 
 		double mdtr[12];
 		double mwet[12];
 		for (int i = 0; i < 12; i++) {
-			mtmp[i] = all_temp[store_index][igrid][i];
+			mtmp[i] = all_temp[store_index][igrid][i] - 273.15;  // K -> degC (per block 8.0.2 T_seq fix above)
 			mprec[i] = all_prec[store_index][igrid][i] * 30; // imogen gives the average daily within a 30-day month, we need summed over month to distribute
 			mwet[i] = all_wetdays[store_index][igrid][i];
 			minsol[i] = all_insol[store_index][igrid][i];
-			mdtr[i] = ifbvoc ? all_dtr[store_index][igrid][i] : 0.0;
+			mdtr[i] = ifbvoc ? all_dtr[store_index][igrid][i] : 0.0;  // delta T (range), no K->C shift needed
 		}
 		interp_climate(mtmp, mprec, minsol, mdtr, mwet, dtemp, dprec, dinsol, ddtr, seed);
 
+		// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+		//  monthly -> quasi-daily interpolation for the new IMOGEN outputs
+		//  (Rh, wind, Tmin, Tmax). Mirrors interp_climate's pattern: use
+		//  interp_monthly_means_conserve for non-rainfall variables. Each
+		//  block guarded so empty-path cases leave the per-day array
+		//  zero-initialized rather than reading uninitialized storage.
+		//  K->degC applied to mtmin/mtmax (Tmin/Tmax in Kelvin from engine);
+		//  Rh (%) and wind (m/s) need no unit conversion. Backport from
+		//  rebuild's lpjguess/modules/imogencfx.cpp lines 979-1004.
+		//  - DKB 2026-05-20 block 8.0.2]
+		double mrelhum[12], mwind[12], mtmin[12], mtmax[12];
+		bool have_relhum = ((char*)file_relhum != NULL && file_relhum != "");
+		bool have_wind   = ((char*)file_wind   != NULL && file_wind   != "");
+		bool have_tmin   = ((char*)file_tmin   != NULL && file_tmin   != "");
+		bool have_tmax   = ((char*)file_tmax   != NULL && file_tmax   != "");
+		for (int i = 0; i < 12; i++) {
+			mrelhum[i] = have_relhum ? all_drelhum[store_index][igrid][i] : 0.0;
+			mwind[i]   = have_wind   ? all_dwind[store_index][igrid][i]   : 0.0;
+			mtmin[i]   = have_tmin   ? (all_dtmin[store_index][igrid][i] - 273.15) : 0.0;  // K -> degC
+			mtmax[i]   = have_tmax   ? (all_dtmax[store_index][igrid][i] - 273.15) : 0.0;  // K -> degC
+		}
+		if (have_relhum) interp_monthly_means_conserve(mrelhum, drelhum, 0);
+		if (have_wind)   interp_monthly_means_conserve(mwind,   dwind,   0);
+		if (have_tmin)   interp_monthly_means_conserve(mtmin,   dtmin);
+		if (have_tmax)   interp_monthly_means_conserve(mtmax,   dtmax);
+
 	}
 	else {
+		// [Block 8.0.2 T_seq Installment-1: K -> degC for daily-mode passthrough
+		//  of dtemp/dtmin/dtmax. Same root cause + same fix as the monthly
+		//  branch above. Mirror application across both branches preserves
+		//  byte-exactness between modes. Plus daily-mode passthrough for the
+		//  new IMOGEN outputs (Rh, wind, Tmin, Tmax) each guarded for empty
+		//  path. Backport from rebuild's lpjguess/modules/imogencfx.cpp
+		//  lines 1008-1028. - DKB 2026-05-20 block 8.0.2]
 		for (int i = 0; i < Date::MAX_YEAR_LENGTH; i++) {
-			dtemp[i] = all_temp[store_index][igrid][i];
+			dtemp[i] = all_temp[store_index][igrid][i] - 273.15;  // K -> degC
 			dprec[i] = all_prec[store_index][igrid][i]; // * 86400 / 1000; // convert to precip rate in kg/m2/s
 			dinsol[i] = all_insol[store_index][igrid][i];
-			if (ifbvoc) ddtr[i] = all_dtr[store_index][igrid][i];
+			if (ifbvoc) ddtr[i] = all_dtr[store_index][igrid][i];  // delta T (range), no K->C shift
+			if ((char*)file_relhum != NULL && file_relhum != "")
+				drelhum[i] = all_drelhum[store_index][igrid][i];
+			if ((char*)file_wind != NULL && file_wind != "")
+				dwind[i] = all_dwind[store_index][igrid][i];
+			if ((char*)file_tmin != NULL && file_tmin != "")
+				dtmin[i] = all_dtmin[store_index][igrid][i] - 273.15;  // K -> degC
+			if ((char*)file_tmax != NULL && file_tmax != "")
+				dtmax[i] = all_dtmax[store_index][igrid][i] - 273.15;  // K -> degC
 		}
 	}
 
@@ -821,7 +989,7 @@ void IMOGENCFXInput::get_climate_for_gridcell(int store_index, int igrid, long& 
 
 double IMOGENCFXInput::parse_spatial_resolution() {
 	return (3.75 / 2); // 3.75x2.5 deg
-	// https://en.wikipedia.org/wiki/HadCM3 resolution: 3.75 ◊ 2.5 degrees in longitude ◊ latitude. This gives 96 ◊ 73 grid points???
+	// https://en.wikipedia.org/wiki/HadCM3 resolution: 3.75 ù 2.5 degrees in longitude ù latitude. This gives 96 ù 73 grid points???
 }
 
 bool IMOGENCFXInput::getgridcell(Gridcell& gridcell) {
@@ -1044,6 +1212,22 @@ bool IMOGENCFXInput::getclimate(Gridcell& gridcell) {
 		if (ifbvoc) {
 			climate.dtr = ddtr[date.day];
 		}
+
+		// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+		//  populate the LPJ-GUESS Climate struct's relhum / u10 / tmin / tmax
+		//  from the IMOGEN engine outputs that the B4 wiring (above) loaded
+		//  into drelhum / dwind / dtmin / dtmax. Mirrors cfxinput.cpp:1941-1944.
+		//  When the corresponding .ins parameters are unset (file_relhum etc.
+		//  = ""), the per-day arrays are zero-filled and these assignments
+		//  produce climate.* = 0; processes that depend on these fields
+		//  (BLAZE, LandSyMM crop dynamics) are gated separately (BLAZE check
+		//  in get_climate_for_gridcell; LandSyMM stand-list config).
+		//  Backport from rebuild's lpjguess/modules/imogencfx.cpp lines 1264-1277.
+		//  - DKB 2026-05-20 block 8.0.2]
+		climate.relhum = drelhum[date.day];
+		climate.u10    = dwind[date.day];
+		climate.tmin   = dtmin[date.day];
+		climate.tmax   = dtmax[date.day];
 
 
 	// Nitrogen deposition
