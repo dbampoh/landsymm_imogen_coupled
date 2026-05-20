@@ -1,0 +1,92 @@
+!
+! Instruction file with global PFTs to be used with the
+! CF I/O module.
+!
+! Make sure to start LPJ-GUESS with -input cf when using this
+! instruction file.
+!
+
+import "global.ins"
+import "crop_n.ins"
+import "wetlandpfts.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Forcing Data & gridlists
+!
+
+! (Climate forcings and N deposition specified farther below)
+!searchradius 50
+param "file_ndep"     (str "")
+! Needed if relative humidity is not supplied
+param "file_pres"     (str "")
+param "variable_pres" (str "")
+! Needed if relative humidity is not supplied
+param "file_specifichum" (str "")
+param "variable_specifichum" (str "")
+! Wet days can only be used with monthly precipitation
+param "file_wetdays"     (str "")
+param "variable_wetdays" (str "")
+
+! Soil map
+param "file_soildata" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\soilmap_center_interpolated.dat")
+
+!state_path "state/%Y/"
+param "file_gridlist" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\Ins\pasture_fert_test_european_apps\gridlist_sites_test.txt")
+param "file_gridlist_cf" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\Ins\pasture_fert_test_european_apps\gridlist_sites_test.txt")
+nyear_spinup 500	     ! number of years to spin up the simulation for
+freenyears 100	     ! Number of years to spin up without N limitation (needed to build up a N pool)
+ifdyn_phu_limit 1    ! Whether to limit dynamic phu calculation to a period specified by nyear_dyn_phu
+nyear_dyn_phu 165    ! Number of years to calculate dynamic phu if dynamic_phu_limit is 1
+param "variable_temp" (str "tas")
+param "variable_prec" (str "pr")
+param "variable_insol"  (str "rsds")
+param "variable_wind"  (str "sfcwind")
+param "variable_relhum" (str "hurs")
+param "variable_min_temp"  (str "tasmin")
+param "variable_max_temp"  (str "tasmax")
+
+! DKB: actual historical
+firsthistyear 1850
+firstoutyear 1900
+lasthistyear 2100
+lastoutyear 2100
+!restart 0         ! Whether to start from a state file
+!restart_year 2015
+!save_state 0         ! Whether to save a state file
+!save_years "1850 1950 2000 2014 2015 2050 2100"
+
+! DKB actual: MPI-ESM1-2-HR  historical; previously used IPSL. But hi-res is based on MPI, so have to use this now for comparability!
+param "file_temp1"     	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_tas_global_daily_1850_2014.nc4")
+param "file_prec1"     	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_pr_global_daily_1850_2014.nc4")
+param "file_insol1"    	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_rsds_global_daily_1850_2014.nc4")
+param "file_wind1" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_sfcwind_global_daily_1850_2014.nc4")
+param "file_relhum1" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_hurs_global_daily_1850_2014.nc4")
+! Min/max temp is required for BVOC, if BVOC is switched off these can be set to ""
+param "file_min_temp1"  (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_tasmin_global_daily_1850_2014.nc4")
+param "file_max_temp1"  (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_historical_tasmax_global_daily_1850_2014.nc4")
+
+! DKB actual: MPI-ESM1-2-HR  ssp126
+param "file_temp2"     	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_tas_global_daily_2015_2100.nc4")
+param "file_prec2"     	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_pr_global_daily_2015_2100.nc4")
+param "file_insol2"     (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_rsds_global_daily_2015_2100.nc4")
+param "file_wind2" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_sfcwind_global_daily_2015_2100.nc4")
+param "file_relhum2" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_hurs_global_daily_2015_2100.nc4")
+! Min/max temp is required for BVOC, if BVOC is switched off these can be set to ""
+param "file_min_temp2"  (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_tasmin_global_daily_2015_2100.nc4")
+param "file_max_temp2"  (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\mpi-esm1-2-hr_r1i1p1f1_w5e5_ssp126_tasmax_global_daily_2015_2100.nc4")
+
+param "file_co2" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\co2_histssp126_annual_1850_2100.txt")
+
+!param "file_popdens" 	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+param "file_popdens"    (str "") ! since hi-res hurs&sfcwind aren't available, so no fire in comparison. Thus use firemethod "NOFIRE". When using "fire_popdens_method 0  ! Fire popdens input methods: 0=(undefined), 1=simfire binary, 2=netcdf within cfxinput" in .ins, Sams code also works without providing popdens input. 
+param "variable_popdens" (str "popd")
+!param "file_simfire"  	(str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\SimfireInput.bin")
+
+param "file_mNHxdrydep" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\ndep_drynhx_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNOydrydep" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\ndep_drynoy_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNHxwetdep" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\ndep_wetnhx_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNOywetdep" (str "C:\GitHub\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Data\NETCDF2\ndep_wetnoy_histsoc_monthly_1850_2015_lpjg.nc4")
+param "variable_mNHxdrydep" (str "drynhx")
+param "variable_mNOydrydep" (str "drynoy")
+param "variable_mNHxwetdep" (str "wetnhx")
+param "variable_mNOywetdep" (str "wetnoy")
