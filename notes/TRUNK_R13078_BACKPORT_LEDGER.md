@@ -2239,6 +2239,71 @@ All gates ✅ PASS. **Rule #9 datapoint #15 carries forward unchanged** (no new 
 
 ---
 
+### Block 8.1 LANDED (session 9 day 2 close, 2026-05-21 evening): Cluster reconnaissance under T_seq retargeting fully complete — all 5 acceptance gates G0-G4 PASS; KIT IMK-IFU `owl` ready for T_seq Track 2 production runs at canonical resource allocation `genius × 2 nodes × 128 CPUs/node = 256 ranks × 3-day walltime`; both fork binaries built cleanly on cluster (trunk_r13078 + lpjguess; B48 hypothesis Ubuntu-immunity CONFIRMED); all 5 cluster input data categories verified + ndep fallback strategy SSP2-4.5+SSP4-6.0 already encoded in user's wpeat runs; **MIXED: TRUNK-IRRELEVANT-by-novelty for `scripts/cluster/env_owl.sh` canonical module-load population + bundle/doc cascade work; cumulative T_seq Installment-1 backport-debt UNCHANGED at ~277 LOC (Installment-2 still pending ~2900-3100 LOC at post-paper Backport Sprint per §1.2)**
+
+**Date:** 2026-05-21 (evening; session 9 day 2 close after ~6 hours of iterative SSH paste-back + local mirror rsync inspection over 7 rounds; immediately after session 9 opening orientation + session 8.0.3 follow-up commits at HEAD `9561f1e6...`; same calendar week as block 8.0.3 close 2026-05-20). **Commit hash:** _to be determined_ (this commit; on `main` working branch directly; no tag — operational reconnaissance milestone not release-worthy; tag candidate `v0.23.0-cluster-trunk-tseq-smoke-complete` reserved for block 8.3 cluster end-to-end smoke test ✅ PASS — first actual cluster runtime test).
+
+**Backport relevance summary:**
+
+- **Per ✅ STRATEGIC RESOLUTION at the top of this ledger** + B47 §0 + §5 (T_seq Installment-1 trajectory): this commit's substantive work is reconnaissance (not source-edit); cumulative backport-debt to `forks/trunk_r13078/` UNCHANGED at the ~277 LOC Installment-1 cumulative from blocks 8.0.1-8.0.3. The single source-edit at this commit (`scripts/cluster/env_owl.sh` canonical module-load population per discovery D1) is **TRUNK-IRRELEVANT-by-novelty** (`scripts/cluster/` is per-fork rebuild-side; not in `trunk_r13078/`).
+- **Per LEDGER §1.1 dual-fork policy** extension: NEW B52 row at `notes/FOLLOWUPS.md` (per discovery D8) extends the dual-fork policy to a 4th component-pairing: Fortran IMOGEN (at `imogen/code/imogen_lpjg.f`; rebuild's primary engine) + IMOGENCXX C++ legacy (at `version_A/B` framework codebases; backport-pending) become switchable alternatives at v1.1+/v1.5+ post-paper era. **Classification: TRUNK-IRRELEVANT-by-novelty** in initial filing (IMOGENCXX work would land under NEW `forks/imogencxx/` or equivalent path; not under `trunk_r13078/` or `lpjguess/`); B52 is informational here for completeness of the v1.1+ comprehensive backport sprint roadmap.
+
+**Acceptance gate scorecard (full evidence at `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/B81_cluster_reconnaissance_evaluation_2026-05-21.md`):**
+
+| Gate | Verdict | Headline |
+|---|---|---|
+| G0 SSH + bash env | ✅ PASS | AlmaLinux 9 + Spack 0.19.0 + 7 auto-loaded modules in user's `.bash_profile` |
+| G1 cluster discovery | ✅ PASS | 11 partitions; canonical production target genius × 2 × 128 = 256 ranks (per user's recent wpeat setup_run.sh); milan + cclake alternatives |
+| G2 trunk fork build | ✅ PASS | 2,594,392 bytes sha1 `40d36db6…`; cmake 1.88s + make 17.67s; B48-immune (no -lcurl workaround needed) |
+| G3 lpjguess fork build | ✅ PASS | 2,639,744 bytes sha1 `4da4462a…`; same Spack-managed dep chain; provides Step A migration optionality |
+| G4 input paths | ✅ PASS | 5/5 categories present (soilmap + 4-NetCDF ndep + popdens + simfire + `_peatland` LU hist+scen); ndep fallback for SSP2-4.5+SSP4-6.0 already encoded |
+
+**8 discoveries surfaced (per Rule #9 datapoint #17; details in `_chat_artifacts/.../B81_AGENDA_2026-05-21.md` §2):**
+
+- **D1**: B48 hypothesis CONFIRMED Ubuntu-specific (cluster Spack-managed HDF5 1.12.2 + libcurl 7.85.0 + rpath chain is immune; B48 priority stays LOW-MEDIUM as Ubuntu-only impact)
+- **D2**: Canonical production resource allocation = `genius × 2 × 128 = 256 ranks` (NOT cclake × 160 as 2023-vintage `owl_hpc_cluster_scripts/setup_run.sh` template suggested; per user's recent wpeat setup_run.sh + sacct evidence; ~2.5× faster than legacy cclake target)
+- **D3**: Site-wide newer orchestrator at `/bg/data/lpj/scripts/setup_run_owl_with_scratch_lpj_work.sh` (Jan 21 2026; improved gridlist split via `function split_gridlist` + `srun --label`; recommend adoption at block 8.4)
+- **D4**: HOME=/bg/home/bampoh-d/ (NOT /pd/home as `scripts/cluster/setup_run.sh:113-123` path-translation assumed); 4-LOC case-add needed at block 8.4
+- **D5**: ndep fallback strategy for SSP2-4.5 + SSP4-6.0 ALREADY ENCODED in user's wpeat runs (use `histsoc-wetdry-lpjguess/` 1850-2015 historical fallback; established by user 2026-03-14/15; mirror this pattern; no upload needed)
+- **D6**: Rule #10 self-correction on canonical reference dir framing (mid-recon; preserved per amendment-vs-rewrite corollary); physical data file path verifications unaffected
+- **D7**: Cross-SSP _wpeat parallelism is perfect (all 6 dirs IDENTICAL 18 .ins file sets; deltas 30-31 lines per scenario; clean copy-with-replace pattern for block 8.4 cluster main.ins authoring)
+- **D8**: NEW v1.1+ trajectory finding — IMOGENCXX C++ legacy backport from version_A/B as switchable-alternative to rebuild's improved Fortran IMOGEN (filed as B52 NEW at `notes/FOLLOWUPS.md` this commit)
+
+**Source-edits at this commit** (1 file):
+
+- `scripts/cluster/env_owl.sh` (placeholder commented module-loads replaced with canonical 7-module load matching user's `.bash_profile` auto-load; ~20 LOC net change). For future maintainers who don't have the user's bash profile + for documenting the canonical cluster build environment. **TRUNK-IRRELEVANT-by-novelty** (`scripts/cluster/` is per-fork; novel since step 16).
+
+**Audit-evidence bundle**: `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/` (10 files; 2328 LOC; 162 KB; includes 7-round SSH paste-back captures + cluster builds + canonical reference rsync inspection + 5-gate evaluation Markdown + agenda with 8 discoveries + reconciliation points for block 8.4). Plus `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/` (121 MB; local mirror of cluster's `landsymm_imogen_runs/` 15-dir tree; excludes state/+output*/+submitted/+guess for compact useful-content-only retention).
+
+**What block 8.1 unblocks:**
+
+- Block 8.2 cluster build verification (mostly already absorbed into G2+G3; remaining work minimal; may collapse into block 8.3 close commit)
+- Block 8.3 cluster end-to-end smoke test (~0.5 d; first actual cluster runtime: SCP engine library workstation → cluster + first cluster runtime test on smoke gridlist)
+- Block 8.4 production-config delta authoring (~1-1.5 d; cluster main_hist.ins + main_scen.ins templates mirroring user's canonical wpeat .ins-config pattern with cfx → imogencfx swap + skip_inprocess_engine_run=1 + restructure `forks/trunk_r13078_runs/` to mirror cluster naming convention + T_seq retargeting of `scripts/cluster/setup_run.sh` + `run_coupled.sbatch` per agenda §3.1+3.2 reconciliation points + adopt newer site-wide orchestrator improvements per agenda §3.6)
+- Blocks 8.5-8.7 + sessions 9-11 Track 2 cluster production runs (5 SSP-RCPs × 62538 cells × 1900-2100; ~5-15 hours total cluster wall on genius/256)
+- Sessions 11-12 validation triad + paper figures + Methods/Results/Discussion writing
+- v1.0 GMD submission ~6-11 weeks calendar from this commit (UNCHANGED estimate)
+
+#### Files in this commit
+
+| File / Path | Change | Backport directive |
+|---|---|---|
+| `scripts/cluster/env_owl.sh` | placeholder commented loads → canonical 7-module load (~20 LOC) | TRUNK-IRRELEVANT-by-novelty (per-fork; novel since step 16) |
+| `notes/FOLLOWUPS.md` | top-of-dashboard NEW entry + NEW B52 row | DOC TRUNK-IRRELEVANT-by-novelty (per-fork notes) |
+| `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` | §1 block 8.1 LANDED status update | DOC TRUNK-IRRELEVANT-by-novelty |
+| `notes/STEP_17c.md` | §1.7.8 block 8.1 status entry prepend | DOC TRUNK-IRRELEVANT-by-novelty |
+| `notes/PRODUCTION_RUN_CONFIG.md` | §3.1 small ndep+popdens local-mirror path correction (user-confirmed canonical at /media/bampoh-d/ISIMIP/inputs/) | DOC TRUNK-IRRELEVANT-by-novelty |
+| `notes/TRUNK_R13078_BACKPORT_LEDGER.md` | §3 NEW Block 8.1 LANDED entry (this entry) | DOC TRUNK-IRRELEVANT-by-novelty |
+| `CHANGELOG.md` | NEW [Unreleased] entry | DOC TRUNK-IRRELEVANT-by-novelty |
+| `EXECUTION_PLAN.md` | row 17c block 8.1 ✅ DONE status update | DOC TRUNK-IRRELEVANT-by-novelty |
+| `_chat_artifacts/CHAT_HANDOFF_2026-05-18_session5_post_b19.md` (sibling; not tracked) | Part 13 append (session 9 day 2 narrative) | sibling artifact; not part of commit's tracked-tree |
+| `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/` (sibling; not tracked) | 10 files / 2328 LOC / 162 KB audit-evidence bundle | sibling artifact; not part of commit's tracked-tree |
+| `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/` (rsync mirror; outside repo) | 121 MB canonical reference mirror of cluster's landsymm_imogen_runs/ tree | rsync mirror; outside repo; informational only |
+
+**Cumulative T_seq Installment-1 source-edit at block 8.1 close**: ~297 LOC = ~277 LOC cumulative from blocks 8.0.1-8.0.3 + ~20 LOC from this block (env_owl.sh; per-fork). Installment-2 remaining estimate UNCHANGED at ~2900-3100 LOC pending post-paper Backport Sprint per §1.2.
+
+---
+
 ### Block 8.0.1 LANDED (session 8.0.1 close, 2026-05-20 afternoon): T_seq Installment-1 — structural import of `trunk_r13078` LPJG fork into rebuild repo at `forks/trunk_r13078/` (sibling to `lpjguess/`) — ZERO source-edit at import; NEW `forks/README.md` + baseline build verification PASS with NEW B48 `-lcurl` workaround documented — **TRUNK-RELEVANT classification flips per ✅ STRATEGIC RESOLUTION at top of this ledger**: under Option T_seq adopted at B47, `forks/trunk_r13078/` is now the **in-repo backport surface** for Installment-1 (pre-paper) + Installment-2 (post-paper full-fork-parity)
 
 **Date:** 2026-05-20 (afternoon; session 8.0.1 close immediately after B47 decision-record commit `d6ef6c1` at session 8.0 opening; same calendar day). **Commit hash:** _to be determined_ (this commit; on `main` working branch directly; no tag — operational milestone not release-worthy; tag candidate `v0.22.0-tseq-installment-1-complete` would land at block 8.0.3 acceptance test close).

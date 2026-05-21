@@ -72,8 +72,8 @@ This document captures the full smoke→production migration delta, the updated 
 | Parameter | Smoke value | Production value | Where |
 |---|---|---|---|
 | `file_simfire` | `""` | `SimfireInput.bin` | `/media/bampoh-d/lpjg_input/input/fire/SimfireInput.bin` (local) ↔ `/bg/data/lpj/LPJ-GUESS/input/fire/SimfireInput.bin` (cluster) |
-| `file_popdens` | (not set; firemodel=NOFIRE) | population NetCDF for SimFire ignition | `/media/bampoh-d/lpjg_input/input/pop_dens/...` (local) ↔ `/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/...` (cluster) |
-| `file_mNHxdrydep` | (not set) | `ndep_drynhx_*.nc4` (per-SSP) | `/media/bampoh-d/lpjg_input/input/ndep/...` ↔ cluster equivalent |
+| `file_popdens` | (not set; firemodel=NOFIRE) | population NetCDF for SimFire ignition | `/media/bampoh-d/ISIMIP/inputs/pop/lpjg-popd/...` (local; user-confirmed canonical at block 8.0.3 follow-up 2026-05-20) ↔ `/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/...` (cluster; verified at block 8.1 G4) |
+| `file_mNHxdrydep` | (not set) | `ndep_drynhx_*.nc4` (per-SSP) | `/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-ssp{126,370,585}soc-wetdry-lpjguess/` (local; user-confirmed canonical at block 8.0.3 follow-up; SSP-specific variants for SSP1-2.6, SSP3-7.0, SSP5-8.5) + `/media/bampoh-d/ISIMIP/inputs/n-deposition/histsoc-wetdry-lpjguess/` (1850-2015 historical fallback for SSP2-4.5 + SSP4-6.0 per user's canonical wpeat runs pattern verified at block 8.1 D5) ↔ cluster equivalents at `/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/...` (verified at block 8.1 G4) |
 | `file_mNHxwetdep` | (not set) | `ndep_wetnhx_*.nc4` | (same) |
 | `file_mNOydrydep` | (not set) | `ndep_drynoy_*.nc4` | (same) |
 | `file_mNOywetdep` | (not set) | `ndep_wetnoy_*.nc4` | (same) |

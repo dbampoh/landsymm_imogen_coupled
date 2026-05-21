@@ -149,6 +149,41 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
+### ✅ BLOCK 8.1 LANDED status update (2026-05-21 evening session 9 day 2 close)
+
+**Block 8.1 cluster reconnaissance under T_seq retargeting ✅ FULLY COMPLETE** at this close. All 5 acceptance gates G0-G4 PASS via 7 rounds of iterative SSH paste-back + local mirror rsync of `/bg/data/lpj/bampoh-d/landsymm_imogen_runs/` to `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/` (121 MB; canonical reference for meticulous direct-file inspection per Rule #11 + #13).
+
+**Headline outcome**: KIT IMK-IFU `owl` ready for T_seq Track 2 production runs at canonical resource allocation **`genius × 2 nodes × 128 CPUs/node = 256 ranks × 3-day walltime`** (matches user's recent wpeat Track 1 production setup_run.sh + sacct PNV_unmanage_guess 256 NCPUs 1h07m wall = ~2.5× faster than legacy cclake/160 baseline). Both fork binaries built cleanly on cluster (`forks/trunk_r13078/build_owl/guess` 2,594,392 bytes sha1 `40d36db6…` + `lpjguess/build_owl/guess` 2,639,744 bytes sha1 `4da4462a…`) without B48 `-lcurl` workaround (Spack-managed dep chain is Ubuntu-immune). Project mirror cloned at `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/` (63 MB; HEAD matches workstation `9561f1e6…`; tag `v0.22.0-tseq-installment-1-complete` present). All 5 cluster input categories verified present + ndep fallback strategy for SSP2-4.5 + SSP4-6.0 already encoded in user's wpeat runs (use `histsoc-wetdry-lpjguess/` 1850-2015 historical fallback; established by user 2026-03-14/15).
+
+**8 substantive discoveries** (D1-D8 per Rule #9 datapoint #17; full details at `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/B81_AGENDA_2026-05-21.md` §2): D1 B48-immunity + D2 genius/256 canonical allocation + D3 site-wide newer orchestrator at `/bg/data/lpj/scripts/` + D4 HOME=/bg/home/ path-translation case-add + D5 ndep fallback pre-encoded + D6 Rule #10 self-correction on canonical reference dir framing + D7 cross-SSP _wpeat parallelism perfect + **D8 NEW v1.1+ trajectory** = IMOGENCXX C++ legacy backport from version_A/B as switchable-alternative to rebuild's improved Fortran IMOGEN (filed as **B52 NEW** at `notes/FOLLOWUPS.md` this commit).
+
+**Acceptance gate scorecard**:
+
+| Gate | Verdict | Evidence |
+|---|---|---|
+| G0 SSH + bash env | ✅ PASS | AlmaLinux 9 + Spack 0.19.0 + 7 auto-loaded modules in user's `.bash_profile` |
+| G1 cluster discovery | ✅ PASS | 11 partitions; canonical genius/256 + milan/cclake alternatives; site-wide newer orchestrator |
+| G2 trunk fork build | ✅ PASS | 2,594,392 bytes sha1 40d36db6...; B48-immune |
+| G3 lpjguess fork build | ✅ PASS | 2,639,744 bytes sha1 4da4462a...; Step A migration optionality |
+| G4 cluster input paths + ndep strategy | ✅ PASS | 5/5 categories present; ndep fallback pre-encoded |
+
+**Block 8.1 close commit artifacts** (per `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 NEW "Block 8.1 LANDED" entry; per `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/B81_cluster_reconnaissance_evaluation_2026-05-21.md` 5-gate scorecard with concrete-artifact citations per Rule #10): 1 source-edit (`scripts/cluster/env_owl.sh` canonical module-load population; ~20 LOC; TRUNK-IRRELEVANT-by-novelty) + 7 doc updates + 1 sibling Part 13 of session5_post_b19 handoff + comprehensive audit-evidence bundle (10 files; 2328 LOC; 162 KB).
+
+**POST-BLOCK-8.1 NEXT** (replaces §1.2 8-block plan ordering below since blocks 8.0 + 8.1 are now DONE; blocks 8.2/8.3/8.4/8.5/8.6/8.7 are renumbered + retargeted under T_seq per `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §0.2 ✅ STRATEGIC RESOLUTION):
+
+- **Block 8.3 cluster end-to-end smoke test** (~0.5 d) — first actual cluster runtime: SCP engine library workstation → cluster (~443 MB SSP1-2.6) + symlink Common-directory + run `forks/trunk_r13078/build_owl/guess -input imogencfx main.ins` on `owl` smoke gridlist; expected ~1-2 hours wall on genius/256 per cluster runtime extrapolation; tag candidate `v0.23.0-cluster-trunk-tseq-smoke-complete`
+- **Block 8.4 production-config delta authoring** (~1-1.5 d) — author cluster `main_hist.ins` + `main_scen.ins` templates per SSP mirroring user's canonical wpeat .ins-config pattern (per `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/integrated-4.1-ins2_landsymm_{hist,ssp126,ssp245,ssp370,ssp460,ssp585}_wpeat/main.ins` reference with `cfx → imogencfx` swap + `skip_inprocess_engine_run 1` + add `imogen_intermediary.ins` to extra .ins set + engine-library climate substitution); restructure `forks/trunk_r13078_runs/` to mirror cluster naming convention (hist + 5 scenarios × _wpeat); update `scripts/cluster/setup_run.sh` + `run_coupled.sbatch` for T_seq retargeting (per agenda §3.1+3.2+3.4 reconciliation points); adopt the newer site-wide orchestrator improvements (per agenda §3.6); 4-LOC `/bg/home → /bg/data/lpj/work` path-translation case-add in `scripts/cluster/setup_run.sh:113-123` (per agenda §3.4 D4)
+- **Block 8.5 cluster MPI pre-flight** (~0.5 d) — verify trunk-T_seq runs with MPI on `owl` genius/256
+- **Block 8.6 Track 1 baseline cluster runs** (~0.5-1 d) — Track 1 (`-input cfx` + ISIMIP3b MRI-ESM2-0 climate) for all 5 SSPs as Axis 4 validation comparison baseline
+- **Block 8.7 (optional) intermediate-cell production smoke** (~0.5 d) — confidence-builder before full 62538-cell launch
+- **Sessions 9-11 Track 2 cluster production runs** — 5 SSP-RCPs × 62538 cells × 1900-2100 on genius/256; ~5-15 hours total cluster wall (estimated; user note "cluster is always in use" → check availability before allocating + use milan/cclake fallback if genius busy)
+- **Sessions 11-12 validation triad** (Axes 1-4 per `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1) + paper figures + Methods/Results/Discussion writing
+- **v1.0 GMD paper submission** — target ~6-11 weeks calendar from block 8.1 close
+
+**Below**: §1 8-block original ordering preserved for forensic continuity per Rule #10 amendment-vs-rewrite corollary (the original session-7-close framing where blocks 8.1 was preliminary cluster reconnaissance + 8.2-8.7 were the in-process integration options; T_seq retargeting at session 8.0 C5 changed the meaning of blocks 8.2-8.7 to T_seq-specific; this block 8.1 close confirms all reconnaissance work is done).
+
+---
+
 ### 1.1 Headline strategy — local-first with cluster reconnaissance in parallel
 
 Reasoning (carried forward from session-7 close analysis):
