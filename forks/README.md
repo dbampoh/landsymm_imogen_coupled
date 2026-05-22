@@ -17,6 +17,29 @@
 
   **End state**: `forks/trunk_r13078/` and `lpjguess/` are switchable alternatives — same physics; same coupling capability; user/CI chooses which binary to build + run; outputs cross-checked between forks for paper publications.
 
+## Switchable-regrid-strategy for v1.0 paper production runs (NEW post-block-8.1.5)
+
+Per block 8.1.5 architectural clarification (2026-05-22; canonical findings .md at `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md` §13), the v1.0 paper Track 2 production runs adopt a **switchable-regrid-strategy** with multiple interchangeable alternatives sharing common infrastructure (intermediary_py upstream + FastRegrid post-engine + LPJG `forks/trunk_r13078/` consumer). The active alternatives for v1.0 are:
+
+| Option | Engine implementation | Engine native output grid | Regrid pathway | LPJG run | Status |
+|---|---|---|---|---|---|
+| **α** | C++ port `lpjguess/modules/climatemodel.cpp` | 1631 (native pattern grid; REGRID is dead code) | in-consumer NN-within-50°-Euclidean (in `imogencfx::lon_lat_lines_in_file()`) | @ 62,892 | ✅ SSP1-2.6 library complete; 4 remaining SSPs at block 8.2 |
+| **β** | Fortran `imogen/code/imogen_lpjg.f` | 62,892 (REGRID=.TRUE.; NGPOINTS=62,892) | engine-side NN (in REGRID_CLIM helper) | @ 62,892 | Available; v1.1+ scope |
+| **δ-A** | Fortran (same as β/δ-B) | 3698 (REGRID=.TRUE.; NGPOINTS=3698) | engine-side NN to 3698 + post-process FastRegrid IDW for figures only | @ 3698 (NOT 62,892) | Available; v1.1+ scope |
+| **δ-B** ⭐ | Fortran (same as β/δ-A) | 3698 (REGRID=.TRUE.; NGPOINTS=3698) | engine-side NN to 3698 + external FastRegrid IDW to 62,892 | @ 62,892 | **v1.0 paper candidate (Fortran-engine pipeline; predecessor-architecture-matching)** |
+| **δ-B-variant** ⭐ | C++ port `climatemodel.cpp` (same as α; faithful Fortran translation per climatemodel.cpp:2) | 1631 (no engine-side regrid; native) | external FastRegrid IDW 1631 → 62,892 (skip 3698 intermediate; engine uses its native output grid) | @ 62,892 | **v1.0 paper candidate (C++-engine pipeline; rebuild-native engine validation)** |
+
+**v1.0 paper Track 2 production runs**: choose ONE of δ-B vs δ-B-variant at block 8.2.5 close (after side-by-side 4-cell smoke comparison). Both pipelines stay in repo as switchable infrastructure for v1.1+ post-paper development (e.g., live-coupling work uses C++ engine path; backport-fork-parity work uses Fortran engine path; either can serve as future paper sensitivity comparable). Per `notes/FOLLOWUPS.md` B57 (block 8.2.5 wiring) + NEW **B59** (δ-B-variant decision).
+
+**Naming convention for δ-B / δ-B-variant run directories** (from block 8.4 onward):
+
+| Pipeline | Trunk-T_seq run dir (cluster) | Engine-library subdir |
+|---|---|---|
+| δ-B (Fortran engine) | `forks/trunk_r13078_runs/integrated_tseq_<scenario>_wpeat_fortranengine/` | `Common-directory-fortranengine/IMOGEN/output_3698/<year>/` (raw) + `output_62892/<year>/` (post-FastRegrid) |
+| δ-B-variant (C++ engine) | `forks/trunk_r13078_runs/integrated_tseq_<scenario>_wpeat_cppengine/` | `Common-directory/IMOGEN/output/<year>/` (existing 1631 native) + `Common-directory/IMOGEN/output_62892_cppengine/<year>/` (post-FastRegrid) |
+
+This naming makes the engine implementation explicit in cluster file listings and `setup_run.sh` invocations.
+
 ## Layout
 
 ```

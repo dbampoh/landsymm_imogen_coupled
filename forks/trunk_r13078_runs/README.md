@@ -4,6 +4,12 @@
 
 **Purpose**: house the trunk-Track-2 T_seq `.ins` files + run-directory structure for v1.0 paper-publication Track 2 production runs per `notes/B47.md` §4. Sibling to `forks/trunk_r13078/` (the source tree imported at block 8.0.1 + minimally source-edited at block 8.0.2). This dual-sibling structure preserves the rebuild's primary fork (`lpjguess/` + `runs/`) untouched while keeping the trunk backport fork's source AND its run configurations clearly co-located + version-controlled.
 
+> **✅ SWITCHABLE-REGRID-STRATEGY NOTE (post-block-8.1.5; 2026-05-22)**: per `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 POST-BLOCK-8.1.5 ordering + `forks/README.md` "Switchable-regrid-strategy" section, v1.0 paper Track 2 production runs use one of two **switchable engine+regrid pipelines** (chosen at block 8.2.5 close based on side-by-side 4-cell smoke comparison; the other stays in repo as v1+ post-paper alternative):
+> - **δ-B (Fortran engine)**: `imogen/code/imogen_lpjg.f` @ 3698 → FastRegrid IDW → 62,892 → trunk-T_seq LPJG; **predecessor-architecture-matching**. Run directories: `integrated_tseq_<scenario>_wpeat_fortranengine/`.
+> - **δ-B-variant (C++ engine)**: `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` @ 1631 native → FastRegrid IDW → 62,892 → trunk-T_seq LPJG; **rebuild-native engine validation**. Run directories: `integrated_tseq_<scenario>_wpeat_cppengine/`.
+>
+> Block 8.4 will populate these `_fortranengine/` and `_cppengine/` run directories per SSP (hist + 5 SSPs × 2 engine pipelines = 12 total run dirs). Block 8.2.5 acceptance test runs both at 4-cell smoke + user picks one for paper cluster production. Per **NEW B59** filing in `notes/FOLLOWUPS.md`.
+
 ## Layout
 
 ```
@@ -38,6 +44,20 @@ forks/
     ├── SSP3-7.0/                        (planned)
     ├── SSP4-6.0/                        (planned)
     └── SSP5-8.5/                        (planned)
+
+    [Block 8.4 cluster-naming restructure (NEW post-block-8.1.5; per CLUSTER_SETUP §1 + B57 + B59):]
+    ├── integrated_tseq_hist_wpeat_fortranengine/        (δ-B Fortran-engine pipeline; hist)
+    ├── integrated_tseq_ssp126_wpeat_fortranengine/       (δ-B; SSP1-2.6 scenario)
+    ├── integrated_tseq_ssp245_wpeat_fortranengine/       (δ-B; SSP2-4.5)
+    ├── integrated_tseq_ssp370_wpeat_fortranengine/       (δ-B; SSP3-7.0)
+    ├── integrated_tseq_ssp460_wpeat_fortranengine/       (δ-B; SSP4-6.0)
+    ├── integrated_tseq_ssp585_wpeat_fortranengine/       (δ-B; SSP5-8.5)
+    ├── integrated_tseq_hist_wpeat_cppengine/             (δ-B-variant C++-engine pipeline; hist)
+    ├── integrated_tseq_ssp126_wpeat_cppengine/           (δ-B-variant; SSP1-2.6)
+    ├── integrated_tseq_ssp245_wpeat_cppengine/           (δ-B-variant; SSP2-4.5)
+    ├── integrated_tseq_ssp370_wpeat_cppengine/           (δ-B-variant; SSP3-7.0)
+    ├── integrated_tseq_ssp460_wpeat_cppengine/           (δ-B-variant; SSP4-6.0)
+    └── integrated_tseq_ssp585_wpeat_cppengine/           (δ-B-variant; SSP5-8.5)
 ```
 
 ## T_seq workflow (per `notes/B47.md` §4)

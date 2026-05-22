@@ -14,6 +14,36 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-22 (evening, session 10 day 1) — Block 8.1.5 cascade-gap-fill + NEW B59 δ-B-variant decision (C++-engine pipeline parallel to δ-B Fortran-engine pipeline as switchable infrastructure for v1.0 paper Track 2 production runs)
+
+Doc-only follow-up commit (ZERO source change; 8 in-tree doc surfaces touched). Two-part scope at this commit:
+
+**Part A — Block 8.1.5 cascade-gap-fill** (closes the 3 doc gaps from commit `184a5007` block 8.1.5 cascade; reflects session-10-day-1 review of cascade completeness flagged by user in session 10 prompt §13 due to Opus-4.6 model-downgrade during the block 8.1.5 close):
+
+- `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 **NEW POST-BLOCK-8.1.5 OPERATIONAL ORDERING subsection prepended above existing BLOCK 8.1 LANDED subsection** (preserves old POST-BLOCK-8.1 NEXT list verbatim per Rule #10 amendment-vs-rewrite corollary). The new ordering enumerates block 8.2 (engine library completion for 4 remaining SSPs; ~0.5 d wall) + block 8.2.5 (switchable-regrid-strategy wiring with BOTH δ-B + δ-B-variant; ~1.5-2 d) + block 8.3 (cluster end-to-end smoke; ~0.5 d; tag candidate `v0.23.0-cluster-trunk-tseq-smoke-complete`) + block 8.4 (production-config delta authoring with `_fortranengine` + `_cppengine` parallel naming convention; ~1-1.5 d) + blocks 8.5-8.7 (cluster MPI pre-flight + Track 1 baseline + intermediate-cell smoke; ~1-2 d) + sessions 9-11 (5 SSP-RCPs Track 2 cluster production runs on genius/256; ~5-15 hours cluster wall) + sessions 11-12 (validation triad Axes 1-4 + paper figures + Methods/Results/Discussion writing) + v1.0 GMD paper submission within ~5-10 week calendar. Naming convention table added (NEW): `integrated_tseq_<scenario>_wpeat_fortranengine/` for δ-B + `_cppengine/` for δ-B-variant; engine library subdirs use `Common-directory-fortranengine/IMOGEN/output_3698/…` + `output_62892/…` for δ-B vs `Common-directory/IMOGEN/output/…` (existing 1631 native) + `output_62892_cppengine/…` for δ-B-variant.
+
+- `forks/README.md` **NEW "Switchable-regrid-strategy for v1.0 paper production runs" section** added before "Layout" — 5-option summary table (α + β + δ-A + δ-B + δ-B-variant) + naming-convention table (`_fortranengine` + `_cppengine` suffix policy) + cross-references to block 8.1.5 findings + B57 + B59.
+
+- `forks/trunk_r13078_runs/README.md` **NEW ✅ SWITCHABLE-REGRID-STRATEGY NOTE banner** at top + layout-diagram addition showing the post-block-8.4 12-run-dir restructure (hist + 5 SSPs × 2 engine pipelines = 12 `integrated_tseq_…_wpeat_{fortranengine,cppengine}/` dirs).
+
+**Part B — NEW B59 δ-B-variant decision filing** (records the session-10-day-1 user direction at ~18:40-18:56 evening exchange):
+
+Per user direction: build BOTH **δ-B (Fortran engine via `imogen/code/imogen_lpjg.f` native @ 3698 → FastRegrid IDW → 62,892 → trunk-T_seq LPJG @ 62,892)** AND **δ-B-variant (C++ port via `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` native @ 1631 → FastRegrid IDW → 62,892 → trunk-T_seq LPJG @ 62,892)** pipelines at block 8.2.5 acceptance + side-by-side 4-cell smoke comparison + user picks ONE for paper main Track 2 cluster production based on smoke results + operational maneuverability for v1+ live-coupling trajectory. Unchosen pipeline stays in repo as v1+ post-paper switchable infrastructure (analogous to LEDGER §1.1 dual-fork policy applied here to engine-implementation pairing within switchable-regrid-strategy framework).
+
+**Critical clarification per user-question at session 10 day 1**: the C++ engine does NOT need source-edits to support δ-B-variant — FastRegrid handles all post-engine regridding externally; the dead `bool regrid` declaration at `climatemodel.cpp:261` + vestigial `NGPOINTS=3698` constant remain v1.1+ source-edit scope per B54 + B56 (independent of B59). The C++ engine produces its native 1631 output via existing `--engine-only-mode` (block 8.2 work; already done for SSP1-2.6); δ-B-variant just chains a FastRegrid IDW 1631→62,892 step (same FastRegrid as δ-B's 3698→62,892; different source-grid config).
+
+**Scientific value**: validates the C++ port against Fortran (per `climatemodel.cpp:2` self-description "fairly a direct translation of the original Fortran based IMOGEN"); near-identical smoke outputs → empirical equivalence demonstrated for paper claim; meaningful divergence → Rule #9 datapoint surfaces engine implementation difference worth investigating. Either outcome strengthens paper Methods §2.2 framing + the v1.1+ live-coupling trajectory (which uses C++ engine per F-12 Option A in-process).
+
+**Effort impact**: block 8.2.5 +3-4h analyst (1 additional FastRegrid config + 1 additional 4-cell δ-B-variant acceptance test); block 8.4 +2h (parallel `_fortranengine/` + `_cppengine/` .ins authoring); block 8.3 cluster smoke +0.5h (one extra smoke job for chosen pipeline); cluster production sessions 9-11 single run-set with chosen option only (no doubling of cluster wall). Total ~5-6h analyst + ~0.5h cluster wall extra — well within v1.0 ~5-10 week calendar.
+
+**Audit-item state matrix at this commit**: B53-B58 UNCHANGED from block 8.1.5; **B59 ⏳ NEW filed** at this commit; F-rows UNCHANGED.
+
+**Cumulative T_seq Installment-1 source-edit UNCHANGED at ~297 LOC** (block 8.1.5 was doc-only; this commit is also doc-only; cumulative includes block 8.1's `scripts/cluster/env_owl.sh` 20 LOC). Installment-2 UNCHANGED at ~2900-3100 LOC; rebuild→LANDSYMM_LPJ-GUESS-upstream UNCHANGED at +145 LOC. Per Rule #10 amendment-vs-rewrite corollary, all prior framings preserved verbatim; this entry layers on top.
+
+**8 in-tree doc surfaces touched**: notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md §1 + forks/README.md + forks/trunk_r13078_runs/README.md + notes/FOLLOWUPS.md (dashboard top + NEW B59 row) + CHANGELOG.md (this entry) + notes/TRUNK_R13078_BACKPORT_LEDGER.md §3 (small DOC-trunk-irrelevant entry) + notes/STEP_17c.md §1.7.8 (small update) + EXECUTION_PLAN.md row 17c (small status update).
+
+Rule #10 datapoint #21 (honest cascade-gap-fill + honest framing of Opus-4.6-downgrade-truncation issue per user prompt §13 flag + no goalpost-shifting on δ-B vs δ-B-variant scope; per Rule #10 amendment-vs-rewrite corollary the prior block-8.1.5 cascade is preserved verbatim while this commit layers on top). v1.0 % done UNCHANGED at ~96-98%; calendar UNCHANGED at ~5-10 weeks. **No tag at this commit** (operational doc-cleanup + audit-row filing milestone; block 8.1.5 tag-candidacy retains its doc-only-architectural-clarification disposition). 3-remote convergence pending at this commit.
+
 ### 2026-05-22 (afternoon, session 9 day 3) — Block 8.1.5 architectural clarification: IMOGEN engine identity + REGRID semantics + switchable-regrid-strategy (β/δ-A/δ-B)
 
 Doc-only follow-up commit (ZERO source change); 10 doc-cascade surfaces + 1 comprehensive findings .md at `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md` (390 LOC; 18 sections; canonical single-source-of-truth for this investigation). Triggered by user's "don't we need to run IMOGEN on cluster too?" question at session 9 day 2 late evening; systematic investigation (I-1 to I-6 + C1 + C2) revealed:

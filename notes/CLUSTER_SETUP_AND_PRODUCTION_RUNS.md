@@ -149,6 +149,44 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
+### ✅ BLOCK 8.1.5 LANDED + POST-BLOCK-8.1.5 OPERATIONAL ORDERING (2026-05-22 afternoon session 9 day 3 + session 10 day 1 cascade-gap-fill)
+
+**Block 8.1.5 architectural clarification ✅ DONE** at commit `184a5007` (2026-05-22 ~16:54). Systematic investigation (I-1 to I-6 + C1 + C2; 8 items) triggered by user's "don't we need to run IMOGEN on cluster too?" question revealed: (1) **v1.0 production-IMOGEN engine = C++ port `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` via `-input imogencfx`** (NOT standalone Fortran as some project docs implied; doc drift filed as B53); (2) **REGRID is DEAD CODE in C++ port** (B3 forensic 2026-05-12; engine always outputs 1631-point native grid); (3) **predecessor architecture = IMOGEN@3698 (Fortran REGRID) + LPJG@62892**; (4) **Fortran standalone engine ALREADY BUILT + OPERATIONAL** (binary May 17 2026; ALLOCATABLE NGPOINTS per STEP_3); (5) **FastRegrid version_B = production-grade** (IDW + Haversine + variable-agnostic; climate-var extension = ~5 LOC). **Switchable-regrid-strategy adopted**: β + δ-A + δ-B as interchangeable alternatives sharing same infrastructure. **6 NEW B-rows filed** (B53-B58). Full evidence: `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md` (390 LOC; 18 sections).
+
+**Session 10 day 1 cascade-gap-fill + NEW B59 δ-B-variant decision (2026-05-22 evening)**: Block 8.1.5 commit `184a5007` left this §1 operational ordering partially out-of-sync with the new block-plan reality (§1 still jumped block 8.1 → 8.3 without 8.2 + 8.2.5). This sub-banner fills that cascade gap + records the **NEW B59 δ-B-variant decision** per user direction at session 10 day 1 ~18:40-18:56: build BOTH δ-B (Fortran engine) AND δ-B-variant (C++ engine via `climatemodel.cpp`) pipelines at block 8.2.5 acceptance, then choose ONE for v1.0 paper Track 2 cluster production runs based on smoke comparison + operational maneuverability for v1+ live-coupling trajectory.
+
+**POST-BLOCK-8.1.5 + B59 OPERATIONAL ORDERING** (supersedes POST-BLOCK-8.1 NEXT below):
+
+- **Block 8.2 engine library completion** (~0.5 d wall on workstation; ~40 min if 4-way parallelized in terminal tabs) — produce C++ engine libraries (`--engine-only-mode`) for the 4 remaining SSPs (SSP2-4.5, SSP3-7.0, SSP4-6.0, SSP5-8.5; SSP1-2.6 already done at B44/B47). Outputs 5 × ~443 MB libraries at `runs/<SSP>/Common-directory/IMOGEN/output/<year>/`. These C++ engine libraries feed **δ-B-variant** directly + provide an Option α baseline-set if needed for sensitivity studies.
+- **Block 8.2.5 switchable-regrid-strategy wiring** (~1.5-2 d focused work) — BOTH pipelines built + 4-cell smoke acceptance tested:
+  - **δ-B (Fortran engine; predecessor architecture)**: align `imogen/code/imogen_settings.txt` (REGRID=.TRUE., NGPOINTS=3698, B39 init values 296.1/875.6/277.4, adapter input paths) + clone `version_B/FastRegrid/` into `tools/FastRegrid/` + extend `FastRegrid.cpp:66 file_types` vector for all 10 climate variables (~5 LOC) + Fortran-engine@3698 smoke + FastRegrid IDW 3698→62,892 smoke + 4-cell end-to-end δ-B acceptance test
+  - **δ-B-variant (C++ engine; rebuild-native engine)**: reuse Block 8.2's C++ engine library at 1631 native + run FastRegrid IDW 1631→62,892 (same FastRegrid; different source-grid config) + 4-cell end-to-end δ-B-variant acceptance test on existing SSP1-2.6 1631-grid library
+  - **Block 8.2.5 close acceptance comparison**: side-by-side 4-cell ecosystem outputs from δ-B vs δ-B-variant → user picks ONE for paper main Track 2 (likely based on operational preference; unchosen path's plumbing preserved as v1+ alternative)
+- **Block 8.3 cluster end-to-end smoke test** (~0.5 d) — first actual cluster runtime test: SCP chosen-option's engine library (raw or post-FastRegrid 62,892) workstation → cluster + run `forks/trunk_r13078/build_owl/guess -input imogencfx main.ins` on `owl` smoke gridlist; expected ~1-2 hours wall on genius/256; tag candidate `v0.23.0-cluster-trunk-tseq-smoke-complete`
+- **Block 8.4 production-config delta authoring** (~1-1.5 d) — author cluster `main_hist.ins` + `main_scen.ins` templates per SSP mirroring user's canonical wpeat .ins-config pattern (per `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/integrated-4.1-ins2_landsymm_{hist,ssp126,ssp245,ssp370,ssp460,ssp585}_wpeat/main.ins` reference with `cfx → imogencfx` swap + `skip_inprocess_engine_run 1` + add `imogen_intermediary.ins` to extra .ins set + chosen-option's engine-library climate substitution); restructure `forks/trunk_r13078_runs/` to mirror cluster naming convention with engine-tag suffix per **NEW naming convention** = `integrated_tseq_<scenario>_wpeat_fortranengine/` (for δ-B; Fortran-engine pipeline) + `integrated_tseq_<scenario>_wpeat_cppengine/` (for δ-B-variant; C++-engine pipeline; v1+ plumbing reserved even if unchosen for paper); update `scripts/cluster/setup_run.sh` + `run_coupled.sbatch` for T_seq retargeting (per agenda §3.1+3.2+3.4 reconciliation points); adopt the newer site-wide orchestrator improvements (per agenda §3.6); 4-LOC `/bg/home → /bg/data/lpj/work` path-translation case-add in `scripts/cluster/setup_run.sh:113-123` (per agenda §3.4 D4)
+- **Block 8.5 cluster MPI pre-flight** (~0.5 d) — verify chosen-option's trunk-T_seq runs with MPI on `owl` genius/256
+- **Block 8.6 Track 1 baseline cluster runs** (~0.5-1 d) — Track 1 (`-input cfx` + ISIMIP3b MRI-ESM2-0 climate) for all 5 SSPs as Axis 4 validation comparison baseline
+- **Block 8.7 (optional) intermediate-cell production smoke** (~0.5 d) — confidence-builder before full 62538-cell launch
+- **Sessions 9-11 Track 2 cluster production runs** — 5 SSP-RCPs × 62538 cells × 1900-2100 on genius/256; ~5-15 hours total cluster wall (estimated; user note "cluster is always in use" → check availability before allocating + use milan/cclake fallback if genius busy); single run-set with chosen δ-B or δ-B-variant
+- **Sessions 11-12 validation triad** (Axes 1-4 per `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1) + paper figures + Methods/Results/Discussion writing
+- **v1.0 GMD paper submission** — target ~5-10 weeks calendar from block 8.1.5 close (block 8.2.5 adds ~1.5-2 d vs prior α-only ~0 d; still within budget)
+
+**Naming convention summary (NEW; per block 8.4 onward)**:
+
+| Component | δ-B (Fortran engine pipeline) | δ-B-variant (C++ engine pipeline) |
+|---|---|---|
+| Engine source | `imogen/code/imogen_lpjg.f` | `lpjguess/modules/climatemodel.cpp::RUN_IMOGEN_ENGINE()` |
+| Engine binary path | `imogen/code/imogen_lpjg` | `lpjguess/build/guess --engine-only-mode` (via `scripts/run_coupled.sh`) |
+| Engine native output grid | 3698 (REGRID=.TRUE.; NGPOINTS=3698) | 1631 (REGRID is dead code; always native) |
+| Engine library directory | `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_3698/<year>/` (raw) + `output_62892/<year>/` (post-FastRegrid) | `runs/<SSP>/Common-directory/IMOGEN/output/<year>/` (existing 1631 native) + `runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/<year>/` (post-FastRegrid) |
+| Trunk-T_seq run directory (cluster) | `forks/trunk_r13078_runs/integrated_tseq_<scenario>_wpeat_fortranengine/` | `forks/trunk_r13078_runs/integrated_tseq_<scenario>_wpeat_cppengine/` |
+| FastRegrid invocation | 3698 → 62,892 IDW (Haversine; power=2; max_points=5; radius=100 km) | 1631 → 62,892 IDW (same params; different source grid) |
+| Climate resolution at LPJG | 3698 source IDW-interpolated to 62,892 | 1631 source IDW-interpolated to 62,892 |
+| Predecessor parity (architectural) | ✅ Match | ❌ Different engine source grid (1631 vs predecessor's 3698) |
+| C++/Fortran engine cross-validation | Reference | Variant — useful for v1+ live-coupling (which uses C++ engine) |
+
+Block 8.2.5 acceptance close decides which pipeline becomes Track 2 paper production. Both stay in repo as switchable infrastructure for v1+ post-paper development.
+
 ### ✅ BLOCK 8.1 LANDED status update (2026-05-21 evening session 9 day 2 close)
 
 **Block 8.1 cluster reconnaissance under T_seq retargeting ✅ FULLY COMPLETE** at this close. All 5 acceptance gates G0-G4 PASS via 7 rounds of iterative SSH paste-back + local mirror rsync of `/bg/data/lpj/bampoh-d/landsymm_imogen_runs/` to `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/` (121 MB; canonical reference for meticulous direct-file inspection per Rule #11 + #13).
