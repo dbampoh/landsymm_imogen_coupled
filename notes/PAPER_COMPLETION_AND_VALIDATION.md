@@ -257,6 +257,10 @@ paper/
 
 The `paper/` subdir in the rebuild repo is currently empty (only `README.md`); populating it is part of paper-stage work + happens incrementally as the validation triad + figure generation + manuscript revisions proceed. Each addition gets its own commit + brief CHANGELOG entry.
 
+### 4.5.1 Block 8.1.5 addendum — engine identity + regrid-strategy clarification for Paper Methods §2.2 (2026-05-22 session 9 day 3)
+
+> **✅ ENGINE IDENTITY + REGRID-STRATEGY ADDENDUM**: per block 8.1.5 findings (§1+§12+§13 of `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md`), the v1.0 paper Methods §2.2 SHOULD explicitly note: (1) the IMOGEN engine implementation used is the C++ port embedded in LPJ-GUESS (`climatemodel.cpp::RUN_IMOGEN_ENGINE()`), which produces climate on IMOGEN's native 1631-point pattern grid; (2) for v1.0 production runs, the **Option δ-B switchable-regrid-strategy** uses the standalone Fortran IMOGEN with `REGRID=TRUE` + `NGPOINTS=3698` to produce 3698-grid climate, which is then regridded to the full 62892-cell LPJG gridlist via FastRegrid (inverse-distance-weighted interpolation) — matching the predecessor coupled-model architecture for apples-to-apples Axis 4 validation; (3) the v1.1+ trajectory includes porting the REGRID branch to the C++ port (and optionally switching to the IMOGENCXX C++ engine backport per B52) for a unified in-process architecture. **Also** add a sentence in the Discussion §5 v1.1+ outlook on the IMOGENCXX C++ backport (B52) + switchable-regrid-strategy (β/δ-A/δ-B) as future work extending the coupling framework.
+
 ### 4.5 Paper Methods §2.2 draft text — v1.0 prescribed-mode coupling architecture (drafted at session 8.0.3 follow-up; 2026-05-20 ~7:12 PM)
 
 **Status**: ⏳ DRAFT — authored at session 8.0.3 follow-up exchange in conversation with user; deposited here for sessions 11-12 paper-writing phase to pick up + refine. Per Rule #10 amendment-vs-rewrite corollary, this draft text is the cumulative refinement post §1.4 HYBRID-PRE-BAKED ARCHITECTURE CLARIFICATION + .ins-config-alignment refinement (both 2026-05-20 same exchange).

@@ -14,6 +14,23 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-22 (afternoon, session 9 day 3) — Block 8.1.5 architectural clarification: IMOGEN engine identity + REGRID semantics + switchable-regrid-strategy (β/δ-A/δ-B)
+
+Doc-only follow-up commit (ZERO source change); 10 doc-cascade surfaces + 1 comprehensive findings .md at `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md` (390 LOC; 18 sections; canonical single-source-of-truth for this investigation). Triggered by user's "don't we need to run IMOGEN on cluster too?" question at session 9 day 2 late evening; systematic investigation (I-1 to I-6 + C1 + C2) revealed:
+
+- **Corrected engine identity**: v1.0 production-IMOGEN = C++ `climatemodel.cpp::RUN_IMOGEN_ENGINE()` via `-input imogencfx` (5 independent evidence chains per findings §1); NOT standalone Fortran
+- **REGRID DEAD CODE in C++ port**: Fortran REGRID_CLIM never ported; C++ outputs 1631-point native grid only (B3 forensic 2026-05-12)
+- **Predecessor architecture = IMOGEN@3698 + LPJG@62892**: current C++ engine@1631 + in-consumer NN-match departs from predecessor
+- **Switchable-regrid-strategy adopted**: β + δ-A + δ-B as interchangeable alternatives; **Option δ-B = v1.0 expedited path** (predecessor-matching; ~1.5-2 d; all components operational)
+- **Fortran engine ALREADY OPERATIONAL**: binary May 17 2026; ALLOCATABLE NGPOINTS; adapter outputs compatible; zero source-edit needed
+- **FastRegrid version_B = production-grade**: full IDW + Haversine; variable-agnostic `regrid_file()`; climate-var extension = ~5 LOC
+- **version_B confirmed more up-to-date** than version_A (preferred reference order B-first-then-A)
+- **Doc drift detected**: scientific_framework.md + STEP_17b vs PRODUCTION_RUN_CONFIG + B47 → filed B53
+- **6 NEW B-rows filed**: B53 (doc drift), B54 (NGPOINTS vestigial), B55 (version_B canonical), B56 (REGRID defensive warning), B57 (switchable-regrid-strategy wiring), B58 (engine-on-cluster v1.1+)
+- **Block plan revised**: NEW block 8.2.5 (Option δ-B wiring; ~1.5-2 d) inserted between block 8.2 + block 8.3
+
+Rule #10 datapoints #19+#20. v1.0 % done UNCHANGED at ~96-98%; calendar updated ~5-10 weeks (block 8.2.5 adds ~1.5-2 d). Session 10 prompt updated.
+
 ### 2026-05-21 (evening, session 9 day 2 close) — Block 8.1 ✅ DONE — Cluster reconnaissance under T_seq retargeting fully complete: all 5 acceptance gates G0-G4 PASS; KIT IMK-IFU `owl` ready for T_seq Track 2 production runs at canonical resource allocation `genius × 2 nodes × 128 CPUs/node = 256 ranks × 3-day walltime`
 
 Block 8.1 close commit on `main` working branch directly (matching post-window-close commit pattern); 8 in-tree doc surfaces touched (1 source-edit `scripts/cluster/env_owl.sh` populated with canonical module loads + 7 doc updates: FOLLOWUPS top-of-dashboard + NEW B52 row + CHANGELOG (this entry) + EXECUTION_PLAN row 17c + STEP_17c §1.7.8 prepend + CLUSTER_SETUP §1 block 8.1 LANDED + TRUNK_R13078_BACKPORT_LEDGER §3 NEW entry + small notes/PRODUCTION_RUN_CONFIG.md §3.1 ndep+popdens local-path correction) + 1 sibling Part 13 of session5_post_b19 handoff + comprehensive audit-evidence bundle at `_chat_artifacts/b8_1_cluster_reconnaissance_2026-05-21/` (10 files; 2328 LOC; 162 KB; rsync'd canonical reference mirror at `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/` 121 MB for meticulous documentation accuracy per Rule #11). **No tag at this commit** (operational reconnaissance milestone; tag candidate `v0.23.0-cluster-trunk-tseq-smoke-complete` reserved for block 8.3 cluster end-to-end smoke test ✅ PASS — first actual cluster runtime test). 3-remote-converge pending at this commit.
