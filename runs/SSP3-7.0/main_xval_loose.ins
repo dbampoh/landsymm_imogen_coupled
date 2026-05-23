@@ -1,0 +1,192 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+! Step 17a (F-12 sub-milestone C1.2 cross-validation) — Loose-mode .ins for
+! year_outer cross-validation
+!
+! This .ins file is used by the cross-validation harness at
+! scripts/cross_validate_year_outer.sh. It runs LPJ-GUESS with `-input imogen`
+! (LOOSE-coupling input module; ImogenInput) against pre-staged engine
+! climate at runs/SSP3-7.0/Common-directory/IMOGEN/output/<YYYY>/.
+!
+! Cross-validation pattern: 2 runs with identical inputs except
+! framework_loop_mode:
+!   Run A: framework_loop_mode "gridcell_outer" (existing trusted baseline)
+!   Run B: framework_loop_mode "year_outer"     (new additive code path; C1.1)
+! Compared bit-exactly per the spinup_year_idx formula reproduction
+! (per notes/STEP_17a.md §5.4 + §7.2; per FOLLOWUPS F-12).
+!
+! The harness sets framework_loop_mode by writing a small wrapper .ins
+! that imports this file + adds the framework_loop_mode override.
+! file_gridlist is also overridden by the harness per smoke-test stage
+! (1-cell first, then 4-cell).
+!
+! IMPORTANT: this .ins is intended to be loaded with cwd =
+! runs/SSP3-7.0/Common-directory/ so that the relative file_temp etc.
+! paths resolve to the staged engine climate. Absolute paths are used
+! for non-climate inputs (gridlist, soildata) so cwd doesn't matter for
+! those.
+!
+! - Daniel Bampoh, 2026-05-10 (step 17a C1.2 of unified-codebase rebuild)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard PFT definitions + run config
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports landcover.ins itself)
+import "crop_n.ins"
+
+! Wetland PFTs
+import "wetlandpfts.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Smoke-test overrides — these REPLACE values set in global.ins / imported files
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Smoke gridlist: harness will override file_gridlist below to either
+! gridlist_test1.txt (1-cell smoke; bypasses cell-ordering complexity) or
+! gridlist_test2.txt (4-cell smoke; tests spinup_year_idx formula).
+! Default here is the 4-cell variant; harness overrides for 1-cell run.
+! ABSOLUTE PATHS (not affected by cwd).
+param "file_gridlist"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+param "file_gridlist_cf"  (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/gridlist/gridlist_test2.txt")
+
+! Soil map (Tier-1 committed data) — ABSOLUTE PATH
+param "file_soildata"     (str "/home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/data/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition: empty -> LPJG uses pre-industrial constant 2 kgN/ha/yr.
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP70")
+
+! Climate forcing files (relative to cwd; cwd MUST be
+! runs/SSP3-7.0/Common-directory/ for these to resolve).
+param "file_temp"         (str "./IMOGEN/output/YYYY/T_anom.dat")
+param "file_prec"         (str "./IMOGEN/output/YYYY/P_anom.dat")
+param "file_insol"        (str "./IMOGEN/output/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "./IMOGEN/output/YYYY/WET.dat")
+param "file_dtr"          (str "./IMOGEN/output/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "./IMOGEN/output/YYYY/CO2.dat")
+
+! [Step 17b (B4): IMOGEN-engine Rh / wind / Tmin / Tmax outputs. Mirrors
+!  main_xval_imogencfx.ins lines 96-99. All four pre-staged files exist
+!  in Common-directory/IMOGEN/output/YYYY/ (verified 2026-05-12 ahead of
+!  B4 land; sizes 246281 B each at YYYY=1871). file_tmin/file_tmax are
+!  available post-B2 (Fortran engine, commit `76b3b04`); file_relhum/
+!  file_wind are B1-pending in the Fortran engine but the pre-staged
+!  predecessor data fills the gap for the xval window. Empty value
+!  (no path set) is also a valid configuration; B4's read pipeline
+!  guards each path with `if ((char*)file_* != NULL && file_* != "")`.
+!  - DKB 2026-05-12]
+param "file_relhum"       (str "./IMOGEN/output/YYYY/Rh_anom.dat")
+param "file_wind"         (str "./IMOGEN/output/YYYY/W_anom.dat")
+param "file_tmin"         (str "./IMOGEN/output/YYYY/Tmin_anom.dat")
+param "file_tmax"         (str "./IMOGEN/output/YYYY/Tmax_anom.dat")
+
+! ImogenInput-specific tuning. searchradius (climate) is 50 = generous so
+! ImogenInput's IDWC nearest-neighbour search succeeds against the engine's
+! native 1631-cell grid for whatever LPJG cells we ask for.
+! searchradius_soil is the SoilInput counterpart (per soilinput.h:32) which
+! enables nearest-cell lookup in the 62892-cell soilmap when the requested
+! cell isn't an exact match. Necessary because IMOGEN's 3.75° x 2.5° HadCM3
+! grid + LPJG's 0.5° soilmap grid have NO exact intersections.
+! NOTE: searchradius is declared as a class-member param (custom-param
+! table syntax `param "X" (num Y)`); searchradius_soil is declared via
+! declare_parameter as a global plib item (bare-global syntax "X Y").
+param "searchradius" (num 50)
+searchradius_soil    50
+
+! [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.1) of unified-codebase
+!  rebuild (2026-05-10 evening): MULTI-CELL CROSS-VALIDATION CONFIG.
+!
+!  Tests the spinup_year_idx state-machine reproduction formula
+!    spinup_year_idx_for_this = (cell_idx * nyear_spinup + year_idx) % NYEAR_SPINUP
+!  across BOTH cell_idx > 0 AND year_idx > 0 branches.
+!
+!  PREREQUISITE: engine writer fix landed (climatemodel.cpp lines ~884,
+!  ~963, ~787, ~988, ~998 unconditional OPEN/CLOSE per IYEAR iteration;
+!  fixes the alternating-year staged climate quirk so EVEN years now have
+!  full climate too). Without that fix, EVEN imogen_years 1872, 1874, etc.
+!  would have only `done` markers; preload would fail with
+!  "could not open ./IMOGEN/output/1872/T_anom.dat".
+!
+!  CONFIG RATIONALE:
+!  - nyear_spinup=2: 2 spinup years per cell (year_idx 0 and 1) — exercises
+!    the formula's year_idx>0 branch alongside cell_idx>0.
+!  - lasthistyear=1879: gives ImogenInput's cache size
+!      nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1 = 1879 - 1871 + 1 = 9
+!    Sufficient to hold the maximum number of distinct imogen_year values
+!    needed across the simulation:
+!      Cell 0 spinup_year_idx=0,1 -> imogen_year 1871, 1872
+!      Cell 1 spinup_year_idx=0,1 -> imogen_year 1873, 1874
+!      Cell 2 spinup_year_idx=0,1 -> imogen_year 1875, 1876
+!      Cell 3 spinup_year_idx=0,1 -> imogen_year 1877, 1878
+!      All cells historical years 1871..1879 -> imogen_year 1871..1879
+!    Union: {1871, 1872, 1873, 1874, 1875, 1876, 1877, 1878, 1879} = 9 distinct.
+!    Without sufficient nyears, the existing getclimate's
+!    `stored_years[store_index] = imogen_year` triggers an OOB write
+!    (latent bug; std::vector::operator[] no bounds check; UB / segfault).
+!
+!  - firsthistyear=1871: simulation 9 historical years 1871-1879.
+!  - firstoutyear/lastoutyear=1871/1879: write LPJG output for all 9 years.
+!
+!  Net simulation per cell: 2 spinup + 9 historical = 11 years.
+!  Total: 4 cells × 11 years = 44 cell-year iterations per run.
+!
+!  Both Run A (gridcell_outer; existing per-cell getclimate driver) and
+!  Run B (year_outer; preload_all_climate + getclimate_for_year) should
+!  produce bit-identical .out files per per-cell-year (cell, year) data.
+!  - DKB 2026-05-10]
+nyear_spinup        2              ! 2 spinup years per cell (exercises year_idx 0..1 branches of formula)
+freenyears          0              ! 0 N-free spinup years; validator: freenyears < nyear_spinup ✓ (0 < 2)
+
+! Year-range parameters. Set BOTH the bare-global syntax (which framework.cpp
+! reads via the global firsthistyear/lasthistyear ints) AND the custom-param
+! syntax (which ImogenInput::init() reads via param["firsthistyear"].num at
+! imogen_input.cpp:304). Both must be set for ImogenInput to work.
+firsthistyear       1871
+lasthistyear        1879              ! 9 historical years (1871-1879); cache nyears=9 per the §17a sub-step 7.3.1 sizing analysis above
+firstoutyear        1871
+lastoutyear         1879
+
+param "firsthistyear" (num 1871)
+param "lasthistyear"  (num 1879)
+
+firemodel           "NOFIRE"       ! Avoid BLAZE wind/RH dependency
+run_landcover       0              ! Disabled for cross-validation (LU files Tier-3)
+npatch              1              ! Single patch for smoke speed
+
+! [B12 FIX 2026-05-11 (session 3): ifcalcsla and ifcalccton MUST be 1 (LPJ-GUESS
+!  default) so initsla() and init_cton_min() are called for each PFT during
+!  parameters.cpp::CB_CHECKPFT (lines 2327-2337). Previously these were set to 0
+!  to mean "use values from .ins"; but at parameters.cpp:2345, init_cton_limits()
+!  is called UNCONDITIONALLY and propagates cton_leaf_min through cton_leaf_max,
+!  cton_root_max, cton_sap_max via avg_cton(). With ifcalccton=0 and PFTs that
+!  don't override cton_leaf_min in .ins (e.g., TeBE in global.ins), cton_leaf_min
+!  stays at 0 (default), and the cascade gives cton_sap_max = cton_root_max =
+!  cton_*_avr = 0. For new individuals with cmass_sap=nmass_sap=0, cton_sap()
+!  returns pft.cton_sap_max=0. Then in respiration() at canexch.cpp:2494:
+!    resp_sap = respcoeff * K * cmass_sap / cton_sap * gtemp_air
+!             = respcoeff * K * 0 / 0 * gtemp_air     ← 0/0 = NaN
+!  resp = NaN → indiv.dnpp = NaN → indiv.anpp = NaN → cmass_* = NaN at year-end
+!  growth() → ESTC debit = NaN at growth.cpp:1524 → NaN cascades to all .out
+!  files. This was the substantively-validation NaN found 2026-05-11; full
+!  forensic chain documented in notes/STEP_17b.md §3a.7 + §3a.7.4b.
+!  Verified empirically: with ifcalccton=1 + ifcalcsla=1, ALL 37 .out files
+!  produce non-NaN sensible values (NEE around -0.8 → -10 kgN/ha/yr; vegetation
+!  establishes Year 2; soil C builds up).
+!  - Daniel Bampoh, 2026-05-11 evening session 3 B12 resolution]
+ifcalcsla           1              ! REQUIRED: enable initsla() per PFT
+ifcalccton          1              ! REQUIRED: enable init_cton_min() per PFT
+
+! framework_loop_mode: harness writes a wrapper .ins that imports this
+! file + adds the override. Default here is gridcell_outer (the
+! existing baseline) so this .ins works standalone if invoked directly.
+!
+! [B15 FIX 2026-05-12 (session 3): MUST use bare plib syntax (NOT param
+!  "framework_loop_mode" (str "...")) because framework_loop_mode is bound
+!  via declare_parameter (imogen_input.cpp:214 + imogencfx.cpp:353) to the
+!  C++ xtring IMOGENConfig::framework_loop_mode that framework.cpp:464
+!  reads. See notes/STEP_17c.md §0 (audit item B15) for full forensic + parallel comment
+!  block in main_xval_imogencfx.ins.]
+framework_loop_mode "gridcell_outer"
+
+! Output directory: harness sets cwd to a per-run dir; outputs go there.
+outputdirectory "./"

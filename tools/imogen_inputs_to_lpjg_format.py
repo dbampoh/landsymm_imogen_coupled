@@ -125,9 +125,23 @@ SANITY_RANGES = {
     # negative-emissions technologies (BECCS, DACCS) in late 21st century;
     # SSP1-2.6 in particular can dip to ~-6 GtCO2/yr by 2080-2100
     # per RCMIP. Allow generous range. - DKB step 13 of unified rebuild
-    "CO2_EFOS_Mt":   (-50000.0,  100000.0), # pre-ind 0; modern ~37000; SSP1-2.6 future may be neg
-    "CO2_NEE_Mt":    (-50000.0,  50000.0),  # NEE can be either sign
-    "CO2_total_Mt":  (-50000.0, 100000.0),
+    #
+    # [Block 8.2 update 2026-05-22 session 10 day 1; Rule #9 datapoint #18]:
+    # SSP5-8.5 peak CO2_EFOS_Mt ~131000 Mt CO2/yr (~131 GtCO2/yr around 2090)
+    # exceeds the original 100,000 upper bound — physically plausible per
+    # Friedlingstein 2025 GCB + IPCC AR6 WG3 SSP5-8.5 peak range
+    # (~120-140 GtCO2/yr). Original bound was calibrated for moderate
+    # scenarios at script-authoring time + never tested at SSP5-8.5 because
+    # SSP5-8.5 intermediary_py outputs hadn't been produced yet at step 13.
+    # Bumped upper bounds for CO2_EFOS_Mt + CO2_total_Mt from 100,000 to
+    # 200,000 Mt CO2/yr (= 200 GtCO2/yr); generous margin for SSP5-8.5
+    # peak + future-scenario extensions while still flagging 1000x-error
+    # outliers (e.g., unit conversion bug). CO2_NEE_Mt unchanged (max
+    # ~8500 for SSP5-8.5; within bound). All CH4/N2O columns unchanged
+    # (within their existing bounds across all 5 SSPs).
+    "CO2_EFOS_Mt":   (-50000.0,  200000.0), # pre-ind 0; modern ~37000; SSP5-8.5 peak ~131000 (Friedlingstein 2025 GCB); SSP1-2.6 future may be neg
+    "CO2_NEE_Mt":    (-50000.0,  50000.0),  # NEE can be either sign; SSP5-8.5 max ~8500 within bound
+    "CO2_total_Mt":  (-50000.0, 200000.0),  # SSP5-8.5 peak ~127000 (= EFOS + NEE composite); bumped to match
 }
 
 

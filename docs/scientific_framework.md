@@ -1,7 +1,10 @@
 # Scientific framework — LandSyMM-IMOGEN coupled model
 
-**Version:** v0.15.0 (created at step 15 of the unified-codebase rebuild,
-2026-05-08).
+**Version:** v0.15.0 (created at step 15 of the unified-codebase rebuild, 2026-05-08; **POST-BLOCK-8.2 climatemodel.cpp fork-divergence clarification banner added 2026-05-23 session 10 day 1 close**).
+
+> **POST-BLOCK-8.2 fork-divergence clarification banner** (per NEW **B61** + **Rule #10 datapoint #23** filing 2026-05-23 session 10 day 1 close):
+>
+> At v1.0 paper publication, the C++ IMOGEN engine is implemented at **`lpjguess/modules/climatemodel.cpp`** (rebuild's improved version with step-7 polling guards + step-8 imogenoutput integration + step-9.5 Tmin/Tmax/Rh/W writers + step-17a engine writer fix + step-17a skip_inprocess_engine_run + B19/B37/B39/B44/B45 deltas). The **trunk-T_seq LPJG-consumer fork** at `forks/trunk_r13078/modules/climatemodel.cpp` has a pre-rebuild-deltas baseline version (~263 LOC behind lpjguess's per B61; imported at block 8.0.1 from version_A/.../trunk_r13078/). Per **T_seq design (`notes/B47.md` §4)**, the rebuild's improved engine produces the per-SSP climate library at `runs/<SSP>/Common-directory/IMOGEN/output/`; that library is physically cp'd to `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/` (γ-physical separation per session 10 day 1 user direction); the trunk-T_seq LPJG then consumes the pre-baked library on cluster as a pure consumer (skip_inprocess_engine_run=1; engine bypassed; LPJG main loop runs in sequential-standalone mode). v1+ Installment-2 backport (post-paper Backport Sprint per LEDGER §1.2) will forward-port rebuild's climatemodel.cpp deltas to trunk's fork so the two forks' engines become functionally equivalent + trunk's binary's own engine becomes usable for separate v1.1+ runs (deferred per NEW B61). The v1.0 architectural documentation below describes the **rebuild's C++ engine architecture** (lpjguess/modules/) which is the operational engine of record at v1.0 paper publication. See `_chat_artifacts/b8_2_engine_libraries_2026-05-22/B8_2_engine_libraries_evaluation_2026-05-22.md` §1.7 + §3 for full evidence + corrected accounting.
 
 **Purpose:** Document the scientific architecture of the LandSyMM-IMOGEN-LPJG
 coupled model framework — what each component does, how they interact, and how

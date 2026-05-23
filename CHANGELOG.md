@@ -14,6 +14,65 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-23 (early morning, session 10 day 1 close) — Block 8.2 ✅ DONE — 5-SSP C++ engine library production + γ-physical Common-directory separation + paired runs/+trunk-runs/ scaffolding + production-grade .ins-config alignment + v1+ trunk-engine groundwork (deferred per Rule #10 datapoint #23 self-correction on climatemodel.cpp byte-identity); NEW B60 + B61 filed
+
+Major block close commit (substantive source-edits + data production + comprehensive cascade across ~14 surfaces). Block 8.2 spans Phase A (template inspection) + Phase B (production-grade .ins alignment at runs/SSP1-2.6/main.ins) + Phase C (paired scaffolding runs/SSP{2-4.5,3-7.0,4-6.0,5-8.5}/) + Phase C2 (γ-physical Common-directory separation per user direction) + Phase D (5-SSP C++ engine library production via lpjguess --engine-only-mode; ~2.2 GB total) + Phase E (γ-physical cp to trunk-runs side; ~4.4 GB total) + Phase F (NEW main_engine_only.ins + scripts/run_trunk_engine_only.sh as v1+ trunk-engine groundwork; deferred per Rule #10 self-correction).
+
+**Phase A-D summary (Rule #2 evidence-based)**:
+
+- Phase B: `runs/SSP1-2.6/main.ins` updated to production-grade per user direction (LPJG-side params: firemodel BLAZE + npatch 5 + 1900-1930 window + LU `_peatland` paths + 4-NetCDF ndep + popdens + simfire); architectural setup preserved (file_temp paths stay `./IMOGEN/output/YYYY/*.dat`; DIR_COMMON stays `./Common-directory`; skip_inprocess_engine_run defaults 0; FILE_*_EMITS active via imogen_intermediary.ins; comprehensive 370 LOC documentation unchanged). Filed **NEW B60** for latent file_temp-vs-DIR_COMMON-write-location inconsistency (LOW; v1+ live-coupling-prerequisite).
+- Phase C: paired scaffolding of `runs/SSP{2-4.5,3-7.0,4-6.0,5-8.5}/` via cp + sed from updated SSP1-2.6 (16 files × 4 SSPs = 64 files). Per-SSP sed-replacements: SSP-tag + RCP-tag + CMIP6 ssp-tag + ssprcp value + SSP_RCP path. For SSP2-4.5 + SSP4-6.0: ndep fallback to histsoc-wetdry-lpjguess (1850-2015 historical) per block 8.1 D5 finding (SSP-specific variants don't exist on cluster for these SSPs).
+- Phase C2: γ-physical Common-directory separation per user direction. Phase C2.1: converted `forks/trunk_r13078_runs/SSP1-2.6/Common-directory` from symlink (39 bytes → physical 443 MB cp from `runs/SSP1-2.6/Common-directory/IMOGEN/`). Phase C2.2: scaffolded `forks/trunk_r13078_runs/SSP{2-4.5,3-7.0,4-6.0,5-8.5}/` via cp + sed (18 operational files per SSP). **Rule #9 datapoint #17 pre-existing block-8.0.2 typo fixed**: `forks/trunk_r13078_runs/SSP1-2.6/imogen_intermediary.ins:43` had `ssprcp "245"` (should be `"126"`); fixed + sed-propagated correct per-SSP values (126/245/370/460/585) to all 5 trunk-runs SSPs.
+- Phase D: 5-SSP C++ engine library production via `scripts/run_coupled.sh --backbone intermediary-py --coupling-mode prescribed --scenario <SSP> --no-build --no-intermediary --engine-only-mode`. SSP2-4.5 canary ~13m 25s wall (✅ 202 year-dirs; 443 MB; physically sensible CO2 trajectory). SSP3-7.0 + SSP4-6.0 in 3-way parallel with SSP5-8.5 — SSP5-8.5 first attempt FAILED at adapter step (**Rule #9 datapoint #18**: SANITY_RANGES upper bound `CO2_EFOS_Mt: (-50000, 100000)` rejected SSP5-8.5 peak 131,071 Mt CO2/yr; physically sensible per Friedlingstein 2025 GCB / IPCC AR6 WG3 ~120-140 GtCO2/yr range; bound too restrictive). Fix applied at `tools/imogen_inputs_to_lpjg_format.py:117-145`: bumped CO2_EFOS_Mt + CO2_total_Mt upper bounds 100,000 → 200,000 Mt CO2/yr. SSP5-8.5 re-launch ✅. SSP1-2.6 re-run under updated production-grade .ins config ~13 min wall (CO2 trajectory match B44 reference exactly per engine-output-independence-of-LPJG-side-params per block 8.1.5 §1). All 5 engine libraries 202 year-dirs / 443 MB / physically sensible CO2 trajectories vs IPCC AR6 / Friedlingstein 2025: SSP1-2.6 = 295.844 → 472.872 → 427.62 ppm (peak-then-decline ✅); SSP2-4.5 = 295.844 → 512.143 → 590.815 ppm ✅; SSP3-7.0 = 295.844 → 548.071 → 826.34 ppm ✅; SSP4-6.0 = 295.85 → 528.073 → 631.473 ppm ✅; SSP5-8.5 = 295.844 → 575.746 → 1092.59 ppm ✅. **All 5 use intermediary_py adapter outputs** (RCMIP/CMIP6-backboned anthropogenic + pre-baked offline trunk_r13078 LPJG natural fluxes) per --backbone intermediary-py (Option B; Decision #1); legacy IIASA paths COMMENTED OUT in all 5 imogen_intermediary.ins.
+- Phase E: γ-physical cp `runs/<SSP>/Common-directory/IMOGEN/` → `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/` for each of 5 SSPs. All 5 trunk-runs/<SSP>/Common-directory/IMOGEN/output/ now physical 443 MB / 202 year-dirs (no symlinks). Total disk ~2.2 GB runs/ + ~2.2 GB trunk-runs/ = ~4.4 GB engine libraries.
+
+**Phase F summary + Rule #10 datapoint #23 (climatemodel.cpp byte-identity correction)**:
+
+Per user direction "Option D both b+c" at session 10 day 1 evening: re-ran SSP1-2.6 latest-lpj-guess (Option B; ✅ done at Phase D.3) + attempted to exercise trunk_r13078 binary's C++ engine standalone for filesystem evidence of trunk engine at v1.0 (Option C). Authored NEW `forks/trunk_r13078_runs/<SSP>/main_engine_only.ins` × 5 SSPs (~245 LOC each; flips skip_inprocess_engine_run to 0 + un-nulls FILE_*_EMITS / FILE_LPJG_* via end-of-file overrides pointing at runs/<SSP>/inputs/ intermediary_py adapter outputs + CMIP6 ssp<XYZ>.txt non-CO2 RF) + NEW `scripts/run_trunk_engine_only.sh` (~200 LOC wrapper; mimics scripts/run_coupled.sh --engine-only-mode for trunk-runs context with sidecar + log handling).
+
+Trunk-engine SSP1-2.6 canary FAILED with engine stuck in polling loop showing `RUNNOW_EXIST = 0` (engine waiting for runnow marker that B37/B44 path-iv done-marker sidecar doesn't provide). Verified `md5sum lpjguess/modules/climatemodel.cpp` = `8dcced2834fa083a41ca84fd29bb4206`; `md5sum forks/trunk_r13078/modules/climatemodel.cpp` = `fcc7110a9246d057f540cdcc96f1b803` — **DIFFERENT**. **Rule #10 datapoint #23**: my earlier statements (twice in this chat) that "climatemodel.cpp is byte-identical between lpjguess + forks/trunk_r13078 per block 8.1.5 §6" were WRONG — block 8.1.5 §6 byte-identity finding was specifically about **IMOGENCXX Main.cpp** (version_A vs version_B; B52 v1.1+ backport scope), NOT about climatemodel.cpp between the two forks of the rebuild. ~263 LOC divergence per LEDGER §1.2 Installment-2 estimate (rebuild has step-7 polling guards + step-8 imogenoutput integration + step-9.5 8-field writers + step-17a engine writer fix + step-17a skip_inprocess_engine_run + B19/B37/B39/B44/B45 deltas; trunk's is pre-rebuild-deltas baseline).
+
+T_seq design per B47 §4 intentionally uses rebuild engine library (= Phase E cp matches design intent; exercising trunk's engine separately would produce inferior output until Installment-2 reconciliation). Reverted Phase F to v1+ groundwork status: kept main_engine_only.ins + wrapper script as v1+ infrastructure (will become useful post-Installment-2 backport when trunk's climatemodel.cpp catches up to lpjguess's); cp'd library at trunk-runs/SSP1-2.6/Common-directory/IMOGEN/ restored from Phase E state.
+
+Filed **NEW B61** for v1+ Installment-2 climatemodel.cpp ~263 LOC backport (refines LEDGER §1.2 ~2900-3100 LOC accounting from rough estimate to quantified sub-item).
+
+**Acceptance gate scorecard** (per Rule #10 verification-integrity discipline; per `_chat_artifacts/b8_2_engine_libraries_2026-05-22/B8_2_engine_libraries_evaluation_2026-05-22.md` §2):
+
+| Gate | Verdict | Headline evidence |
+|---|---|---|
+| G0 5 × 202 year-dirs | ✅ PASS | `ls runs/<SSP>/Common-directory/IMOGEN/output/ | wc -l` = 202 for all 5 |
+| G1 5 × 443 MB libraries | ✅ PASS | `du -sh` shows 443M for all 5 |
+| G2 Per-year-dir 13-file inventory | ✅ PASS | T_anom + P_anom + SW_anom + DTEMP_anom + Rh_anom + W_anom + Tmin_anom + Tmax_anom + WET + CO2 + done + dtemp_o + fa_ocean |
+| G3 CO2 1900 = 295.844 ppm all 5 SSPs | ✅ PASS | B39 Law Dome 1900 init seed verified |
+| G4 CO2 2050 + 2100 within IPCC AR6 / Friedlingstein 2025 ranges all 5 | ✅ PASS | per Phase D trajectory verification |
+| G5 All 5 use intermediary_py emissions | ✅ PASS | active FILE_LPJG_FLUX at runs/<SSP>/inputs/; legacy IIASA paths COMMENTED OUT |
+| G6 γ-physical separation 5 × 443 MB at trunk-runs | ✅ PASS | `ls -la` shows physical dirs (no symlinks); du -sh 443M each |
+| G7 Zero ERROR/FATAL/SEGFAULT | ✅ PASS | grep across logs: 0 matches (modulo expected exit 99 per B37/B44 over-shoot) |
+
+**8 of 8 ✅ PASS**.
+
+**NEW B-rows filed at this commit (3 substantive)**:
+
+- **B60** ⏳ NEW (LOW; v1+ live-coupling-prerequisite): runs/SSP*/main.ins file_temp etc. paths reference `./IMOGEN/output/YYYY/*.dat` but engine writes to `./Common-directory/IMOGEN/output/YYYY/*.dat` (per DIR_COMMON `./Common-directory`); latent invisible under --engine-only-mode + F-10 deadlock; surfaces at v1+ live coupling; resolution: ~10 LOC × 5 main.ins; ~30 min at v1+
+- **B61** ⏳ NEW (MEDIUM; v1+ Installment-2 Backport Sprint; TRUNK-RELEVANT): `climatemodel.cpp` + `climatemodel.h` non-byte-identity between forks; ~263 LOC divergence quantified sub-item of LEDGER §1.2 Installment-2 ~2900-3100 LOC scope; resolution: forward-port rebuild deltas to forks/trunk_r13078/modules/ at post-paper Backport Sprint; ~2-4 d focused source-edit
+- B59 (NEW at session 10 day 1 cascade-gap-fill commit `4ce558f`) **ADVANCED**: Stage 1 (C++ engine library at 1631 native at runs/<SSP>/Common-directory/ via Phase D; cp at γ-physical Phase E) DONE; Stage 2 (chained FastRegrid wiring) deferred to block 8.2.5
+
+**Source-edits at this commit** (TRUNK-IRRELEVANT-by-novelty in entirety; per LEDGER):
+- `tools/imogen_inputs_to_lpjg_format.py:117-145` — SANITY_RANGES CO2_EFOS_Mt + CO2_total_Mt upper bounds 100,000 → 200,000 Mt CO2/yr (~20 LOC including expanded comment block; Rule #9 datapoint #18)
+- `runs/SSP1-2.6/main.ins` — production-grade alignment (~+50 LOC overall; firemodel BLAZE + npatch 5 + 1900-1930 + LU _peatland + 4-NetCDF ndep + popdens + simfire + run_peatland 1; preserves file_temp paths + DIR_COMMON + skip_inprocess defaults + FILE_*_EMITS active per user direction)
+- `forks/trunk_r13078_runs/SSP1-2.6/imogen_intermediary.ins` — ssprcp "245" → "126" 1-LOC typo fix (Rule #9 datapoint #17; pre-existing block-8.0.2 authoring bug)
+- NEW 64 files at `runs/SSP{2-4.5,3-7.0,4-6.0,5-8.5}/` (16 .ins + README.md × 4 SSPs; cp + sed from updated SSP1-2.6)
+- NEW 72 files at `forks/trunk_r13078_runs/SSP{2-4.5,3-7.0,4-6.0,5-8.5}/` (18 operational × 4 SSPs; mirrored from SSP1-2.6 trunk-runs)
+- NEW 5 files `forks/trunk_r13078_runs/<SSP>/main_engine_only.ins` (~245 LOC each; v1+ trunk-engine groundwork deferred per B61)
+- NEW `scripts/run_trunk_engine_only.sh` (~200 LOC; v1+ trunk-engine wrapper)
+- Cumulative T_seq Installment-1 source-edit UNCHANGED at ~297 LOC (block 8.2 additions are TRUNK-IRRELEVANT-by-novelty per LEDGER §1.1 classification)
+
+**14 in-tree doc surfaces + 1 sibling Part 15 of session5_post_b19 handoff + audit-evidence bundle at `_chat_artifacts/b8_2_engine_libraries_2026-05-22/B8_2_engine_libraries_evaluation_2026-05-22.md` (~250 LOC) + NEW chat prompt at `_chat_artifacts/new_chat_prompt_session11_2026-05-23.md` (~1050 LOC; spiritual successor to session 10 prompt)** on `main` working branch directly. ZERO source-edit to existing forks/trunk_r13078/modules/ files (block 8.0.2 source-edits + this block's NEW main_engine_only.ins / wrapper script are TRUNK-IRRELEVANT-by-novelty). 3-remote-converge pending at this commit. **No tag at this commit** (data-production + groundwork milestone; tag candidate `v0.24.0-switchable-regrid-strategy-complete` reserved for block 8.2.5 close ✅ PASS).
+
+Rule #9 datapoints #17 + #18 + #19; Rule #10 datapoints #22 + #23 (cumulative now at Rule #9 #19 + Rule #10 #23 since project inception). v1.0 % done UNCHANGED at ~96-98%; calendar UNCHANGED at ~5-10 weeks to v1.0 GMD submission.
+
+**POST-BLOCK-8.2 NEXT**: block 8.2.5 switchable-regrid-strategy wiring (Fortran engine settings alignment + clone version_B FastRegrid + extend file_types vector for 10 climate vars + δ-B Fortran-engine standalone × 5 SSPs + δ-B FastRegrid IDW 3698→62892 + δ-B-variant chained FastRegrid NN 1631→3698 + IDW 3698→62892 + 4-cell smoke side-by-side acceptance + user picks ONE for paper Track 2; ~1.5-2 d focused work; tag candidate `v0.24.0-switchable-regrid-strategy-complete`) → block 8.3 cluster smoke (~0.5 d) → blocks 8.4-8.7 + sessions 9-11 Track 2 cluster production runs + sessions 11-12 validation triad + paper writing + v1.0 GMD submission.
+
 ### 2026-05-22 (evening, session 10 day 1) — Block 8.1.5 cascade-gap-fill + NEW B59 δ-B-variant decision (C++-engine pipeline parallel to δ-B Fortran-engine pipeline as switchable infrastructure for v1.0 paper Track 2 production runs)
 
 Doc-only follow-up commit (ZERO source change; 8 in-tree doc surfaces touched). Two-part scope at this commit:

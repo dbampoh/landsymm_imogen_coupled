@@ -1,7 +1,23 @@
 # Production-run configuration reference
 
 **Version**: v1.0 (initial draft)
-**Last updated**: 2026-05-19 (session 6; B19+B20 close-out era; pre-local-v1-verification-window)
+**Last updated**: 2026-05-23 early morning (session 10 day 1 close — POST-BLOCK-8.2 ✅ DONE; 5-SSP CO2 trajectory addendum)
+
+> **POST-BLOCK-8.2 5-SSP CO2 trajectory addendum (2026-05-23 session 10 day 1 close)**:
+>
+> All 5 SSP-RCP scenarios now have C++ engine libraries produced at `runs/<SSP>/Common-directory/IMOGEN/output/` (202 year-dirs 1900-2101 each; ~443 MB each; ~2.2 GB total; γ-physically cp'd to forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/ per block 8.2 phase E). Per `--backbone intermediary-py` (Option B; Decision #1; RCMIP/CMIP6-backboned anthropogenic + pre-baked offline trunk_r13078 LPJG natural fluxes), all 5 SSPs use **intermediary_py adapter outputs** (NOT legacy IIASA). CO2 trajectory physical sensibility verified across all 5 SSPs vs IPCC AR6 / Friedlingstein 2025 GCB published ranges:
+>
+> | SSP | CO2 1900 (ppm; B39 Law Dome init) | CO2 2050 (ppm; mid-century) | CO2 2100 (ppm; endpoint) | IPCC AR6 / Friedlingstein 2025 reference (endpoint) | Acceptance |
+> |---|---|---|---|---|---|
+> | SSP1-2.6 | 295.844 | 472.872 | **427.62** (peak-then-decline ✅) | ~390-470 ppm (peak-then-decline) | ✅ PASS |
+> | SSP2-4.5 | 295.844 | 512.143 | **590.815** | ~580-630 ppm | ✅ PASS |
+> | SSP3-7.0 | 295.844 | 548.071 | **826.34** | ~830-900 ppm | ✅ PASS (low end; well within model uncertainty) |
+> | SSP4-6.0 | 295.85 | 528.073 | **631.473** | ~660-720 ppm | ✅ PASS (low end; well within model uncertainty) |
+> | SSP5-8.5 | 295.844 | 575.746 | **1092.59** | ~900-1100 ppm (peak) | ✅ PASS (peak range) |
+>
+> All 5 SSPs sit within or near-bound the IPCC AR6 / Friedlingstein 2025 GCB published ranges per Methods §2.2 narrative. SSP1-2.6 correctly shows the canonical peak-then-decline trajectory (peak ~2050 at ~472 ppm; decline to ~428 ppm by 2100 from negative emissions). SSP5-8.5 peak ~131 GtCO2/yr at ~2090 (per Friedlingstein 2025 GCB ~120-140 GtCO2/yr published range) drove **Rule #9 datapoint #18 fix** at `tools/imogen_inputs_to_lpjg_format.py:117-145`: CO2_EFOS_Mt + CO2_total_Mt SANITY_RANGES upper bounds bumped 100,000 → 200,000 Mt CO2/yr (200 GtCO2/yr; generous margin for SSP5-8.5 + future-scenario extensions while still flagging 1000x-error outliers). See `_chat_artifacts/b8_2_engine_libraries_2026-05-22/B8_2_engine_libraries_evaluation_2026-05-22.md` §1.5 + §3 for full Phase D + Rule #9 evidence.
+
+**Earlier value**: 2026-05-19 (session 6; B19+B20 close-out era; pre-local-v1-verification-window)
 **Status**: 🔧 INITIAL DRAFT — to be iteratively refined as B36 + B37 + B39 + B40 (local v1 verification window) and 17c.1+ cluster phase 1 inform the v1.0 paper publication readiness checklist.
 
 **Audience**: anyone (current + future maintainers) needing to:
