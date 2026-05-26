@@ -104,7 +104,7 @@
       !Find the value of anthropogenic (+natural if NONCO2_EMISSIONS_LPJG=.FALSE.) CH4 and N2O emissions for this year
       EMISS_TALLY=0
       DO N = 1,NYR_EMISS_NONCO2
-        IF(YR_EMISS(N).EQ.IYEAR-1) THEN !TODO: SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR??? - TP 30.07.15
+        IF(YR_EMISS(N).EQ.IYEAR) THEN !RESOLVED at block 8.2.5 Phase D (2026-05-26; Rule #9 datapoint #26): IYEAR-1 → IYEAR; same fix as imogen_lpjg.f:826 + matches C++ port semantics at lpjguess/modules/climatemodel.cpp:744. - DKB block 8.2.5
           CH4_EMISS_LOCAL=CH4_EMISS(N)
           N2O_EMISS_LOCAL=N2O_EMISS(N)
           EMISS_TALLY=EMISS_TALLY+1
@@ -124,7 +124,7 @@
         EMISS_TALLY=0
         DO N = 1,NYR_LPJG_FLUX
         PRINT *,'YR_LPJG_NONCO2(N) ',YR_LPJG_NONCO2(N)
-          IF(YR_LPJG_NONCO2(N).EQ.IYEAR-1) THEN !TODO: SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR??? - TP 30.07.15
+          IF(YR_LPJG_NONCO2(N).EQ.IYEAR) THEN !RESOLVED at block 8.2.5 Phase D (Rule #9 #26): IYEAR-1 → IYEAR; same fix as imogen_lpjg.f:847; matches C++ port semantics at lpjguess/modules/climatemodel.cpp:761. - DKB block 8.2.5
             CH4_EMISS_LOCAL=CH4_EMISS_LOCAL+CH4_LPJG(N)
             N2O_EMISS_LOCAL=N2O_EMISS_LOCAL+N2O_LPJG(N)
             EMISS_TALLY=EMISS_TALLY+1

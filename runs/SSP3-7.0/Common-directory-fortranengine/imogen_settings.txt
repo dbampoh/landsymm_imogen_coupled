@@ -1,0 +1,113 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+!/ \file runs/SSP3-7.0/Common-directory-fortranengine/imogen_settings.txt
+!/ \brief Fortran IMOGEN engine config for the v1.0 paper Track 2 δ-B (Fortran-engine)
+!/        pipeline; per-SSP variant for SSP3-7.0.
+!/
+!/ Authored at block 8.2.5 (2026-05-26 session 11 day 2) per the user-approved wiring
+!/ plan at _chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_wiring_plan.md.
+!/
+!/ Engine invocation: cd runs/SSP3-7.0/Common-directory-fortranengine/ && ../../../imogen/code/imogen_lpjg
+!/   (via scripts/run_fortran_engine_only.sh wrapper that handles bootstrap +
+!/    path-iv sidecar; mirrors scripts/run_trunk_engine_only.sh block-8.2.4 pattern)
+!/
+!/ All FILE_* paths are intermediary_py-backboned (RCMIP/CMIP6) — NOT legacy IIASA
+!/ DKB_dataset_totals. Same upstream emissions/flux inputs as the C++ engine consumed
+!/ at block 8.2 Phase D + block 8.2.4 (rebuild's lpjguess engine + trunk's freshly-
+!/ forward-ported engine). Per user-flagged sanity-check at session 11 day 2.
+!/
+!/ Engine output land at: ./IMOGEN/output/<year>/*.dat (3698-grid; engine hardcodes
+!/ ${DIR_COMMON}/IMOGEN/output/<year>/ relative to current working directory).
+!/
+!/ Post-FastRegrid IDW 3698→62892 (Phase E) → ./IMOGEN/output_62892/<year>/*.dat
+!/   (subset to 4-cell smoke gridlist at Phase F per the disk-space Option B+C hybrid;
+!/    full 5-SSP 62892 produced locally per user direction; ~85 GB total for δ-B).
+!/
+!/ \author Daniel Bampoh, 2026-05-26 (session 11 day 2 block 8.2.5 Phase B)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! ============================================================================
+! Directory paths (relative to runs/SSP3-7.0/Common-directory-fortranengine/)
+! ============================================================================
+DIR_COMMON ./
+DIR_PATT ../../../imogen/patterns/CEN_CMIP6_MOD_MRI-ESM2-0/
+DIR_CLIM ../../../imogen/CRUNCEP_1960_1989/
+
+! ============================================================================
+! Engine input files (anthropogenic emissions + LPJG-natural fluxes)
+! ALL intermediary_py-backboned per --backbone intermediary-py (RCMIP/CMIP6-backed)
+! NOT legacy IIASA DKB_dataset_totals (which would use rcp85_allsources etc.)
+! Same upstream as C++ engine at block 8.2 Phase D + block 8.2.4 Phase E
+! ============================================================================
+FILE_SCEN_EMITS ../../../runs/SSP3-7.0/inputs/co2_anthro_emissions.txt
+FILE_NON_CO2_VALS ../../../imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp370.txt
+FILE_CH4_N2O_EMITS ../../../runs/SSP3-7.0/inputs/ch4_n2o_anthro_emissions.txt
+FILE_LPJG_FLUX imogen_lpjg_flux.txt
+FILE_LPJG_CH4_N2O_FLUX imogen_lpjg_ch4_n2o_flux.txt
+FILE_GRIDLIST ../../../data/gridlist/gridlist_hurtt_RNDM_midpoint_3698.txt
+FILE_SCEN_CO2_PPMV 
+
+! ============================================================================
+! Engine numerics (matched to C++ engine runs/SSP3-7.0/imogen_intermediary.ins B34(β)
+! to ensure byte-comparable engine output if both engines consume same inputs;
+! NGPOINTS=3698 enables REGRID_CLIM NN inside the engine)
+! ============================================================================
+NGPOINTS 3696          !IN Number of grid points in FILE_GRIDLIST. NOTE: data/gridlist/gridlist_hurtt_RNDM_midpoint_3698.txt has 3696 actual cells despite the "_3698" in its filename — a misnomer inherited from the predecessor codebase. NGPOINTS MUST match the actual line count, NOT the filename label, otherwise the Fortran engine writes 2 trailing (LON=0,LAT=0) padding rows in each climate output file that break downstream FastRegrid. RESOLVED at block 8.2.5 Phase E (Rule #9 datapoint #29). Step 3 of unified-codebase rebuild made this run-time configurable; previously hardcoded PARAMETER. - DKB 2026-05-05 + block 8.2.5
+STEP_DAY 1             !IN Number of daily timesteps of IMPACTS_MODEL
+T_OCEAN_INIT 289.28    !IN Initial ocean temperature (K)
+KAPPA_O 280.0          !IN Ocean eddy diffusivity (W/m/K)
+F_OCEAN 0.71           !IN Fractional coverage of the ocean
+LAMBDA_L 0.4           !IN Inverse of climate sensitivity over land (W/m2/K)
+LAMBDA_O 1.9           !IN Inverse of climate sensitivity over ocean (W/m2/K)
+MU 1.78                !IN Ratio of land to ocean temperature anomalies
+Q2CO2 3.74             !IN Radiative forcing due to doubling CO2 (W/m2)
+TAU_DECAY_CH4 9.3      !IN Atmospheric lifetime of CH4 (years)
+TAU_DECAY_N2O 121      !IN Atmospheric lifetime of N2O (years)
+
+! ============================================================================
+! Initial atmospheric concentrations (B39 Law Dome 1900 ice-core per MacFarling Meure
+! 2006; was 286.085 / 865.0 / 277.4 in legacy template; CO2 + CH4 fixed at B39)
+! ============================================================================
+CO2_INIT_PPMV 296.1    !IN B39 Law Dome 1900 (was 286.085 in legacy = 1850s)
+CH4_INIT_PPBV 875.6    !IN B39 Law Dome 1900 (was 865.0 = ~1880s)
+N2O_INIT_PPBV 277.4    !IN Law Dome ~1901; within 0.07% of 1900 (left unchanged at B39)
+
+! ============================================================================
+! Year-count parameters (1900-2100 inclusive = 201 years; was 251 in legacy 1850-2100)
+! Aligned with rebuild's runs/SSP3-7.0/imogen_intermediary.ins B34(β) 2026-05-18 update
+! + intermediary_py adapter outputs cover 1900-2100 only per --backbone intermediary-py
+! ============================================================================
+NYR_NON_CO2 251        !IN Number of years for which NON_CO2 forcing is prescribed (file may cover 1850-2100; engine reads YEAR1-IYEND subset)
+NYR_EMISS 201          !IN Number of years of emission data in FILE_SCEN_EMITS (1900-2100)
+NYR_EMISS_NONCO2 201   !IN Number of years of CH4+N2O emission data in FILE_CH4_N2O_EMITS
+NYR_LPJG_FLUX 201      !IN Number of years of LPJG-natural-flux data in FILE_LPJG_FLUX
+
+! ============================================================================
+! Boolean engine flags
+! KEY change vs legacy template: REGRID .FALSE. → .TRUE. (the δ-B pipeline activation)
+!                                LPJG_CFLUX .FALSE. → .TRUE. (use intermediary_py LPJG natural fluxes)
+! ============================================================================
+FILE_NON_CO2 .TRUE.            !IN If true, non-CO2 radiative forcings are contained within a file
+NONCO2_EMISSIONS .TRUE.        !IN If true, use FAIR model for CH4 and N2O forcing
+NONCO2_EMISSIONS_LPJG .TRUE.   !IN If true, use LPJG-natural CH4+N2O emissions (if NONCO2_EMISSIONS==T)
+C_EMISSIONS .TRUE.             !IN If true, CO2 concentration is calculated (vs prescribed)
+LPJG_CFLUX .TRUE.              !IN [BLOCK 8.2.5 CHANGE]: take land C flux from LPJ-GUESS natural-emission output file (was .FALSE. in legacy template; .TRUE. matches rebuild's runs/SSP3-7.0/imogen_intermediary.ins line 301)
+INCLUDE_CO2 .TRUE.             !IN Are adjustments to CO2 values allowed?
+INCLUDE_NON_CO2 .TRUE.         !IN Are adjustments to non-CO2 values allowed?
+DAILYOUT .FALSE.               !IN Are outputs daily (true) or monthly (false)?
+LAND_FEED .TRUE.               !IN Are land feedbacks allowed on atmospheric CO2?
+OCEAN_FEED .TRUE.              !IN Are ocean feedbacks allowed on atmospheric CO2?
+ANLG .TRUE.                    !IN If true, use the GCM analogue model
+ANOM .TRUE.                    !IN If true, use the GCM analogue model anomaly mode
+REGRID .TRUE.                  !IN [BLOCK 8.2.5 CHANGE]: KEY δ-B pipeline activation; engine internally NN-regrids 1631 native patterns → 3698-grid output via SUBROUTINE REGRID_CLIM (was .FALSE. in legacy template)
+CO2_RF_FAIR .FALSE.            !IN Whether to use CO2 radiative forcing from FAIR model (T) or IMOGEN standard (F)
+STANDALONE .TRUE.              !IN [Block 8.2.5 Rule #9 datapoint #30 NEW]: when .TRUE., engine sets KEEPRUNNING=.FALSE. after completing one full year-loop (IYEAR=YEAR1..IYEND) so it exits gracefully without external LPJG flipping KEEPRUNNING. Default .FALSE. (engine waits for LPJG-coupled mode). MUST be .TRUE. for engine-only-mode (scripts/run_fortran_engine_only.sh) per block 8.2.5 Rule #9 #27 root-cause fix. - DKB block 8.2.5
+
+!///////////////////////////////////////////////////////////////////////////////////////
+!/ End of imogen_settings.txt for runs/SSP3-7.0/Common-directory-fortranengine/
+!/
+!/ NOTE: Bootstrap params YEAR1=1900, IYEND=2100, YEAR1_LPJG=1900, SPINUP=0,
+!/ KEEPRUNNING=1, FIRSTCALL=1 are written by scripts/run_fortran_engine_only.sh
+!/ to ./LPJG_main/IMOGEN/imogen_lpjg.txt at runtime BEFORE engine launch
+!/ (Fortran engine reads these from unit 82 via SETTIN_LPJG; mirrors lpjguess's
+!/ scripts/run_coupled.sh --engine-only-mode Step [4/7] bootstrap pattern).
+!///////////////////////////////////////////////////////////////////////////////////////

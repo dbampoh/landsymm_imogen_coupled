@@ -320,6 +320,7 @@ C  QSAT at the bottom of this file). - DKB 2026-05-12]
       REAL, ALLOCATABLE :: LAT_OUT(:)    !IN/OUT Latitude array to perform regridding to (read from file) - TP 06.08.15
 
       LOGICAL REGRID        !IN If true use nearest-neighbour regridding - TP 06.08.15
+      LOGICAL STANDALONE    !IN [Block 8.2.5 (2026-05-26) Rule #9 datapoint #30]: engine-only-mode auto-exit flag; when .TRUE., engine sets KEEPRUNNING=.FALSE. after one full year-loop iteration (IYEAR=YEAR1..IYEND) so it exits gracefully without needing external LPJG to flip KEEPRUNNING. Default .FALSE. preserves original LPJG-coupled-mode behaviour. Read from imogen_settings.txt via SETTIN; passed as new SETTIN arg. - DKB block 8.2.5
 
       LOGICAL FIRSTCALL     !IN Is this the very first call to IMOGEN from LPJ-GUESS (start of spin-up)?
 
@@ -341,7 +342,7 @@ C Now call the subroutine to read in the input settings file - TP 13.07.15
      & FILE_LPJG_FLUX,NYR_LPJG_FLUX,DIR_COMMON,REGRID,
      & FILE_CH4_N2O_EMITS,CH4_INIT_PPBV,N2O_INIT_PPBV,TAU_DECAY_CH4,
      & TAU_DECAY_N2O,NONCO2_EMISSIONS,NONCO2_EMISSIONS_LPJG,FILE_LPJG_CH4_N2O_FLUX,
-     & CO2_RF_FAIR,NGPOINTS) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05
+     & CO2_RF_FAIR,NGPOINTS,STANDALONE) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05. STANDALONE added at block 8.2.5 Phase E (2026-05-26; Rule #9 datapoint #30) for engine-only-mode graceful auto-exit - DKB block 8.2.5
 
 C [Step 3 of unified-codebase rebuild: ALLOCATE NGPOINTS-dimensioned
 C  arrays now that NGPOINTS has been parsed from imogen_settings.txt.
@@ -823,7 +824,7 @@ C Now do the carbon cycling update.
 C Include anthropogenic carbon emissions.
           EMISS_TALLY=0
           DO N = 1,NYR_EMISS
-            IF(YR_EMISS(N).EQ.IYEAR-1) THEN !TODO: SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR??? - TP 30.07.15
+            IF(YR_EMISS(N).EQ.IYEAR) THEN !RESOLVED at block 8.2.5 Phase D (2026-05-26; Rule #9 datapoint #26): the original IYEAR-1 check (with TP's "SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR???" TODO 30.07.15) required emission-data tagged at previous year IYEAR-1, breaking with intermediary_py 1900-2100 adapter outputs at year 1900 (1899 not present). C++ port at lpjguess/modules/climatemodel.cpp:744 already uses iyear (commented "//Check whether should be iyear-1?") + works correctly producing physically-sensible CO2 trajectories matching IPCC AR6 / Friedlingstein 2025 GCB at block 8.2 Phase D + block 8.2.4 Phase E. Conforming Fortran to C++ semantics: convention is "emission tagged year X = expected emissions to apply at year X's atmospheric update". - DKB block 8.2.5
               C_EMISS_LOCAL=C_EMISS(N)
               CO2_PPMV = CO2_PPMV + CONV*C_EMISS_LOCAL
               EMISS_TALLY=EMISS_TALLY+1
@@ -844,7 +845,7 @@ C Here, take the land C flux from LPJ-GUESS - TP 13.07.15
             EMISS_TALLY=0
             !DO N = 1,NYR_EMISS !TODO, SHOULD THIS BE NYR_LPJG_FLUX??
             DO N = 1,NYR_LPJG_FLUX !TODO, SHOULD THIS BE NYR_LPJG_FLUX??
-              IF(YR_LPJG(N).EQ.IYEAR-1) THEN !TODO: SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR??? - TP 30.07.15
+              IF(YR_LPJG(N).EQ.IYEAR) THEN !RESOLVED at block 8.2.5 Phase D (Rule #9 #26): IYEAR-1 → IYEAR; matches C++ port semantics at lpjguess/modules/climatemodel.cpp:761; same fix as line ~826 above. - DKB block 8.2.5
                 C_LPJG_LOCAL=C_LPJG(N)
                 D_LAND_ATMOS=CONV*C_LPJG_LOCAL
                 CO2_PPMV = CO2_PPMV + D_LAND_ATMOS
@@ -1415,6 +1416,24 @@ C  7be595a (climatemodel.cpp ~line 998). - DKB 2026-05-11]
         CALL FLUSH(6)
       ENDDO !End of IYEAR loop
 
+C [Block 8.2.5 (2026-05-26) Rule #9 datapoint #30: STANDALONE-mode auto-exit.
+C  When STANDALONE=.TRUE. (set via imogen_settings.txt for engine-only-mode
+C  runs via scripts/run_fortran_engine_only.sh), set KEEPRUNNING=.FALSE.
+C  here so the outer DO WHILE (KEEPRUNNING) loop at line ~391 exits
+C  gracefully after one full year-loop completion (YEAR1..IYEND). Without
+C  this, in engine-only-mode (no LPJ-GUESS running to flip KEEPRUNNING via
+C  imogen_lpjg.txt re-write), the engine endlessly re-cycles the inner
+C  year-loop (the v5 Phase D canary hang we observed pre-fix). Root-cause
+C  fix replacing the SIGTERM watchdog workaround at scripts/run_fortran_
+C  engine_only.sh. Default STANDALONE=.FALSE. preserves original LPJG-
+C  coupled-mode semantics. - DKB block 8.2.5]
+      IF(STANDALONE) THEN
+        PRINT *,'[STANDALONE mode] Year-loop YEAR1=',YEAR1,
+     &    ' IYEND=',IYEND,' complete. Setting KEEPRUNNING=.FALSE.',
+     &    ' for graceful engine-only-mode exit per Rule #9 #30.'
+        KEEPRUNNING=.FALSE.
+      ENDIF
+
       ENDDO !End of KEEPRUNNING loop - TP 29.07.15
 
 C [Step 3 of unified-codebase rebuild: deallocate the NGPOINTS-dimensioned
@@ -1641,7 +1660,7 @@ C  above (use IND_MIN found via the GP loop). - DKB 2026-05-12]
      & FILE_LPJG_FLUX,NYR_LPJG_FLUX,DIR_COMMON,REGRID,
      & FILE_CH4_N2O_EMITS,CH4_INIT_PPBV,N2O_INIT_PPBV,TAU_DECAY_CH4,
      & TAU_DECAY_N2O,NONCO2_EMISSIONS,NONCO2_EMISSIONS_LPJG,FILE_LPJG_CH4_N2O_FLUX,
-     & CO2_RF_FAIR,NGPOINTS) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05
+     & CO2_RF_FAIR,NGPOINTS,STANDALONE) !NGPOINTS added in Step 3 of unified-codebase rebuild - DKB 2026-05-05. STANDALONE added at block 8.2.5 Phase E (Rule #9 #30) - DKB block 8.2.5
 
       IMPLICIT NONE
 
@@ -1683,6 +1702,7 @@ C  above (use IND_MIN found via the GP loop). - DKB 2026-05-12]
       LOGICAL NONCO2_EMISSIONS !IN If true, use FAIR model for CH4 and N2O forcing
       LOGICAL NONCO2_EMISSIONS_LPJG !IN Whether to use LPJG to provide natural CH4 and N2O emissions (if NONCO2_EMISSIONS==T)
       LOGICAL CO2_RF_FAIR       !IN Whether to use the CO2 radiative forcing calculation from the FAIR model (T) or IMOGEN standard (F)
+      LOGICAL STANDALONE        !IN [Block 8.2.5 (2026-05-26) Rule #9 datapoint #30]: when .TRUE., the engine sets KEEPRUNNING=.FALSE. after one full year-loop completion so it exits gracefully without external LPJG flipping KEEPRUNNING. Default .FALSE. preserves original LPJG-coupled-mode behaviour (outer DO WHILE expects LPJG to re-write imogen_lpjg.txt with KEEPRUNNING=FALSE). MUST be .TRUE. for engine-only-mode via scripts/run_fortran_engine_only.sh (block 8.2.5 root-cause fix for Rule #9 #27 KEEPRUNNING-loop hang). - DKB block 8.2.5
 
       CHARACTER(LEN=180) DIR_PATT           !Directory containing the patterns
       CHARACTER(LEN=180) DIR_CLIM           !Directory containing initialising climatology.
@@ -1708,6 +1728,13 @@ C  above (use IND_MIN found via the GP loop). - DKB 2026-05-12]
 C [Step 3 of unified-codebase rebuild: sentinel value for NGPOINTS so we
 C  can detect a missing setting after the parse loop completes.]
       NGPOINTS=-1
+C [Block 8.2.5 (2026-05-26) Rule #9 datapoint #30: STANDALONE default .FALSE.
+C  preserves original LPJG-coupled-mode behaviour (outer DO WHILE expects
+C  LPJG to flip KEEPRUNNING via imogen_lpjg.txt re-write). Engine-only-mode
+C  configs (scripts/run_fortran_engine_only.sh + per-SSP imogen_settings.txt
+C  at runs/<SSP>/Common-directory-fortranengine/) must set .TRUE. explicitly
+C  for graceful auto-exit after one full year-loop. - DKB block 8.2.5]
+      STANDALONE=.FALSE.
 
       OPEN(81,FILE='imogen_settings.txt') !TODO: Update folder path appropriately - TP 03.08.15
 
@@ -1854,6 +1881,9 @@ C  can detect a missing setting after the parse loop completes.]
             CASE('NGPOINTS')
               READ(BUFFER,*,IOSTAT=IOS) NGPOINTS
               PRINT *,'Read NGPOINTS: ',NGPOINTS
+            CASE('STANDALONE') ! [Block 8.2.5 Rule #9 #30] engine-only-mode auto-exit flag
+              READ(BUFFER,*,IOSTAT=IOS) STANDALONE
+              PRINT *,'Read STANDALONE: ',STANDALONE
             CASE DEFAULT
               PRINT *,'Skipping invalid label "',LABEL,'" at line ',LINE
           ENDSELECT

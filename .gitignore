@@ -117,6 +117,56 @@ lpjguess/build_mpi/
 **/Common-directory/IMOGEN/output/
 **/IMOGEN/output/
 
+# [Block 8.2.5 (2026-05-26) NEW: gitignore patterns for the switchable-regrid-strategy
+#  per-pipeline output libraries + per-SSP runtime dirs that emerged in this block.
+#  Per `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 POST-BLOCK-8.2.5 + the wiring
+#  plan at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_wiring_plan.md`:
+#  - **/Common-directory-fortranengine/  : new per-SSP runtime dir for δ-B Fortran-engine
+#    pipeline (sibling to existing Common-directory/ which has C++ engine output);
+#    contains imogen_settings.txt (THIS file is committed; see negation below) +
+#    LPJG_main/IMOGEN/ handshake state (not committed) + IMOGEN/output/ year-dirs
+#    (3698-grid Fortran engine output) + IMOGEN/output_62892/ year-dirs
+#    (post-FastRegrid IDW 62892-grid output for paper Track 2 cluster production)
+#  - **/IMOGEN/output_*/  : ALL post-FastRegrid variants (output_62892/ from δ-B IDW;
+#    output_3698_cppengine/ from δ-B-variant chained-NN intermediate; output_62892_cppengine/
+#    from δ-B-variant final IDW; output_62892_fortranengine/ = same as output_62892/ for δ-B)
+#  - logs/run_fortran_engine_only_*.log + logs/run_fastregrid_*.log : per-run engine
+#    + regrid driver logs at MB to tens-of-MB sizes (verbose engine outputs across 201 years);
+#    too big for git ergonomics + regenerable from source. - DKB block 8.2.5]
+# NOTE: don't use `**/Common-directory-fortranengine/` (too aggressive — excludes
+# the parent dir + git negation can't re-include files once parent is excluded).
+# Instead explicitly exclude only the data subdirs (IMOGEN/, LPJG_main/) — keeps
+# imogen_settings.txt at the dir root tracked.
+**/Common-directory-fortranengine/IMOGEN/
+**/Common-directory-fortranengine/LPJG_main/
+**/IMOGEN/output_*/
+logs/run_fortran_engine_only_*.log
+logs/run_fastregrid_*.log
+
+# [Block 8.2.5 (2026-05-26): forensic backups created during the IYEAR-1→IYEAR
+#  + NGPOINTS=3698→3696 + STANDALONE fixes; preserved on filesystem per Rule #10
+#  amendment-vs-rewrite but NOT committed (regenerable + bulky). - DKB block 8.2.5]
+forks/trunk_r13078_runs/*/imogen_intermediary.ins.pre_block_8_2_4_predecessor_baseline
+
+# [Block 8.2.5 (2026-05-26): trim the 36+ MB phase_d_ssp126_canary_v5.log + similar
+#  verbose engine logs in _chat_artifacts/ working dirs. The Phase-X *_complete.md +
+#  evaluation.md files (~few KB each) ARE committed as the audit-evidence
+#  narrative; the raw verbose run-logs are regenerable from source + gitignored. - DKB]
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_d_ssp126_canary_v*.log
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_e_fastregrid_*.log
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_e_fortran_*.log
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_c_canary_output/
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_c_make.log
+_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/phase_c_cmake.log
+
+# [Block 8.2.5 (2026-05-26): pre-existing forensic data snapshots (e.g.,
+#  *_baseline_may7/) at intermediary_py + runs/ that emerged during block-8.2.5
+#  staging inspection but are unrelated to this block's work. Bulky (~48 MB +
+#  per dir; CSV/data snapshots from May 7 development period) + not block 8.2.5
+#  scope. Gitignored for cleanliness. - DKB]
+intermediary_py/imogen_ghg_controller/outputs_baseline_may7/
+runs/*/inputs_baseline_may7/
+
 # [Block 8.0.3 (session 8.0.3 close, 2026-05-20): T_seq Installment-1 acceptance test
 #  surfaced need for forks/trunk_r13078_runs/<SSP>/ operational scratch gitignore
 #  parallel to runs/<SSP>/ gitignore patterns above. Per `forks/trunk_r13078_runs/README.md`

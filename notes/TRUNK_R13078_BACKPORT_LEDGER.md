@@ -2247,6 +2247,47 @@ All gates ✅ PASS. **Rule #9 datapoint #15 carries forward unchanged** (no new 
 
 ---
 
+### Block 8.2.5 PARTIAL (session 11 day 2 mid-block, 2026-05-26 evening): Switchable-regrid-strategy wiring — δ-B Fortran-engine pipeline + tools/FastRegrid/ + 5-SSP Fortran 3698-grid + 62892-grid libraries + 9 Rule #9 datapoints; Phase A-D + Phase E δ-B LANDED; Phase E δ-B-variant + Phase F/G/H PENDING
+
+**Date:** 2026-05-26 (evening; session 11 day 2 mid-block). **Commit hash:** _to be determined_ (THIS checkpoint commit; PARTIAL block close; no tag — `v0.24.0-switchable-regrid-strategy-complete` reserved for block 8.2.5 FULL close at Phase H).
+
+**Fortran tree source-edits (LEDGER-RELEVANT per §1.3 fork-shared Fortran tree)**: ~11 LOC total at `imogen/code/imogen_lpjg.f` + `imogen/code/nonco2.f`. Affects both rebuild + trunk-fork builds of the Fortran engine; TRUNK-IRRELEVANT-by-novelty for trunk-T_seq workflow which never invokes the Fortran engine (T_seq uses `-input imogencfx` with `skip_inprocess_engine_run=1` per block 8.0.2 Installment-1).
+
+#### File: `imogen/code/imogen_lpjg.f` (4 IYEAR-1→IYEAR + 5 STANDALONE plumbing LOC = ~9 LOC substantive)
+- **Operation:** modify
+- **Lines:** 826 (CO2 emission year-match) + 847 (LPJG flux year-match) + 322 (LOGICAL STANDALONE declaration in main PROGRAM IMOGEN) + 335 (CALL SETTIN STANDALONE arg) + 1635 (SUBROUTINE SETTIN STANDALONE arg in signature) + ~1686 (LOGICAL STANDALONE declaration in SETTIN) + ~1717 (STANDALONE=.FALSE. default initialization in SETTIN) + ~1856 (CASE('STANDALONE') in parser) + ~1417 (auto-exit hook `IF(STANDALONE) KEEPRUNNING=.FALSE.` between IYEAR-loop ENDDO and outer DO WHILE ENDDO)
+- **Description:** (a) Rule #9 datapoint #26 fixes 2 sites of IYEAR-1 → IYEAR per author's TODO "SHOULD THIS BE IYEAR-1 RATHER THAN IYEAR??? - TP 30.07.15"; conforms Fortran emission-year-match semantics to C++ port at `lpjguess/modules/climatemodel.cpp:744` + `:761` (which already use iyear); required for intermediary_py adapter outputs 1900-2100 to work (no year 1899 data; original Fortran IYEAR-1 logic looks for 1899 at year 1900 → STOP "Emission dataset does not match run"). (b) Rule #9 datapoint #30 NEW STANDALONE config flag for engine-only-mode auto-exit; default .FALSE. preserves original LPJG-coupled-mode behaviour where outer `DO WHILE (KEEPRUNNING)` at line 391 expects external LPJG to write new imogen_lpjg.txt with KEEPRUNNING=FALSE per line 283 documentation; when .TRUE. (set via imogen_settings.txt for engine-only-mode runs via scripts/run_fortran_engine_only.sh), engine sets KEEPRUNNING=.FALSE. after one full year-loop iteration → graceful exit.
+- **Backport guidance:** TRUNK-IRRELEVANT for the v1.0 paper Track 2 T_seq workflow (Fortran engine never invoked by trunk-T_seq mode). However, the source-edits land in the FORK-SHARED Fortran tree so they apply automatically to any future trunk-side use of the Fortran engine (e.g., v1+ engine cross-validation studies or v1.1+ live-coupling that uses Fortran engine). The Installment-2 ~145 LOC Fortran B33(c) WARN_POSIX_CONCAT_COLLAPSE accounting at LEDGER §1.2 is independent of this block 8.2.5 edit; both are Fortran tree edits but cover different defects.
+
+#### File: `imogen/code/nonco2.f` (2 IYEAR-1→IYEAR LOC)
+- **Operation:** modify
+- **Lines:** 107 (FAIR_NON_CO2_GHG_BUDGET CO2 emission year-match) + 127 (FAIR_NON_CO2_GHG_BUDGET LPJG flux year-match)
+- **Description:** Rule #9 datapoint #26 fixes 2 sites of IYEAR-1 → IYEAR per author's TODO; mirrors the imogen_lpjg.f:826 + :847 fixes above; required for non-CO2 (CH4 + N2O) emission-year-match consistency with the CO2 case.
+- **Backport guidance:** same as imogen_lpjg.f above (TRUNK-IRRELEVANT for v1.0; Fortran tree shared).
+
+**Other source-edits at block 8.2.5 (TRUNK-IRRELEVANT-by-novelty; rebuild-only operational infrastructure)**:
+- `.gitignore`: ~30 LOC new patterns for `**/Common-directory-fortranengine/IMOGEN/` + `**/Common-directory-fortranengine/LPJG_main/` + `**/IMOGEN/output_*/` + `logs/run_fortran_engine_only_*.log` + `logs/run_fastregrid_*.log` + block-8.2.4 forensic backup gitignore + audit-bundle large-log exclusions per Rule #9 #29.
+- 5 × `runs/<SSP>/Common-directory-fortranengine/imogen_settings.txt`: NEW per-SSP Fortran engine config (~75 LOC each ~9 KB; REGRID=.TRUE. + NGPOINTS=3696 + LPJG_CFLUX=.TRUE. + B39 init + intermediary_py adapter paths + CMIP6 MRI-ESM2-0 patterns + STANDALONE=.TRUE.).
+- `scripts/run_fortran_engine_only.sh`: NEW operational wrapper (~180 LOC; sibling to block 8.2.4 `scripts/run_trunk_engine_only.sh` pattern; bootstrap imogen_lpjg.txt + path-iv done-marker sidecar + symlinks for FILE_LPJG_FLUX into handshake dir + auto-suicide watchdog with KEEPRUNNING=FALSE write fallback to SIGTERM).
+- `scripts/run_fastregrid.sh`: NEW operational wrapper (~200 LOC; per-SSP + per-pipeline FastRegrid invocation; handles single-step δ-B IDW + chained δ-B-variant NN+IDW; cp's non-regriddable CO2/done/dtemp_o/fa_ocean files; `--radius 0` for robust sparse-source regrid per Rule #9 #31).
+- `tools/FastRegrid/`: NEW dir (cloned from `../version_B/.../FastRegrid/FastRegrid/`; 4 source files; Linux-adapted lowercase filenames + CMakeLists keyword-signature fix + CLI-arg parsing in fastregrid.cpp + 9 per-cell climate vars in file_types).
+
+**Cumulative state at block 8.2.5 PARTIAL checkpoint**:
+- Engine libraries at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output/` (NEW; 5 SSPs × ~915 MB = ~4.5 GB; Fortran 3698-grid; gitignored)
+- Engine libraries at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` (COMPLETE at checkpoint; 5 SSPs × 18 GB = ~90 GB; FastRegrid IDW 62892-grid PAPER-READY for δ-B Track 2 cluster runs; gitignored)
+- Cumulative T_seq Installment-1 source-edit at `forks/trunk_r13078/`: UNCHANGED at ~297 LOC (block 8.2.5 source-edits are Fortran tree which is fork-shared, not trunk-fork-specific)
+- Installment-1.5 engine slice at `forks/trunk_r13078/` from block 8.2.4: UNCHANGED at ~1300 LOC
+- Installment-2 residual for v1+ Backport Sprint: ~1300 LOC UNCHANGED (year_outer scaffolding ~500 LOC + imogen_input.{cpp,h} ~640 LOC + Fortran B33(c) ~145 LOC)
+- **Fortran tree source-edit cumulative**: was ~145 LOC pre-block-8.2.5 (B33(c) WARN_POSIX_CONCAT_COLLAPSE per Installment-2 residual); NOW additional ~11 LOC at block 8.2.5 (Rule #9 #26 + #30 fixes); cumulative ~156 LOC pending Installment-2 Backport Sprint (though block 8.2.5 ones already LANDED in fork-shared Fortran tree; only the binary rebuild step is fork-specific)
+- v1.0 % done: ~97-99% UNCHANGED
+- Calendar to v1.0 GMD submission: ~5-9 weeks UNCHANGED
+
+**Audit-evidence bundle PARTIAL** at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/`: B8_2_5_wiring_plan.md (~430 LOC; Phase A inspection + plan; user-approved) + phase_bc_complete.md (Phase B+C close marker). Large engine + FastRegrid logs gitignored per Rule #9 #29 (regenerable from source). Full B8_2_5_evaluation_2026-05-XX.md awaits Phase H block-close.
+
+**POST-CHECKPOINT NEXT**: Phase E δ-B-variant chained-FastRegrid launch (NN 1631→3698 + IDW 3698→62892 on trunk-cpp-engine libraries from block 8.2.4 at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/`; 5-way parallel; ~30-60 min wall) → Phase F 4-cell smoke side-by-side acceptance → Phase G user-pick-ONE-pipeline-for-paper → Phase H block-close audit-evidence bundle + full multi-surface doc cascade + tag candidate `v0.24.0-switchable-regrid-strategy-complete`.
+
+---
+
 ### Block 8.2.4 LANDED (session 11 day 2 close, 2026-05-26 afternoon): Trunk-engine forward-port (engine-side Installment-2 slice ~1300 LOC) + 5-SSP trunk-engine library production + 250/250 byte-identity verification with rebuild's lpjguess engine; B61 ✅ CLOSED
 
 **Date:** 2026-05-26 (afternoon; session 11 day 2 close). **Commit hash:** _to be determined_ (this commit; on `main` working branch directly; tag candidate `v0.23.0-trunk-engine-forwardport-complete` reserved for this close commit; annotated; engine-side Installment-2 slice LANDED). **TRUNK-RELEVANT** (logically a separate Installment-2 slice; ~1300 LOC substantive source-edit + 2 NEW files within `forks/trunk_r13078/` source tree).
