@@ -1,0 +1,205 @@
+--- forks/trunk_r13078/modules/imogencfx.h	2026-05-24 16:37:56.304922711 +0200
++++ lpjguess/modules/imogencfx.h	2026-05-18 02:16:25.051176627 +0200
+@@ -14,6 +14,8 @@
+ #include "soilinput.h"
+ #include "inputmodule.h"
+ #include <vector>
++#include <map>
++#include <utility>
+ #include "gutil.h"
+ #include "globalco2file.h"
+ #include "lamarquendep.h"
+@@ -64,6 +66,81 @@
+ 
+ 	void year_init(int rank, int calendar_year);
+ 
++	// ============================================================================
++	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
++	//  rebuild (2026-05-10 late evening): year_outer mode support for
++	//  IMOGENCFXInput. Overrides InputModule's preload_all_climate +
++	//  getclimate_for_year virtuals added at the C1 foundation step.
++	//  Together these enable LPJ-GUESS's framework() to drive simulation
++	//  in per-year-outer / per-gridcell-inner ordering (gated on
++	//  IMOGENConfig::framework_loop_mode == "year_outer") while reproducing
++	//  IMOGENCFXInput::getclimate()'s gridcell_outer mode semantics
++	//  bit-exactly per cell-year-day.
++	//
++	//  Mirrors the C1.1 ImogenInput pattern at imogen_input.h with the
++	//  IMOGENCFXInput-specific differences:
++	//    1. NO K -> degC conversion in climate.temp = dtemp[date.day]
++	//       (IMOGENCFXInput's existing getclimate at line ~1179 does NOT
++	//       subtract 273.15; ImogenInput's getclimate at line ~876 DOES).
++	//       Preserved here for byte-exact reproduction of IMOGENCFXInput's
++	//       gridcell_outer behaviour.
++	//    2. Additional climate fields populated from cache: relhum, u10,
++	//       tmin, tmax (per step 9.5 wiring; IMOGENCFXInput-specific).
++	//    3. BLAZE compatibility check fires on day 0 (mirror of imogencfx.cpp
++	//       lines 884-893 in existing get_climate_for_gridcell).
++	//
++	//  Cross-references:
++	//  - notes/STEP_17a.md §7.3.2 (sub-step 7.3.2 plan + erratum-corrected
++	//    spinup_year_idx formula)
++	//  - notes/FOLLOWUPS.md F-12 (canonical revised plan)
++	//  - lpjguess/framework/framework.cpp year_outer additive block (the
++	//    caller of these methods)
++	//  - lpjguess/modules/imogen_input.h (C1.1 ImogenInput pattern; same
++	//    cache-key + cache-value structure)
++	//  - DKB 2026-05-10]
++
++	/// year_outer mode override: pre-load all needed years' climate for
++	/// ONE cell into the existing all_temp/all_prec/.../all_dtmax cache
++	/// via readenv(). Caches per-cell cell_idx + per-cell NDepData
++	/// value-copy in year_outer_cell_idx + year_outer_ndep_cache maps
++	/// respectively. Uses the corrected spinup_year_idx state-machine
++	/// reproduction formula:
++	///
++	///   spinup_year_idx_for_this = year_idx % NYEAR_SPINUP
++	///
++	/// NO `+1` in the formula. The existing getclimate() reads
++	/// spinup_year_idx VALUE BEFORE incrementing it on day 0, so for
++	/// cell C, spinup year Y, the value READ equals the count of PRIOR
++	/// day-0 increments WITHIN cell C = Y modulo NYEAR_SPINUP. The
++	/// formula has NO cell_idx dependence because IMOGENCFXInput::
++	/// getgridcell() RESETS spinup_year_idx = 0 at the start of every
++	/// cell (line 1122).
++	///
++	/// [Step 17c (17c.0.6) — B17(b) CLOSURE FIX (landed 2026-05-15):
++	///  the previous formula `(cell_idx * nyear_spinup + year_idx) %
++	///  NYEAR_SPINUP` was based on an INCORRECT assumption that
++	///  spinup_year_idx persists across cells in gridcell_outer mode
++	///  (per notes/STEP_17a.md §5.4 derivation; the "verified at sub-
++	///  step 7.3.1 4-cell PASS" claim was a B15-style structural false
++	///  positive). The spurious cell_idx*nyear_spinup term caused
++	///  divergent spinup climate inputs for cell_idx >= 1 → per-PFT-
++	///  total drift envelope (audit B17(b); see notes/STEP_17c.md §3.8
++	///  forensic + §3.8.6 closure record). Corrected here per the
++	///  canonical fix forensic at lpjguess/modules/imogen_input.cpp
++	///  preload_all_climate. - DKB 2026-05-15]
++	void preload_all_climate(Gridcell& gridcell, int first_calendar_year, int last_calendar_year);
++
++	/// year_outer mode override: serve cached climate per (cell, year, day).
++	/// Looks up cached cell_idx + ndep, computes imogen_year via the same
++	/// formula as preload_all_climate, finds store_index in the cache,
++	/// then on day 0: BLAZE compatibility check + populates per-day arrays
++	/// via get_climate_for_gridcell + ndep + co2; every day: assigns
++	/// climate.{temp WITHOUT K->C conversion, prec, insol, dtr conditional,
++	/// relhum, u10, tmin, tmax} + gridcell.{dNH4dep, dNO3dep}. Returns
++	/// false at sim-done terminator (calendar_year > lasthistyear) or on
++	/// missing-grid-point conditions.
++	bool getclimate_for_year(Gridcell& gridcell, int calendar_year, int day_of_year);
++
+ private:
+ 
+ 	/// Land cover input module
+@@ -143,15 +220,14 @@
+ 	/// Wind for current gridcell and current year
+ 	double dwind[Date::MAX_YEAR_LENGTH];
+ 
+-	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+-	//  Tmin / Tmax per-day arrays for IMOGEN engine's Tmin_anom.dat /
+-	//  Tmax_anom.dat outputs (per-year ASCII files written by the rebuild
+-	//  engine post-step-9.5-B2 / step-17b-B4 work). Backport from rebuild's
+-	//  lpjguess/modules/imogencfx.h lines 254-257.
+-	//  - DKB 2026-05-20 block 8.0.2]
+-	/// Tmin (daily minimum temperature) for current gridcell and current year (deg C; K->C conversion applied in get_climate_for_gridcell)
++	// [Step 9.5 of unified-codebase rebuild: per-day Tmin/Tmax arrays, populated
++	//  from monthly IMOGEN engine output Tmin_anom.dat / Tmax_anom.dat (when
++	//  the C++ engine emits them; Fortran-engine port deferred to step 9.5b).
++	//  Mirrors the cfxinput.cpp dmax_temp/dmin_temp pattern. - DKB 2026-05-07]
++	/// Minimum temperature for current gridcell and current year (deg C)
+ 	double dtmin[Date::MAX_YEAR_LENGTH];
+-	/// Tmax (daily maximum temperature) for current gridcell and current year (deg C; K->C conversion applied in get_climate_for_gridcell)
++
++	/// Maximum temperature for current gridcell and current year (deg C)
+ 	double dtmax[Date::MAX_YEAR_LENGTH];
+ 
+ 	/// Daily N deposition for one year
+@@ -197,14 +273,8 @@
+ 	xtring file_relhum;
+ 	xtring file_wind;
+ 
+-	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+-	//  file_tmin / file_tmax paths for IMOGEN engine's Tmin_anom.dat /
+-	//  Tmax_anom.dat per-year outputs. Backport from rebuild's
+-	//  lpjguess/modules/imogen_input.h lines 308-309 + corresponding
+-	//  imogencfx-side wiring. Set in .ins via file_tmin / file_tmax
+-	//  parameters pointing at <DIR_COMMON>/IMOGEN/output/YYYY/Tmin_anom.dat
+-	//  and Tmax_anom.dat. Empty path => engine output not consumed (graceful
+-	//  no-op in readenv per existing pattern). - DKB 2026-05-20 block 8.0.2]
++	// [Step 9.5: paths to IMOGEN engine's per-year Tmin_anom.dat / Tmax_anom.dat
++	//  output. Wired in init() + read in read_climate_for_year(). - DKB 2026-05-07]
+ 	xtring file_tmin;
+ 	xtring file_tmax;
+ 
+@@ -221,31 +291,7 @@
+ 	//static const int FIRST_HIST_YEAR = 2012;
+ 	static const int NYEAR_RUN = 200;
+ 
+-	// [Block 8.0.3 T_seq Installment-1 surgical site (h) — added at session 8.0.3
+-	//  acceptance-test execution per `notes/B47.md` §4.2 amendment:
+-	//  FIRST_SPINUP_YEAR was 1871 (legacy era; assumed engine produces
+-	//  1871-1900 climate library for the spinup cycle). Under T_seq, the
+-	//  rebuild's engine library starts at year 1900 (no pre-1900 dirs —
+-	//  intermediary_py covers 1900-2100 only per B34(β); engine YEAR1=1900);
+-	//  trunk's spinup logic at imogencfx.cpp::getclimate uses
+-	//  `imogen_year = FIRST_SPINUP_YEAR + spinup_year_idx` which would
+-	//  attempt to open <DIR_COMMON>/IMOGEN/output/1871/T_anom.dat etc.
+-	//  → file-not-found failure. Mismatch surfaced at session 8.0.3
+-	//  pre-flight (classic Rule #9 datapoint — harness-authoring + pre-flight
+-	//  inventory surfaces latent defect dormant pre-T_seq because F-10
+-	//  deadlock blocked rebuild's LPJG main loop + trunk's exit(200) regression
+-	//  blocked trunk's). Fix: align FIRST_SPINUP_YEAR with engine library
+-	//  coverage (1900). Spinup now cycles imogen_year in [1900..1929]; all
+-	//  years in engine library coverage; physically reasonable (spinup against
+-	//  1900-1929 climate = 30 distinct early-historical years).
+-	//  NEW B49 filed for long-term parametrize-as-.ins fix (analogous to
+-	//  B45 for the 1900/1901/2100/1871 sentinels in climatemodel.cpp;
+-	//  TRUNK-RELEVANT to BOTH forks — rebuild's lpjguess/modules/imogencfx.h:294
+-	//  has same hardcoded 1871 + will need same fix in Installment-2 era
+-	//  when rebuild's LPJG main loop eventually runs against pre-baked library
+-	//  post-F-12 tight-coupling resolution).
+-	//  - DKB 2026-05-20 block 8.0.3]
+-	static const int FIRST_SPINUP_YEAR = 1900;  // was 1871; aligned with engine library coverage under T_seq
++	static const int FIRST_SPINUP_YEAR = 1871;
+ 	static const int NYEAR_SPINUP = 30;
+ 
+ 	int spinup_year_idx; // year index for spinup (0..NYEAR_SPINUP-1)
+@@ -277,14 +323,33 @@
+ 	std::vector< std::vector< std::vector<double> > > all_dtr;
+ 	std::vector< std::vector< std::vector<double> > > all_drelhum;
+ 	std::vector< std::vector< std::vector<double> > > all_dwind;
+-	// [Block 8.0.2 T_seq Installment-1 (B4 8-field consumer wiring backport):
+-	//  Tmin / Tmax 3D storage [year][grid][month|day]. Same shape as all_temp
+-	//  etc. Backport from rebuild's lpjguess/modules/imogencfx.h
+-	//  lines (analogous all_dtmin / all_dtmax addition).
+-	//  - DKB 2026-05-20 block 8.0.2]
++
++	// [Step 9.5: storage for IMOGEN engine's per-year Tmin/Tmax across all
++	//  gridcells × all months/days in the smoke window. Resized in
++	//  read_climate_for_year() the same way all_temp is. - DKB 2026-05-07]
+ 	std::vector< std::vector< std::vector<double> > > all_dtmin;
+ 	std::vector< std::vector< std::vector<double> > > all_dtmax;
+ 
++	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
++	//  rebuild (2026-05-10 late evening): per-cell cache for year_outer mode.
++	//  Maps (lon, lat) coordinate keys to the cell-specific state captured
++	//  during preload_all_climate(). Mirrors imogen_input.h's C1.1 cache
++	//  member pattern (year_outer_cell_idx + year_outer_ndep_cache).
++	//
++	//  Why (lon, lat) keys vs Gridcell* identity: the framework re-creates
++	//  Gridcell objects between phases; pointer-identity is unreliable.
++	//  Coordinate keys are stable throughout the run.
++	//
++	//  Why NDepData is value-copied (not reference): NDepData is a value
++	//  type containing only arrays (no pointers/references); std::map
++	//  value-copies on insert; no aliasing issues. Per-cell cache holds
++	//  cell-specific Lamarque NDep state so getclimate_for_year doesn't
++	//  need to re-fetch ndep from the shared `ndep` member (which gets
++	//  overwritten as gridcells iterate).
++	//  - DKB 2026-05-10]
++	std::map< std::pair<double, double>, int > year_outer_cell_idx;
++	std::map< std::pair<double, double>, Lamarque::NDepData > year_outer_ndep_cache;
++
+ 	// Timers for keeping track of progress through the simulation
+ 	Timer tprogress, tmute;
+ 	static const int MUTESEC = 20; // minimum number of sec to wait between progress messages

@@ -263,17 +263,6 @@ namespace IMOGENConfig {
 	 bool CO2_RF_FAIR;
 	 bool FILE_NON_CO2;
 
-	 // [Block 8.0.2 T_seq Installment-1: skip_inprocess_engine_run gate.
-	 //  Default `false` preserves LTS-equivalent behaviour (RUN_IMOGEN_ENGINE
-	 //  fires in IMOGENCFXInput::init() per the existing prescribed-mode flow).
-	 //  Set true in the .ins to use T_seq sequential-standalone workflow
-	 //  (engine pre-baked externally; trunk-LPJG reads pre-staged climate).
-	 //  See parameters.h same-named comment block + notes/B47.md §0/§4.
-	 //  Backport from rebuild's lpjguess/framework/parameters.cpp line 300
-	 //  (originally Step 17a sub-step 7.3.2; 2026-05-10).
-	 //  - DKB 2026-05-20 block 8.0.2]
-	 bool skip_inprocess_engine_run = false;
-
 	 //Other booleans
 	 bool print_imogen_output=true; //default true
 	 bool include_feedback = true; //defaut true
@@ -284,6 +273,40 @@ namespace IMOGENConfig {
 	 xtring simulation_mode;
 	 xtring feedback_mode; //default
 	 xtring interpolation_mode; //can either be nearest neighbour/ inverse weighted distance
+
+	// [Step 8 of unified-codebase rebuild: coupling-mode gate; default "tight".
+	//  See followup F-10 for v1.0 caveats. - DKB 2026-05-06
+	//  Forward-ported to forks/trunk_r13078/ at block 8.2.4 (2026-05-26)
+	//  per the trunk-engine-up-to-snuff effort for v1.0 paper Track 2.
+	//  See parameters.h same-named comment block. - DKB block 8.2.4]
+	 xtring coupling_mode = "tight";
+
+	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
+	//  rebuild (2026-05-10 late evening): skip_inprocess_engine_run gate.
+	//  Default `false` preserves LTS-equivalent behaviour (RUN_IMOGEN_ENGINE
+	//  fires in IMOGENCFXInput::init() per the existing prescribed-mode flow).
+	//  When set to `true` in an .ins file (e.g. main_xval_imogencfx.ins),
+	//  the engine call is skipped and the user is responsible for having
+	//  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/. Used for
+	//  -input imogencfx cross-validation; bypasses F-10 deadlock. See
+	//  parameters.h same-named comment block for the full rationale.
+	//  - DKB 2026-05-10
+	//  RELOCATED here at block 8.2.4 (2026-05-26) from the block 8.0.2
+	//  T_seq Installment-1 position (right after FILE_NON_CO2; cosmetically
+	//  different) to canonical step-17a position matching lpjguess for
+	//  byte-identity of engine output. - DKB block 8.2.4]
+	 bool skip_inprocess_engine_run = false;
+
+	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
+	//  was added at step 9 then REMOVED at step 9's wrap-up; see
+	//  parameters.h same-named comment block for rationale. - DKB 2026-05-07]
+
+	// [Block 8.2.4 DEFERRAL NOTE (2026-05-26): the corresponding
+	//  `framework_loop_mode = "gridcell_outer"` definition at
+	//  lpjguess/framework/parameters.cpp is INTENTIONALLY NOT
+	//  forward-ported here per the block 8.2.4 scope decision (year_outer
+	//  scaffolding deferred to v1+ Installment-2 residual). See parameters.h
+	//  same-named DEFERRAL NOTE for the rationale. - DKB block 8.2.4]
 	 xtring ssprcp;
 
 	 //LPJG-IMOGEN Coupling config params

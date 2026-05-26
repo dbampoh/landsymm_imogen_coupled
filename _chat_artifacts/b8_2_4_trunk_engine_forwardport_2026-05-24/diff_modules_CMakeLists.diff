@@ -1,0 +1,18 @@
+--- forks/trunk_r13078/modules/CMakeLists.txt	2025-06-12 22:20:50.313864184 +0200
++++ lpjguess/modules/CMakeLists.txt	2026-05-06 19:55:12.252502671 +0200
+@@ -38,6 +38,7 @@
+   intermediary.h
+   climatemodel.h
+   imogenlogger.h
++  imogenoutput.h
+   )
+ 
+ set(source  
+@@ -78,6 +79,7 @@
+   intermediary.cpp
+   climatemodel.cpp
+   imogenlogger.cpp
++  imogenoutput.cpp
+   )
+ 
+ include(add_guess_sources)

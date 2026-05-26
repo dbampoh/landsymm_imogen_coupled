@@ -15,7 +15,15 @@ made in our `lpjguess/` tree (and the related Fortran IMOGEN
 
 - **Installment 1 (pre-paper; blocks 8.0.1-8.0.3 at session 8.0)**: bring `trunk_r13078` into rebuild repo at `forks/trunk_r13078/` (sibling to `lpjguess/`); apply minimal ~180-310 LOC C++ source-edit (skip_inprocess_engine_run flag + B4 8-field consumer wiring for Rh/W/Tmin/Tmax + per-year CO2.dat reader option-α + 1-line `exit(200)` regression removal at line 483). Purpose: bare-minimum Track-2-runnable state for paper-publication runs in sequential-standalone workflow (rebuild engine standalone Step A → trunk-LPJG standalone Step B reading pre-baked library). The `exit(200)` removal here reduces the §2 baseline-diff from 6-file to 5-file.
 
-- **Installment 2 (post-paper Backport Sprint per §1.2 policy; UNCHANGED timing)**: full forward-port of remaining ~2900-3100 LOC of rebuild deltas to `forks/trunk_r13078/`:
+- **Installment 1.5 (block 8.2.4 ✅ LANDED at 2026-05-26 session 11 day 2 close)**: engine-side slice of Installment-2 forward-ported (~1300 LOC TRUNK-RELEVANT); brings `forks/trunk_r13078/`'s C++ IMOGEN engine to **functional byte-identity** with `lpjguess/`'s engine port. Source-edits in 5 files (`framework/parameters.{h,cpp}` ~30 LOC + `modules/climatemodel.cpp` wholesale cp ~220 LOC + `modules/imogencfx.cpp` head+tail reconstruction ~200 LOC excluding ~438-LOC year_outer block deferred + `modules/CMakeLists.txt` 2 LOC) + 2 NEW files (`modules/imogenoutput.{h,cpp}` 821 LOC NEW). Phase G byte-identity verification: 250/250 md5 matches (5 SSPs × 5 sentinel years × 10 climate vars). **B61 ✅ CLOSED** at this block. Full evidence at `_chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/B8_2_4_evaluation_2026-05-26.md`. See §3 "Block 8.2.4 LANDED" entry for full per-file detail + per-edit backport guidance.
+
+- **Installment 2 (post-paper Backport Sprint per §1.2 policy; SCOPE REFINED at block 8.2.4 per Rule #10 datapoint #24)**: residual ~1300 LOC TRUNK-RELEVANT remaining (was ~2900-3100 LOC pre-block-8.2.4; engine slice ~1300 LOC LANDED at block 8.2.4 Installment-1.5). The residual scope decomposes:
+  - **year_outer scaffolding (~500 LOC)**: `framework/framework.cpp` year_outer additive block (~400 LOC) + `modules/imogencfx.cpp` IMOGENCFXInput::preload_all_climate + IMOGENCFXInput::getclimate_for_year implementations (~438 LOC excised at block 8.2.4; in deferral marker) + `modules/imogencfx.h` year_outer virtual overrides + year_outer_cell_idx + year_outer_ndep_cache maps + `<map>` + `<utility>` includes + `framework/parameters.{h,cpp}` framework_loop_mode declaration + definition + `framework/inputmodule.h` preload_all_climate + getclimate_for_year base-class virtuals. F-12 tight-coupling resolution prerequisite; not paper-blocking (paper Track 2 uses gridcell_outer default).
+  - **`imogen_input.{cpp,h}` consumer-side delta (~640 LOC)**: full forward-port of `lpjguess/modules/imogen_input.{cpp,h}` to `forks/trunk_r13078/modules/`. Affects `-input imogen` mode only; paper Track 2 uses `-input imogencfx` so non-paper-blocking.
+  - **Fortran `imogen/code/imogen_lpjg.f` step-3 ALLOCATABLE + B10 alternating-year + B33(c) WARN_POSIX_CONCAT_COLLAPSE deltas (~145 LOC)**: Fortran tree is fork-shared (per LEDGER §1.3); trunk inherits these automatically when the Fortran tree is updated. Bookkeeping-only item; no actual source-edit needed at `forks/trunk_r13078/`.
+  - **Cosmetic baseline-diff reconciliation (5 files)**: minor whitespace/comment differences in `framework/guess.h` + `modules/canexch.cpp` + `modules/landcover.cpp` + `data/ins/global_cfx.ins` + (critical `modules/imogencfx.cpp:483` exit(200) regression was removed at block 8.0.2 Installment-1; remaining 4 are purely cosmetic). Per LEDGER §2 baseline-diff.
+
+- **Pre-block-8.2.4 framing preserved per Rule #10 amendment-vs-rewrite**: Installment 2 was originally framed as ~2900-3100 LOC full forward-port of remaining rebuild deltas to `forks/trunk_r13078/`:
   - `imogencfx.cpp` year_outer scaffolding (~400 LOC: `preload_all_climate` + `getclimate_for_year`)
   - `imogenoutput.cpp` + `imogenoutput.h` (~821 LOC NEW; LPJG-side handshake-writer for v1.1+ tight coupling)
   - `climatemodel.cpp` engine-side delta (~263 LOC: B19 SPINUP/FIRSTCALL fix + B17(b) 4-LOC spinup_year_idx + Tmin/Tmax/Rh/W engine writers + B45 hardcoded year sentinels if fixed)
@@ -2236,6 +2244,98 @@ All gates ✅ PASS. **Rule #9 datapoint #15 carries forward unchanged** (no new 
 - **Sessions 9-11 Track 2 cluster production runs**: 5 SSP-RCPs × full 62538-cell × 1900-2100; trunk-T_seq on `owl` with MPI parallelization; ~hours per SSP on cluster
 - **Sessions 11-12 validation triad + paper figures** per `notes/PAPER_COMPLETION_AND_VALIDATION.md` §1 (4-axis validation: anthropogenic emissions + IMOGEN atm conc vs literature + IMOGEN climate vs ISIMIP3b + Track 1 vs Track 2 LPJG ecosystem)
 - **v1.0 GMD paper submission** (~6-11 weeks calendar from this commit)
+
+---
+
+### Block 8.2.4 LANDED (session 11 day 2 close, 2026-05-26 afternoon): Trunk-engine forward-port (engine-side Installment-2 slice ~1300 LOC) + 5-SSP trunk-engine library production + 250/250 byte-identity verification with rebuild's lpjguess engine; B61 ✅ CLOSED
+
+**Date:** 2026-05-26 (afternoon; session 11 day 2 close). **Commit hash:** _to be determined_ (this commit; on `main` working branch directly; tag candidate `v0.23.0-trunk-engine-forwardport-complete` reserved for this close commit; annotated; engine-side Installment-2 slice LANDED). **TRUNK-RELEVANT** (logically a separate Installment-2 slice; ~1300 LOC substantive source-edit + 2 NEW files within `forks/trunk_r13078/` source tree).
+
+**Source-edits at `forks/trunk_r13078/`** (~1300 LOC TRUNK-RELEVANT):
+
+#### File: `forks/trunk_r13078/framework/parameters.h` (~15 LOC substantive)
+- **Operation:** modify
+- **Lines:** ~488-501 (DELETE) + ~497-557 (ADD)
+- **Description:** DELETE Installment-1's `skip_inprocess_engine_run` block (cosmetic relocation); ADD `coupling_mode` declaration (step 8); RELOCATED `skip_inprocess_engine_run` at canonical step-17a position with refined documentation; ADD `imogen_nee_perturbation_factor` documentary comment (step 9 add-then-remove); ADD block 8.2.4 DEFERRAL NOTE for `framework_loop_mode` declaration (year_outer-only; deferred to v1+ Installment-2 Backport Sprint).
+- **Backport guidance:** byte-identical with `lpjguess/framework/parameters.h` lines 488-557 modulo the deferral-note comment block.
+
+#### File: `forks/trunk_r13078/framework/parameters.cpp` (~15 LOC substantive)
+- **Operation:** modify
+- **Lines:** ~266-275 (DELETE) + ~270-310 (ADD)
+- **Description:** matching .cpp counterpart to parameters.h; DELETE Installment-1's `skip_inprocess_engine_run = false;` definition; ADD `xtring coupling_mode = "tight";` + RELOCATED `bool skip_inprocess_engine_run = false;` at canonical position; ADD documentary comments + block 8.2.4 DEFERRAL NOTE for `xtring framework_loop_mode = "gridcell_outer";`.
+- **Backport guidance:** byte-identical with `lpjguess/framework/parameters.cpp` analogous section modulo the deferral-note comment block.
+
+#### File: `forks/trunk_r13078/modules/imogenoutput.h` (NEW; 222 LOC)
+- **Operation:** add
+- **Description:** wholesale `cp` from `lpjguess/modules/imogenoutput.h` (md5 `9bdcb726fae8a8e90c2254fef1b8590a` byte-identical). The step-8 / step-17b ImogenOutput class declaration (OutputModule subclass + singleton pattern + flush_pending_year + flush_year + flush_year_globally_synchronized + reset_accumulators + gridcell_area_m2 + MPI integration).
+- **Backport guidance:** byte-identical with lpjguess.
+
+#### File: `forks/trunk_r13078/modules/imogenoutput.cpp` (NEW; 599 LOC)
+- **Operation:** add
+- **Description:** wholesale `cp` from `lpjguess/modules/imogenoutput.cpp` (md5 `bf8b49019a9a475595c39777f4545551` byte-identical). The step-8 / step-17b ImogenOutput class implementation: per-year handshake-file writes per coupling_mode ("tight"|"prescribed"|"loose"); MPI-2 SEEK_SET ordering for `#include <mpi.h>` per step 17b C2 core integration; singleton-pointer static-member ctor/dtor; init() + outannual() + flush_year() + reset_accumulators() etc.
+- **Backport guidance:** byte-identical with lpjguess.
+
+#### File: `forks/trunk_r13078/modules/CMakeLists.txt` (~2 LOC)
+- **Operation:** modify
+- **Lines:** 40-41 (add `imogenoutput.h` to headers set) + 81-82 (add `imogenoutput.cpp` to source set)
+- **Description:** wire the NEW imogenoutput.{h,cpp} into trunk's CMake build.
+- **Backport guidance:** byte-identical with lpjguess.
+
+#### File: `forks/trunk_r13078/modules/climatemodel.cpp` (~220 LOC substantive)
+- **Operation:** modify (wholesale `cp` from lpjguess)
+- **Description:** trunk's pre-rebuild-deltas baseline (md5 `fcc7110a9246d057f540cdcc96f1b803`) wholesale-replaced with lpjguess's full-deltas version (md5 `8dcced2834fa083a41ca84fd29bb4206`). 22 hunks of changes folded in via cp: step-7 polling guards (C2/C3/C4 bug fixes) + step-8 imogenoutput integration / coupling_mode dispatch + step-9.5 8-field Tmin/Tmax/Rh/W per-day writers + step-17a engine writer fix + B19 closed-loop verification + B37 path-iv done-marker sidecar + B39 Law Dome 1900 init-seed handling + B44 --engine-only-mode productisation + B45 v1+ source-edit cleanup. Zero year_outer entanglement so wholesale cp is safe.
+- **Backport guidance:** byte-identical with lpjguess.
+
+#### File: `forks/trunk_r13078/modules/imogencfx.cpp` (~150-200 LOC substantive; ~415 LOC excised for year_outer deferral)
+- **Operation:** modify (head + tail composition from lpjguess + StrReplace)
+- **Description:** trunk's imogencfx.cpp reconstructed via `head -n 1307 lpjguess/modules/imogencfx.cpp` + block 8.2.4 deferral marker (24 LOC) + `tail -n +1747 lpjguess/modules/imogencfx.cpp`. Excises the ~438-LOC year_outer block at lpjguess lines 1309-1746: `IMOGENCFXInput::preload_all_climate` + `IMOGENCFXInput::getclimate_for_year` implementations (year_outer scaffolding; F-12 tight-coupling resolution; v1+ Installment-2 residual). Result: 1360 LOC vs lpjguess 1774. Additional StrReplace: removed `declare_parameter("framework_loop_mode", &IMOGENConfig::framework_loop_mode, ...)` at line 353 (NEW Rule #9 datapoint #22 surfaced at Phase D harness; `IMOGENConfig::framework_loop_mode` is deferred at Phase B parameters.{h,cpp}; would fail to compile if kept).
+- **Backport guidance:** byte-identical with lpjguess for the non-year_outer slice (1307 lines from head + 28 lines from tail = 1335 lines + 25 lines of deferral marker). The year_outer slice + framework_loop_mode declare_parameter remain in lpjguess for v1+ Installment-2 Backport Sprint to backport atomically (paired with framework.cpp year_outer additive block + InputModule::preload_all_climate + InputModule::getclimate_for_year base-class virtuals + parameters.{h,cpp} framework_loop_mode declaration + definition).
+
+**Source-edits at `forks/trunk_r13078_runs/<SSP>/`** (5 SSPs × 2 .ins files = 10 file modifications + 5 backup files preserved):
+
+#### Files: `forks/trunk_r13078_runs/<SSP>/imogen_intermediary.ins` (5 SSPs)
+- **Operation:** modify (wholesale replace from `runs/<SSP>/imogen_intermediary.ins` + 4 relative-path depth-adjustments per file)
+- **Description:** trunk-runs's predecessor-era 169 LOC structure (block 8.0.2 cp from predecessor) wholesale-replaced with rebuild's runs/<SSP>/'s 370 LOC step-9 + B-series structure (B34(β) 2026-05-18 aligned). NEW Rule #9 datapoint #21 surfaced at Phase D harness — predecessor-era values active (YEAR1=1871, IYEND=1871, YEAR1_LPJG=1901, SPINUP=1) caused engine to start year-loop at 1871 instead of 1900; only relevant when trunk's engine actually runs (post-block-8.2.4) since T_seq workflow uses skip_inprocess_engine_run=1 making engine config dormant. **4 relative-path depth-adjustments** per SSP applied post-replace (NEW Rule #9 datapoint #22): `DIR_PATT`, `DIR_CLIM`, `FILE_NON_CO2_VALS`, `FILE_GRIDLIST` `../../` → `../../../` (rebuild's runs/<SSP>/ is depth 2 from project root; trunk's forks/trunk_r13078_runs/<SSP>/ is depth 3).
+- **Backup preserved:** as `forks/trunk_r13078_runs/<SSP>/imogen_intermediary.ins.pre_block_8_2_4_predecessor_baseline` (gitignored; for forensic audit reference per Rule #10 amendment-vs-rewrite).
+
+#### Files: `forks/trunk_r13078_runs/<SSP>/main_engine_only.ins` (5 SSPs)
+- **Operation:** modify (1 relative-path depth-adjustment per file)
+- **Description:** End-of-file override `FILE_NON_CO2_VALS "../../imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp<TAG>.txt"` → `"../../../imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp<TAG>.txt"` (same Rule #9 datapoint #22 depth-adjust). Per-SSP variant: ssp126/ssp245/ssp370/ssp460/ssp585.
+
+**Source-edits at `scripts/`** (~20 LOC TRUNK-IRRELEVANT-by-novelty):
+
+#### File: `scripts/run_trunk_engine_only.sh` (~+22 LOC bootstrap + ~+5 LOC env-overridable TRUNK_BIN)
+- **Operation:** modify
+- **Description:** (a) make `TRUNK_BIN` env-overridable (`TRUNK_BIN="${TRUNK_BIN:-${ROOT}/forks/trunk_r13078/build/guess}"`) so block-8.2.4 canary can target `forks/trunk_r13078/build_b824/guess`; (b) add bootstrap block before sidecar spawn that writes seed `imogen_lpjg.txt` + `done` markers to `${HSHAKE_DIR}/` (mirrors lpjguess's `scripts/run_coupled.sh --engine-only-mode` Step [4/7] pattern at lines 414-446). Surfaced as Rule #9 datapoint #20 at Phase D harness (engine polling loop stuck with RUNNOW_EXIST=0 without bootstrap; identical signature to block 8.2 Phase F failure that originally surfaced B61).
+- **Backport guidance:** rebuild-only operational script; TRUNK-IRRELEVANT-by-novelty.
+
+**Cumulative state at block 8.2.4 close**:
+
+- Engine libraries at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/` are NOW TRUNK'S OWN ENGINE OUTPUT (5 × ~443 MB = ~2.2 GB; gitignored data); block 8.2 Phase E lpjguess-cp'd libraries preserved as `output_pre_block_8_2_4_lpjguess_cp_reference/` for Phase G byte-identity audit reference.
+- Engine libraries at `runs/<SSP>/Common-directory/IMOGEN/output/` UNCHANGED (~2.2 GB; rebuild's lpjguess engine output; remains as redundant cross-validation reference for paper).
+- Total engine library disk: ~4.4 GB (UNCHANGED; γ-physical-separation policy preserved).
+- **Cumulative T_seq Installment-1 source-edit**: ~297 LOC UNCHANGED (block 8.0.1-8.1 stable).
+- **Installment-2 engine slice LANDED at this block**: ~1300 LOC TRUNK-RELEVANT (3-fold accounting refinement per Rule #10 datapoint #24 honest re-estimate; was originally framed as B61 ~263 LOC; actual is ~1300 LOC including imogenoutput.{cpp,h} 821 LOC NEW + imogencfx.cpp non-year_outer ~200 LOC + parameters.{cpp,h} ~30 LOC).
+- **Installment-2 residual for v1+ Backport Sprint**: ~1300 LOC (year_outer scaffolding ~500 LOC across imogencfx.{cpp,h} + framework.cpp + InputModule virtuals + parameters.{cpp,h} framework_loop_mode + imogen_input.{cpp,h} ~640 LOC consumer-side delta + Fortran B33(c) ~145 LOC).
+- v1.0 % done: ~97-99% (slight increment from ~96-98% at block 8.2 close).
+- **Calendar to v1.0 GMD submission**: ~5-9 weeks (UNCHANGED; slightly tighter due to wholesale-cp shortcut + 4-way parallelism reducing block-8.2.4 wall to ~3.5 hrs vs ~5-7 days plan estimate).
+- **Rule #9 datapoints**: now at #22 (added #20-#22 at this block; prior at #19 per block 8.2 close).
+- **Rule #10 datapoints**: now at #24 (added #24 = scope-vs-Installment-2 honest re-estimate at this block; prior at #23 per block 8.2 phase F).
+- **B61 ✅ CLOSED** at this block (climatemodel.cpp non-byte-identity ~263 LOC; resolved by wholesale cp; scope refined to ~1300 LOC engine slice LANDED).
+
+**Phase G byte-identity verification (Rule #10 verification-integrity discipline)**:
+
+5 SSPs × 5 sentinel years (1900, 1950, 2000, 2050, 2100) × 10 climate variables (T_anom, P_anom, SW_anom, DTEMP_anom, Rh_anom, W_anom, Tmin_anom, Tmax_anom, WET, CO2) = **250/250 ✅ md5 byte-identical** matches between trunk's freshly-forward-ported engine output (block 8.2.4) and lpjguess's engine reference (block 8.2 Phase D cp'd to trunk-runs at Phase E preserved as `output_pre_block_8_2_4_lpjguess_cp_reference/`). CO2 trajectory values numerically match exactly across all 5 SSPs (SSP1-2.6 2100 = 427.62 ppm peak-then-decline; SSP2-4.5 = 590.815; SSP3-7.0 = 826.34; SSP4-6.0 = 631.473; SSP5-8.5 = 1092.59 — all within IPCC AR6 / Friedlingstein 2025 GCB published ranges).
+
+**Architectural consistency confirmed** (per user-flagged sanity-check questions session 11 day 2):
+- Both forks consume intermediary_py adapter outputs (RCMIP-backboned; CMIP6-SSP-RCP scenarios) — NOT legacy IIASA (IIASA paths empty/commented in imogen_intermediary.ins).
+- Both forks use CMIP6 MRI-ESM2-0 GCM patterns (`imogen/patterns/CEN_CMIP6_MOD_MRI-ESM2-0/`; CMIP6 model in CMIP5-format-ASCII; converted from `imogen/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/mri-esm2-0_patterns.nc` per step 5 of rebuild plan).
+- Both forks use B39 Law Dome 1900 init seeds (296.1 ppm CO2 / 875.6 ppb CH4 / 277.4 ppb N2O).
+- CO2.dat output format properly space-separated `YEAR CO2_PPMV ... CH4_PPBV N2O_PPBV` (8-column tabular; standard IMOGEN format; byte-identical between forks).
+
+**Audit-evidence bundle**: `_chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/` (~10 files; ~3000 LOC): B8_2_4_evaluation_2026-05-26.md (~620 LOC canonical landing) + B8_2_4_forward_port_plan.md (Phase A; user-approved) + phase_{b,c}_complete.md + phase_{b,c}_make.log + phase_d_ssp126_canary_v{1..5}.log + phase_e_SSP{2-4.5,3-7.0,4-6.0,5-8.5}.log + 7 baseline diff_*.diff files + diff_imogen_intermediary_ins_trunk_vs_rebuild.diff.
+
+**POST-BLOCK-8.2.4 NEXT**: block 8.2.5 switchable-regrid-strategy wiring (δ-B Fortran + δ-B-variant TRUNK-CPP-ENGINE pipelines via FastRegrid; 4-cell smoke side-by-side; ~1.5-2 d) → block 8.3 cluster smoke (~0.5 d) → block 8.4 cluster production-config delta + two-track directories (~1-1.5 d) → blocks 8.5-8.7 + sessions 9-11 Track 2 cluster production + sessions 11-12 validation triad + paper writing + v1.0 GMD submission.
 
 ---
 

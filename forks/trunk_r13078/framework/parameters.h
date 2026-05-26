@@ -485,21 +485,6 @@ namespace IMOGENConfig {
     extern bool CO2_RF_FAIR;
     extern bool FILE_NON_CO2;
 
-    // [Block 8.0.2 T_seq Installment-1: skip_inprocess_engine_run flag.
-    //  Gates the in-process IMOGEN engine invocation in IMOGENCFXInput::init()
-    //  (the RUN_IMOGEN_ENGINE() call at imogencfx.cpp line 482). When true,
-    //  the engine call is skipped and the user is responsible for having
-    //  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via a separate
-    //  rebuild-engine run (e.g., rebuild's `scripts/run_coupled.sh
-    //  --engine-only-mode` per B44 productisation). This is the T_seq
-    //  sequential-standalone workflow per notes/B47.md §0 + §4.
-    //  Backport from rebuild's lpjguess/framework/parameters.h lines 530-548
-    //  (originally Step 17a F-12 sub-milestone C1.3 sub-step 7.3.2; 2026-05-10).
-    //  Default at parameters.cpp is `false` preserving LTS-equivalent
-    //  behaviour (engine runs in-process).
-    //  - DKB 2026-05-20 block 8.0.2]
-    extern bool skip_inprocess_engine_run;
-
     //Other booleans
     extern bool print_imogen_output;
 	extern bool include_feedback;
@@ -510,6 +495,66 @@ namespace IMOGENConfig {
 	extern xtring simulation_mode;
 	extern xtring feedback_mode;
 	extern xtring interpolation_mode;
+
+	// [Step 8 of unified-codebase rebuild: gates ImogenOutput's per-year
+	//  handshake-file writes. Values: "tight" | "prescribed" | "loose".
+	//  Default at parameters.cpp is "tight". See followup F-10 in
+	//  notes/FOLLOWUPS.md for the framework-loop ordering caveat that
+	//  applies to "tight" in v1.0. - DKB 2026-05-06
+	//  Forward-ported to forks/trunk_r13078/ at block 8.2.4 (2026-05-26)
+	//  per the trunk-engine-up-to-snuff effort for v1.0 paper Track 2;
+	//  see _chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/
+	//  B8_2_4_forward_port_plan.md §0.1 + §1.1. - DKB block 8.2.4]
+	extern xtring coupling_mode;
+
+	// [Step 17a (F-12 sub-milestone C1.3 sub-step 7.3.2) of unified-codebase
+	//  rebuild (2026-05-10 late evening): skip_inprocess_engine_run flag.
+	//  Gates the in-process IMOGEN engine invocation in IMOGENCFXInput::init()
+	//  (the RUN_IMOGEN_ENGINE() call at imogencfx.cpp ~line 524). When true,
+	//  the engine call is skipped and the user is responsible for having
+	//  pre-staged climate at <DIR_COMMON>/IMOGEN/output/<YYYY>/ via a
+	//  separate launcher run (or via REGRID=1 + alternative driver, etc.).
+	//  When false (DEFAULT; preserves LTS-equivalent behaviour), the engine
+	//  runs in-process per the existing prescribed-mode flow.
+	//
+	//  Primary purpose: enables -input imogencfx cross-validation (Run A
+	//  gridcell_outer vs Run B year_outer) WITHOUT triggering the F-10
+	//  deadlock at IMOGENCFXInput::init(). Per STEP_17a.md §7.3.2 option (a)
+	//  recommendation; see also FOLLOWUPS.md F-12 + EXECUTION_PLAN.md V.1
+	//  step row 17a + the session-2 chat handoff Part 13.
+	//
+	//  Default at parameters.cpp is `false`. - DKB 2026-05-10
+	//  Originally added to forks/trunk_r13078/ at block 8.0.2 T_seq
+	//  Installment-1 (declaration after FILE_NON_CO2; cosmetically different
+	//  placement). RELOCATED here at block 8.2.4 (2026-05-26) to canonical
+	//  step-17a position matching lpjguess for byte-identity of engine
+	//  output. - DKB block 8.2.4]
+	extern bool skip_inprocess_engine_run;
+
+	// [Step 9 of unified-codebase rebuild: imogen_nee_perturbation_factor
+	//  was added at step 9 as a V.1 step-9 verification helper, then
+	//  REMOVED at step 9's wrap-up (per user code-integrity preference)
+	//  because the smoke test empirically confirmed F-10's architectural
+	//  deadlock means LPJG main loop never runs in v1.0 single-process
+	//  mode -- so the perturbation factor cannot affect anything that's
+	//  actually observable. Resolution will be designed at follow-up F-12
+	//  (multi-pass / two-process verification). - DKB 2026-05-07
+	//  Forward-ported to forks/trunk_r13078/ at block 8.2.4 (2026-05-26)
+	//  as documentary placeholder; the parameter itself was never added.
+	//  - DKB block 8.2.4]
+
+	// [Block 8.2.4 DEFERRAL NOTE (2026-05-26): the corresponding
+	//  `framework_loop_mode` declaration at lpjguess/framework/parameters.h
+	//  is INTENTIONALLY NOT forward-ported here per the block 8.2.4 scope
+	//  decision (year_outer scaffolding deferred to v1+ Installment-2
+	//  residual). Paper Track 2 uses gridcell_outer (default) so
+	//  framework_loop_mode is not exercised. Adding the parameter
+	//  declaration without the corresponding framework.cpp year_outer
+	//  additive block + InputModule virtuals + imogencfx.cpp overrides
+	//  would create dangling state. v1+ Backport Sprint will land the
+	//  full year_outer scaffolding atomically. See
+	//  _chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/
+	//  B8_2_4_forward_port_plan.md §0.2. - DKB block 8.2.4]
 
     //LPJG-IMOGEN Coupling config params
     extern int  YEAR1; //!IN First year of the numerical experiment

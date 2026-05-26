@@ -72,7 +72,11 @@ fi
 SSP="$1"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TRUNK_BIN="${ROOT}/forks/trunk_r13078/build/guess"
+# [Block 8.2.4 (2026-05-26) — TRUNK_BIN env-overridable so block 8.2.4 canary
+#  run can target ${ROOT}/forks/trunk_r13078/build_b824/guess (the
+#  block-8.2.4 forward-port-built binary) while preserving the legacy
+#  ${ROOT}/forks/trunk_r13078/build/guess default for future use. - DKB]
+TRUNK_BIN="${TRUNK_BIN:-${ROOT}/forks/trunk_r13078/build/guess}"
 TRUNK_RUN_DIR="${ROOT}/forks/trunk_r13078_runs/${SSP}"
 INS_FILE="${TRUNK_RUN_DIR}/main_engine_only.ins"
 COMMON_DIR="${TRUNK_RUN_DIR}/Common-directory"
@@ -110,6 +114,33 @@ if [ -d "${OUTPUT_DIR}" ] && [ "$(ls -A "${OUTPUT_DIR}" 2>/dev/null | wc -l)" -g
   rm -rf "${OUTPUT_DIR}"
 fi
 mkdir -p "${OUTPUT_DIR}"
+
+# [Block 8.2.4 (2026-05-26) — bootstrap handshake file imogen_lpjg.txt mirroring
+#  lpjguess's scripts/run_coupled.sh --engine-only-mode pattern at Step [4/7]
+#  (lines 414-446 of that script). Without this bootstrap, trunk's freshly-
+#  forward-ported engine (now byte-identical with lpjguess's climatemodel.cpp at
+#  the step-7 polling guard logic introduced at C2/C3 fix) gets stuck in the
+#  polling loop because runnowExist=false (no imogen_lpjg.txt to read).
+#  Engine reads actual config from IMOGENConfig (parsed from imogen_intermediary.ins)
+#  after escaping the first poll; bootstrap values are only seeds for iteration 1's
+#  polling escape. Surfaced as Rule #9 datapoint at Phase D canary. - DKB block 8.2.4]
+echo "[setup] Bootstrap-writing imogen_lpjg.txt + done at ${HSHAKE_DIR}/" | tee -a "${LOG_FILE}"
+YEAR1_BOOT=1900
+IYEND_BOOT=1901
+if [ "${YEAR1_BOOT}" -lt 1901 ]; then SPINUP_BOOT="TRUE"; else SPINUP_BOOT="FALSE"; fi
+FIRSTCALL_BOOT="TRUE"
+cat > "${HSHAKE_DIR}/imogen_lpjg.txt" <<EOF
+YEAR1 ${YEAR1_BOOT} !IN First year of the numerical experiment
+IYEND ${IYEND_BOOT} !IN Stop year of the ENTIRE run
+YEAR1_LPJG ${YEAR1_BOOT} !IN First year of the whole LPJ-GUESS simulation
+SPINUP ${SPINUP_BOOT} !IN Are we in the spin-up phase of LPJ-GUESS?
+KEEPRUNNING TRUE !IN control flag to keep imogen running
+FIRSTCALL ${FIRSTCALL_BOOT} !IN Is this the very first call to IMOGEN from LPJ-GUESS
+EOF
+if [ ! -f "${HSHAKE_DIR}/done" ]; then
+  echo "bootstrap" > "${HSHAKE_DIR}/done"
+fi
+echo "[setup] Bootstrap files written: ${HSHAKE_DIR}/{imogen_lpjg.txt, done} (SPINUP=${SPINUP_BOOT}, FIRSTCALL=${FIRSTCALL_BOOT}, KEEPRUNNING=TRUE)" | tee -a "${LOG_FILE}"
 
 # Spawn path-iv sidecar: touch done marker every 1s (mimics scripts/run_coupled.sh --engine-only-mode)
 (while true; do touch "${HSHAKE_DIR}/done" 2>/dev/null; sleep 1; done) &

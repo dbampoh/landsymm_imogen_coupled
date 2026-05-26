@@ -261,7 +261,82 @@ The `paper/` subdir in the rebuild repo is currently empty (only `README.md`); p
 
 > **✅ ENGINE IDENTITY + REGRID-STRATEGY ADDENDUM**: per block 8.1.5 findings (§1+§12+§13 of `_chat_artifacts/b8_1_5_architectural_clarification_2026-05-22/B8_1_5_architectural_clarification_findings_2026-05-22.md`), the v1.0 paper Methods §2.2 SHOULD explicitly note: (1) the IMOGEN engine implementation used is the C++ port embedded in LPJ-GUESS (`climatemodel.cpp::RUN_IMOGEN_ENGINE()`), which produces climate on IMOGEN's native 1631-point pattern grid; (2) for v1.0 production runs, the **Option δ-B switchable-regrid-strategy** uses the standalone Fortran IMOGEN with `REGRID=TRUE` + `NGPOINTS=3698` to produce 3698-grid climate, which is then regridded to the full 62892-cell LPJG gridlist via FastRegrid (inverse-distance-weighted interpolation) — matching the predecessor coupled-model architecture for apples-to-apples Axis 4 validation; (3) the v1.1+ trajectory includes porting the REGRID branch to the C++ port (and optionally switching to the IMOGENCXX C++ engine backport per B52) for a unified in-process architecture. **Also** add a sentence in the Discussion §5 v1.1+ outlook on the IMOGENCXX C++ backport (B52) + switchable-regrid-strategy (β/δ-A/δ-B) as future work extending the coupling framework.
 
-### 4.5 Paper Methods §2.2 draft text — v1.0 prescribed-mode coupling architecture (drafted at session 8.0.3 follow-up; 2026-05-20 ~7:12 PM; **POST-BLOCK-8.2 honest-disclosure refinement 2026-05-23 session 10 day 1 close**)
+### 4.5 Paper Methods §2.2 draft text — v1.0 prescribed-mode coupling architecture (drafted at session 8.0.3 follow-up; 2026-05-20 ~7:12 PM; **POST-BLOCK-8.2 honest-disclosure refinement 2026-05-23 session 10 day 1 close; POST-BLOCK-8.2.4 trunk-engine-throughout tightening 2026-05-26 session 11 day 2 close**)
+
+#### 4.5.0 POST-BLOCK-8.2.4 trunk-engine-throughout framing (2026-05-26; LOCKED IN per block 8.2.4 byte-identity verification)
+
+> **✅ TRUNK-ENGINE-THROUGHOUT FRAMING LOCKED IN** at block 8.2.4 close (2026-05-26 session 11 day 2). Block 8.2.4 forward-ported the engine-side slice of LEDGER §1.2 Installment-2 (~1300 LOC) into `forks/trunk_r13078/`, bringing trunk's C++ IMOGEN engine to **functional byte-identity** with rebuild's lpjguess engine. Trunk's freshly-built `build_b824/guess` binary produced all 5 SSP engine libraries at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/` (5 × 443 MB = ~2.2 GB; 1900-2101). **Phase G byte-identity verification: 250/250 ✅ md5 matches** (5 SSPs × 5 sentinel years × 10 climate variables) between trunk's NEW engine output and rebuild's lpjguess-engine reference. CO2 trajectory values numerically match exactly (SSP1-2.6 2100 = 427.62 ppm peak-then-decline; SSP2-4.5 = 590.815; SSP3-7.0 = 826.34; SSP4-6.0 = 631.473; SSP5-8.5 = 1092.59; all within IPCC AR6 / Friedlingstein 2025 GCB ranges). **B61 ✅ CLOSED** at this block. Full evidence at `_chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/B8_2_4_evaluation_2026-05-26.md`.
+
+> **Methodological argument LOCKED IN**: "`trunk_r13078` throughout — engine + LPJG + natural-emission preprocessor — with rebuild's lpjguess as the active v1+ development surface." This satisfies paper-reviewer-defensibility concerns about fork-consistency between Track 1 (ISIMIP3b-forced trunk_r13078 LPJG) and Track 2 (IMOGEN-forced trunk_r13078 LPJG) without requiring full bidirectional fork-parity (which is the v1+ Installment-2 Backport Sprint target; ~1300 LOC residual: year_outer scaffolding + imogen_input.{cpp,h} + Fortran B33(c) — not paper-blocking).
+
+> **Paper Methods §2.2 (CANONICAL; LOCKED IN at block 8.2.4 close)**:
+
+```
+## Methods §2.2 — Coupled-model architecture for v1.0 Track 2 production runs
+
+Both Track 1 (ISIMIP3b-forced trunk_r13078 LPJG runs) and Track 2 (IMOGEN-forced
+trunk_r13078 LPJG runs) use the **same LPJG ecosystem-model fork**
+(`forks/trunk_r13078/`), ensuring a clean differential isolating climate-driver
+source as the experimental variable.
+
+The IMOGEN engine producing Track 2's climate library is the **C++ port located
+in `forks/trunk_r13078/modules/`**, brought to functional byte-identity with
+the rebuild's lpjguess engine port at block 8.2.4 (2026-05-26). The forward-port
+brings the engine-side slice of the trunk-rebuild fork-parity reconciliation
+(~1300 LOC: climatemodel.cpp + imogenoutput.{cpp,h} NEW + imogencfx.cpp
+non-year_outer slice + parameters.{cpp,h} engine-side declarations + CMakeLists.txt
+build wiring). Byte-identity of the trunk-engine vs rebuild-engine climate
+libraries was verified across all 5 SSP-RCP scenarios × 5 sentinel years
+(1900, 1950, 2000, 2050, 2100) × 10 climate variables (T_anom, P_anom, SW_anom,
+DTEMP_anom, Rh_anom, W_anom, Tmin_anom, Tmax_anom, WET, CO2) = 250/250 md5
+byte-identity matches per `_chat_artifacts/b8_2_4_trunk_engine_forwardport_
+2026-05-24/B8_2_4_evaluation_2026-05-26.md` §1.6.
+
+The natural-emission processing in intermediary_py uses pre-baked offline
+`trunk_r13078` LPJG output (`intermediary_py/imogen_ghg_controller/inputs/lpjg/`
+~1.5 GB; from prior trunk_r13078 production runs), ensuring engine + ecosystem
+model + natural-emission preprocessor are all on the same fork lineage. The
+rebuild fork (`lpj-guess_imogen_landsymm/lpjguess/`) serves as the active v1+
+development surface; full bidirectional fork-parity reconciliation including
+the `imogen_input.cpp` consumer-side delta + `year_outer` framework scaffolding
++ Fortran `imogen_lpjg.f` B33(c) deltas is the post-paper Installment-2
+Backport Sprint target (~1300 LOC residual).
+
+The IMOGEN engine consumes anthropogenic emissions (CO2, CH4, N2O) from the
+intermediary_py pipeline (RCMIP-backboned; CMIP6-SSP-RCP scenarios), CMIP6
+non-CO2 radiative forcing inputs (`imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/
+nonco2_ch4_n2o_RF_historical_ssp<TAG>.txt` per SSP), and pre-baked offline
+trunk_r13078 LPJG natural-emission outputs. The engine performs pattern-scaling
+using **CMIP6 MRI-ESM2-0 GCM patterns** (`imogen/patterns/CEN_CMIP6_MOD_MRI-
+ESM2-0/`; converted from `imogen/patterns/CMIP6_IMOGEN_EBM_values_and_patterns/
+mri-esm2-0_patterns.nc` per step 5 of the rebuild plan). Initial atmospheric
+concentrations follow Law Dome 1900 ice-core record (MacFarling Meure 2006;
+296.1 ppm CO2 / 875.6 ppb CH4 / 277.4 ppb N2O) per B39.
+
+CO2 trajectories produced by the engine are physically sensible per IPCC AR6
+/ Friedlingstein 2025 GCB published ranges across all 5 SSPs (Table M-§2.2-1):
+SSP1-2.6 2100 = 427.62 ppm (peak-then-decline; ~430 ppm IPCC AR6 expected);
+SSP2-4.5 = 590.815 ppm (~590 ppm); SSP3-7.0 = 826.34 ppm (~830 ppm); SSP4-6.0
+= 631.473 ppm (~630 ppm); SSP5-8.5 = 1092.59 ppm (~1090 ppm).
+
+For Track 2 production runs, the per-SSP climate library at
+`forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/` (1900-2101;
+202 year-dirs × ~443 MB) is regridded from IMOGEN's native 1631-point pattern
+grid to the LPJG 62,892-cell production gridlist via chained FastRegrid
+(nearest-neighbor 1631→3698 + inverse-distance-weighted 3698→62892); the
+regridded library is then consumed by trunk_r13078's LPJG (`forks/trunk_r13078/
+build_owl/guess -input imogencfx`) on the KIT IMK-IFU `owl` cluster
+(2 nodes × 128 CPUs/node = 256 ranks on `genius` partition; ~5-15 hours total
+wall across 5 SSP-RCPs × 62538 cells × 1900-2100).
+```
+
+#### 4.5.-1 PRIOR Methods §2.2 framing (block 8.2 honest-disclosure refinement 2026-05-23; SUPERSEDED by §4.5.0 above per Rule #10 amendment-vs-rewrite)
+
+The Methods §2.2 framing below (drafted at block 8.2 close per session 10 day 1) was authored under the architectural state where rebuild's lpjguess engine produced the climate library at `runs/<SSP>/Common-directory/IMOGEN/output/` which was cp'd to `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/` at block 8.2 Phase E (γ-physical separation; same data; different filesystem location matching the LPJG consumer fork). Block 8.2.4 (2026-05-26) brought trunk's own engine to byte-identity with rebuild's, making the γ-physical-cp framing OBSOLETE: trunk's NEW engine now produces its own libraries at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/`; rebuild's engine output at `runs/<SSP>/` remains as redundant cross-validation reference. The "honest disclosure" framing below is preserved per Rule #10 amendment-vs-rewrite for forensic continuity; the canonical Methods §2.2 is now §4.5.0 above.
+
+(Original block 8.2 honest-disclosure refinement preserved verbatim below; superseded by §4.5.0)
+
+### 4.5.-2 ORIGINAL Block 8.2 honest-disclosure refinement (2026-05-23 session 10 day 1 close; SUPERSEDED)
 
 **Status**: ⏳ DRAFT — authored at session 8.0.3 follow-up exchange in conversation with user; deposited here for sessions 11-12 paper-writing phase to pick up + refine. Per Rule #10 amendment-vs-rewrite corollary, this draft text is the cumulative refinement post §1.4 HYBRID-PRE-BAKED ARCHITECTURE CLARIFICATION + .ins-config-alignment refinement (both 2026-05-20 same exchange) + **POST-BLOCK-8.2 honest-disclosure refinement** (2026-05-23 session 10 day 1 close — discloses that v1.0 Track 2 uses rebuild's improved C++ IMOGEN engine library cp'd to trunk-runs side rather than trunk's own engine, because of climatemodel.cpp non-byte-identity between forks per NEW B61).
 
