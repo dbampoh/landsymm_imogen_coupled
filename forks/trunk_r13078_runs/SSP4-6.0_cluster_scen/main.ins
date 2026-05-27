@@ -1,0 +1,240 @@
+
+! ====== Block 8.4 cluster production run-dir (SSP4-6.0 cluster, scen) ======
+! Pipeline: δ-B-variant (trunk-C++ engine throughout; chosen at block 8.2.5 Phase G)
+! Authored: session 12 day 2 2026-05-27 (block 8.4 pre-cluster prep landed at block 8.2.5 FULL close commit per user direction)
+! Climate forcing source: /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY (after rsync of 5 × 18 GB δ-B-variant 62892 library workstation→cluster)
+! State path: /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0_cluster_hist/state/
+
+
+! ===== Block 8.2.5 Phase F smoke run-dir =====
+! pipeline: delta_b_variant
+! phase: scen
+! Authored: session 12 day 2 2026-05-27
+! Climate forcing: /home/bampoh-d/Desktop/landsymm_lpjg/landsymm_mat/landsymm_lpjg_imogen_coupled_model/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP1-2.6/Common-directory/IMOGEN/output_62892_cppengine/YYYY
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! forks/trunk_r13078_runs/SSP1-2.6/main.ins — T_seq Installment-1 production-config
+!
+! T_seq sequential-standalone workflow for v1.0 paper-publication Track 2 runs
+! per `notes/B47.md` §4. Authored at block 8.0.2 (2026-05-20 afternoon session 8).
+!
+! WORKFLOW:
+!   Step A (LOCAL): rebuild engine via `scripts/run_coupled.sh --engine-only-mode`
+!                   per B44 productisation produces per-year ASCII climate library
+!                   at runs/SSP1-2.6/Common-directory/IMOGEN/output/<year>/*.dat
+!                   (~12.5 min × 5 SSPs = ~1 h total local)
+!   Step B (LOCAL → CLUSTER, one-time):
+!                   scp -r runs/SSP1-2.6/Common-directory/IMOGEN/output/ \
+!                          <user>@<cluster>:<scen-dir>/Common-directory/IMOGEN/
+!                   (~500 MB per SSP)
+!   Step C (LOCAL or CLUSTER): launched with
+!                   `<repo>/forks/trunk_r13078/build/guess -input imogencfx main.ins`
+!                   from this directory; trunk-T_seq LPJG runs as standalone consumer
+!                   of pre-baked engine library
+!
+! PRE-RUN SETUP (LOCAL):
+!   ln -s ../../../runs/SSP1-2.6/Common-directory ./Common-directory
+!   (symlinks the rebuild's engine library into this run dir; LOCAL only)
+!
+! CLUSTER deployment: copy this directory + the engine library to the cluster;
+!   the path overrides below have CLUSTER variants documented in inline comments
+!   per `notes/PRODUCTION_RUN_CONFIG.md` §3.2 path-equivalence table.
+!
+! Run:  ./guess -input imogencfx main.ins
+!
+! - DKB, block 8.0.2 of session 8 (2026-05-20)
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Standard LPJG PFT definitions + run config (B12-defensive ifcalccton 1 + ifcalcsla 1)
+import "global.ins"
+
+! Crop-N PFTs and the C/N-cycle crop pipeline (imports crop.ins → landcover.ins transitively;
+! do NOT add a direct `import "landcover.ins"` here — that would trigger a "Duplicate group name"
+! parser error at landcover.ins:103 `crop_management` group. The transitive chain
+! main.ins → crop_n.ins → crop.ins → landcover.ins is the canonical pattern; matches rebuild's
+! runs/SSP1-2.6/main.ins:34. Block 8.0.3 acceptance-test pre-launch caught the duplicate-import
+! bug; fix applied at this commit. - DKB 2026-05-20 block 8.0.3)
+import "crop_n.ins"
+
+! Wetland PFTs (required for natural CH4 — IMOGEN consumed wetland CH4 at engine time)
+import "wetlandpfts.ins"
+
+! IMOGEN-coupling parameters (DIR_COMMON, FILE_*, skip_inprocess_engine_run, etc.)
+import "imogen_intermediary.ins"
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! T_seq overrides — engine library + production paths + production knobs
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! T_seq enabler: skip in-process RUN_IMOGEN_ENGINE() call in IMOGENCFXInput::init().
+! Engine has already been run standalone by rebuild's `scripts/run_coupled.sh
+! --engine-only-mode` (B44 productised); trunk-T_seq LPJG is pure pre-baked-library
+! consumer. (Set in imogen_intermediary.ins too; restated here for visibility.)
+skip_inprocess_engine_run 1
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Climate input: per-year ASCII files from rebuild IMOGEN engine library
+!   <DIR_COMMON>/IMOGEN/output/<year>/*.dat (8-field; produced by B44 acceptance test)
+!
+! YYYY-templated filename substitution per IMOGENCFXInput::gen_filename pattern.
+! Paths are relative to CWD (the run dir); symlink Common-directory in place pre-run.
+!///////////////////////////////////////////////////////////////////////////////////////
+param "file_temp"         (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/T_anom.dat")
+param "file_prec"         (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/P_anom.dat")
+param "file_insol"        (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/SW_anom.dat")
+param "file_wetdays"      (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/WET.dat")
+param "file_dtr"          (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/DTEMP_anom.dat")
+param "file_co2"          (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/CO2.dat")
+! B4 8-field consumer wiring (backported at block 8.0.2 source-edit):
+param "file_relhum"       (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/Rh_anom.dat")
+param "file_wind"         (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/W_anom.dat")
+param "file_tmin"         (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/Tmin_anom.dat")
+param "file_tmax"         (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/YYYY/Tmax_anom.dat")
+
+! cfx-style climate variables (NOT NEEDED in imogencfx mode; provide empty for safety)
+param "file_pres"         (str "")
+param "variable_pres"     (str "")
+param "file_specifichum"  (str "")
+param "variable_specifichum" (str "")
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Engine-side FILE_*_EMITS / FILE_LPJG_* — all set empty in T_seq.
+! Rationale: engine has already integrated these at Step A (rebuild engine run); trunk
+! does NOT run engine + LPJG does NOT write handshake files (no engine waiting).
+! Leaving the values syntactically declared (via imogen_intermediary.ins) but null'd
+! here so trunk's init() can parse them without complaint.
+!///////////////////////////////////////////////////////////////////////////////////////
+FILE_SCEN_EMITS         ""
+FILE_NON_CO2_VALS       ""
+FILE_CH4_N2O_EMITS      ""
+FILE_LPJG_FLUX          ""
+FILE_LPJG_CH4_N2O_FLUX  ""
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Auxiliaries: soil + gridlist + ndep + popdens + SimFire BLAZE + LU forcing
+!
+! LOCAL paths (default; workstation `/media/bampoh-d/lpjg_input/...`)
+! CLUSTER overrides documented inline per `notes/PRODUCTION_RUN_CONFIG.md` §3.2
+!///////////////////////////////////////////////////////////////////////////////////////
+
+! Gridlist — block 8.0.3 acceptance test: rebuild's 4-cell smoke gridlist (the
+! engine library at runs/SSP1-2.6/Common-directory/IMOGEN/output/ was produced
+! on this 4-cell gridlist at B44 acceptance test; production-grade testing on
+! larger gridlists requires re-running rebuild engine with larger gridlist first).
+!param "file_gridlist"    (str "gridlist_in_62892_and_climate.txt")    ! Production (62538 cells; cluster-target)
+!param "file_gridlist_cf" (str "gridlist_in_62892_and_climate.txt")
+param "file_gridlist"     (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/data/gridlist/gridlist_in_62892_and_climate.txt")
+param "file_gridlist_cf"  (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/data/gridlist/gridlist_in_62892_and_climate.txt")
+
+! Soil map (LOCAL: predecessor mirror; CLUSTER: /bg/data/lpj/bampoh-d/soil/...)
+param "file_soildata"     (str "/bg/data/lpj/bampoh-d/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+! CLUSTER OVERRIDE: param "file_soildata" (str "/bg/data/lpj/bampoh-d/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")
+
+! N-deposition forcing (Lamarque CRUNCEP fallback path; leave empty to use 4-NetCDF
+! production wet/dry NHx + NOy below)
+param "file_ndep"         (str "")
+param "ndep_timeseries"   (str "RCP26")
+
+! 4-NetCDF wet/dry NHx + NOy ndep (production forcing per PRODUCTION_RUN_CONFIG.md §2.3)
+! [Block 8.0.3 — user-confirmed canonical local mirror at /media/bampoh-d/ISIMIP/inputs/
+!  (NOT /media/bampoh-d/lpjg_input/input/ndep/ which doesn't have these files;
+!  PRODUCTION_RUN_CONFIG.md §3.2 will be updated in a future cascade to reflect
+!  the actual canonical local mirror path). - DKB 2026-05-20 block 8.0.3]
+param "file_mNHxdrydep"   (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-wetdry-lpjguess/ndep_drynhx_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNOydrydep"   (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-wetdry-lpjguess/ndep_drynoy_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNHxwetdep"   (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-wetdry-lpjguess/ndep_wetnhx_histsoc_monthly_1850_2015_lpjg.nc4")
+param "file_mNOywetdep"   (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/histsoc-wetdry-lpjguess/ndep_wetnoy_histsoc_monthly_1850_2015_lpjg.nc4")
+param "variable_mNHxdrydep" (str "drynhx")
+param "variable_mNOydrydep" (str "drynoy")
+param "variable_mNHxwetdep" (str "wetnhx")
+param "variable_mNOywetdep" (str "wetnoy")
+! CLUSTER OVERRIDE: change /media/bampoh-d/ISIMIP/inputs/n-deposition/ to
+!                   /bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/
+
+! Population density NetCDF (for SimFire BLAZE ignition)
+! [Block 8.0.3 — user-confirmed canonical local mirror at /media/bampoh-d/ISIMIP/inputs/pop/lpjg-popd/]
+param "file_popdens"      (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+param "variable_popdens"  (str "popd")
+! CLUSTER OVERRIDE: param "file_popdens" (str "/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/population-density_3b_2015soc_30arcmin_annual_1601_2100.lpjg.nc")
+
+! SimFire BLAZE binary
+param "file_simfire"      (str "/bg/data/lpj/LPJ-GUESS/input/fire/SimfireInput.bin")
+! CLUSTER OVERRIDE: param "file_simfire" (str "/bg/data/lpj/LPJ-GUESS/input/fire/SimfireInput.bin")
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! LU forcing — UPDATED `_peatland` variant per PRODUCTION_RUN_CONFIG.md §3.1
+! Historical phase 1900-2020 uses LU.remapv10_old_62892_gL_peatland.txt;
+! Scenario phase 2021-2100 uses landcover_peatland.txt from SSP1_RCP26 subdir.
+! For initial T_seq Track-2 historical-only smoke + acceptance test, use the
+! historical _peatland LU. Scenario phase uses save_state/restart workflow
+! per docs/scientific_framework.md §4 (TBD at block 8.0.3+ or later session).
+!///////////////////////////////////////////////////////////////////////////////////////
+! [b825 smoke] file_lu now set in landcover.ins per wpeat pattern
+! [b825 smoke] file_lucrop now set in landcover.ins per wpeat pattern
+! [b825 smoke] file_Nfert now set in crop.ins per wpeat pattern
+param "file_irrigintens"  (str "")  ! historical phase: no irrig file; scenario phase uses irrig.txt
+! CLUSTER OVERRIDE: change /media/bampoh-d/lpjg_input/input/LU/plum_harm_lu/ to
+!                   /bg/data/lpj/bampoh-d/landsymm_lu/
+
+run_landcover             1            ! Enable LU forcing (production: 1)
+run_peatland              1            ! Enable peatland subgrid (B40 / paper §2.4.4 sector-ownership rule)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Year range — block 8.0.3 acceptance test: window 1900-1930 (extended from 1903 after
+! first-launch SEGFAULT diagnosis surfaced a latent constraint in trunk's imogencfx.cpp::init():
+!     nyears = (lasthistyear - FIRST_SPINUP_YEAR) + 1;  // line ~484
+! With FIRST_SPINUP_YEAR=1900 (block 8.0.3 surgical site (h)) + lasthistyear=1903 →
+! nyears=4 storage slots. But during spinup, imogencfx cycles imogen_year through
+! NYEAR_SPINUP=30 values (FIRST_SPINUP_YEAR + 0..29 = 1900..1929); attempting to store
+! year 1904 (5th distinct imogen_year) into stored_years[last_store_index=4] →
+! OUT-OF-BOUNDS write → SEGFAULT at first cell's spinup_year_idx=4 iteration.
+! Latent constraint: lasthistyear >= FIRST_SPINUP_YEAR + NYEAR_SPINUP - 1 = 1929.
+! Original trunk's FIRST_SPINUP_YEAR=1871 + rebuild smoke lasthistyear=1901 → nyears=31
+! (just barely fit; coincidentally satisfied this constraint). NEW B49 (extension to
+! the original B49 FIRST_SPINUP_YEAR parametrize) tracks the proper fix:
+! `nyears = max(lasthistyear - FIRST_SPINUP_YEAR + 1, NYEAR_SPINUP);` in trunk +
+! rebuild's imogencfx.cpp::init() (~1-LOC). For block 8.0.3 acceptance, extending
+! lasthistyear to 1930 is the operational workaround that satisfies the constraint
+! without source-edit + only adds ~27 years to history (~minimal wall impact since
+! spinup dominates).
+! For production runs (cluster Track 2): lasthistyear 2020 → nyears=121 >> 30; constraint
+! comfortably satisfied; restore the full historical window.
+!///////////////////////////////////////////////////////////////////////////////////////
+firsthistyear             1901             ! [b825 smoke] required (LPJG year-range bookkeeping)
+lasthistyear              2100             ! [b825 smoke] SCEN phase end (restart from saved 2020)
+firstoutyear              1900
+lastoutyear               2100             ! [b825 smoke] match lasthistyear (phase=scen)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! save_state / restart — historical run normally saves at year 2020; SSP scenario phase
+! restarts from this state per docs/scientific_framework.md §4 (Decision #10).
+! Block 8.0.3 acceptance test: save DISABLED (avoid state-dir creation complications + this
+! is acceptance gate verification not production save); ENABLE for production runs.
+!///////////////////////////////////////////////////////////////////////////////////////
+save_state                0                ! [b825 smoke] SCEN: do not save (restart only)
+! [b825 smoke] SCEN: save_years commented (restart phase)
+state_path                "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0_cluster_hist/state/"  ! [cluster production] per-SSP state at hist dir
+restart                   1                ! [b825 smoke] SCEN: restart from hist saved state
+restart_year              2020             ! [b825 smoke] SCEN: restart from 2020
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Production knobs (most already set in global.ins; block 8.0.3 acceptance test overrides
+! the 3 loop-size parameters to match rebuild smoke pattern for ~10-20 min wall vs ~1-4 h
+! at full production; ALL OTHER production knobs stay ON — BLAZE + _peatland LU +
+! ifcalccton/sla 1 + 4-NetCDF ndep + popdens + LandSyMM full crop pipeline). RESTORE
+! the production values (500/100/25) for cluster Track 2 production runs in block 8.4+.
+!///////////////////////////////////////////////////////////////////////////////////////
+! BLOCK 8.0.3 ACCEPTANCE-TEST OVERRIDES (revert to production for cluster runs):
+nyear_spinup              500              ! [cluster production] wpeat-mirror
+freenyears                100              ! [cluster production] wpeat-mirror (preserves 100/500=0.20 ratio)
+npatch                    25               ! [cluster production] wpeat-mirror
+
+! Production-grade knobs inherited from cp'd global.ins (unchanged for block 8.0.3):
+! firemodel     "BLAZE" (global.ins line 100; needs file_simfire + file_relhum + file_wind set above)
+! ifcalccton     1      (global.ins line 98; B12 defensive)
+! ifcalcsla      1      (global.ins line 96; B12 defensive)
+
+!///////////////////////////////////////////////////////////////////////////////////////
+! Output directory
+!///////////////////////////////////////////////////////////////////////////////////////
+outputdirectory "./"

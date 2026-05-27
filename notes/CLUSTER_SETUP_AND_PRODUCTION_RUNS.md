@@ -149,7 +149,29 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
-### 🔧 BLOCK 8.2.5 PARTIAL + POST-CHECKPOINT NEXT (2026-05-26 evening session 11 day 2 mid-block)
+### ✅ BLOCK 8.2.5 LANDED + POST-BLOCK-8.2.5-FULL OPERATIONAL ORDERING (2026-05-27 afternoon session 12 day 2)
+
+**Block 8.2.5 ✅ DONE** at this close commit — switchable-regrid-strategy wiring Phase A-H ALL LANDED. Both pipelines built (5 × 18 GB δ-B Fortran 62892-grid library at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` + 5 × 18 GB δ-B-variant trunk-C++ 62892-grid library at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`; both 62538-line per climate-var per year-dir post Rule #9 #33 auto-detect-numeric-header fix; both PAPER-READY). **Phase G user choice (~15:30 CEST 2026-05-27) = δ-B-variant** (trunk-C++ engine throughout) for v1.0 GMD paper Track 2 cluster production runs per Methods §2.2 framing locked at block 8.2.4 + double-precision numerics (B62-clean) + warm/wet biome NPP fidelity. **δ-B Fortran-engine pipeline retained as v1+ switchable alternative** per B57/B59 v1+ trajectory. **B57 + B59 ✅ CLOSED**. Full evidence at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` (~400 LOC).
+
+**POST-BLOCK-8.2.5-FULL NEXT** (user direction = cluster path; rejected local 3696-grid alternative due to spatial-resolution disclosure concerns + Track-1 apples-to-apples comparison preservation):
+
+| # | Block | Wall | Notes |
+|---|---|---|---|
+| 1 | **Cluster prep** | ~half-day | git pull cluster mirror at `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/` to v0.24.0 tag (cluster mirror was at HEAD `9561f1e6` per block 8.1 reconnaissance; needs jump to v0.24.0); trunk binary rebuild via cmake+make in `build_owl/`; rsync 90 GB δ-B-variant 62892 library workstation→cluster (target: `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`) + 2.2 GB native 1631 library for provenance |
+| 2 | **Block 8.3 cluster end-to-end smoke** | ~0.5-1 day | Cluster .ins for small smoke gridlist + SBATCH wrapper (`-input imogencfx` + skip_inprocess_engine_run=1 + `mpirun -np N guess -parallel`) + first cluster runtime test on owl genius/256 × ~1-2 hour walltime + SCP outputs back + diff vs local Phase F smoke results; tag candidate `v0.25.0-cluster-trunk-tseq-smoke-complete` |
+| 3 | **Block 8.4 cluster production-config delta + two-track restructure** | ~1-1.5 days | Restructure `forks/trunk_r13078_runs/<SSP>/` → `<SSP>_local/` + `<SSP>_cluster/` per session-11 pivot #2 (manual not programmatic); main_hist.ins + main_scen.ins per SSP × 5 SSPs (mirror our local Phase F smoke pattern but cluster paths); landcover/crop.ins cluster paths (`/bg/data/lpj/bampoh-d/landsymm_lu/...` per user's wpeat pattern); setup_run.sh + run_coupled.sbatch T_seq retargeting; adopt newer site-wide orchestrator improvements per block 8.1 D3 finding; 4-LOC /bg/home path-translation case-add per block 8.1 D4 finding |
+| 4 | **Block 8.5 cluster MPI pre-flight** | ~0.5 day | Verify chosen-pipeline trunk-T_seq scales correctly on genius/256 × 3-day walltime |
+| 5 | **(Optional) Block 8.7 intermediate-cell production smoke** | ~0.5 day | ~1000-cell confidence-builder before full 62538-cell launch |
+| 6 | **Track 2 production runs** | ~5-15 h cluster wall | 5 SSPs × 62538 cells × 1900-2100 × strict production (npatch=25, spinup=500, save_state/restart per user's wpeat hist+ssp126 pattern) on owl genius/256 × 3-day walltime; outputs to cluster scratch then SCP back |
+| 7 | **Track 1 baseline** | already done | user's existing wpeat production runs at `/bg/data/lpj/bampoh-d/landsymm_imogen_runs/integrated-4.1-ins2_landsymm_{hist,ssp*}_wpeat/` (no re-run needed; block 8.6 moot) |
+| 8 | **SCP Track 2 outputs back + validation triad + paper figures + Methods §2.2 update + Results + Discussion writing** | ~3-5 weeks paper writing | Axis 1 rebuild vs predecessor (per F-13 scripts) + Axis 2 physical sensibility (vs IPCC AR6 / Friedlingstein 2025 GCB) + Axis 3 Track 1 vs Track 2 + Axis 4 framework consistency; for Axis 1 + Axis 4, aggregate higher-res outputs to comparison resolution as needed (no need at 62892-native paper-resolution) |
+| 9 | **v1.0 GMD submission** | target ~5-9 weeks from this close | — |
+
+**Total active work to start of validation phase: ~4-6 working days + ~1 day cluster runs.**
+
+---
+
+### 🔧 BLOCK 8.2.5 PARTIAL + POST-CHECKPOINT NEXT (2026-05-26 evening session 11 day 2 mid-block) — **[SUPERSEDED by Block 8.2.5 LANDED entry above; preserved for forensic value per Rule #10 amendment-vs-rewrite corollary]**
 
 **Block 8.2.5 PARTIAL ✅** at this checkpoint commit — Phase A-D + Phase E δ-B LANDED + Phase E δ-B-variant + Phases F/G/H PENDING. Switchable-regrid-strategy wiring substantively in place: δ-B Fortran-engine pipeline FULLY OPERATIONAL (5-SSP × 201-year × ~915 MB Fortran 3698-grid libraries at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output/` + 5-SSP × ~18 GB FastRegrid 62892-grid PAPER-READY libraries at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/`; ~90 GB total gitignored available for SCP to cluster); tools/FastRegrid/ infrastructure built; per-SSP imogen_settings.txt aligned with intermediary_py (RCMIP/CMIP6 backboned, not legacy IIASA) + CMIP6 MRI-ESM2-0 patterns + B39 init seeds + STANDALONE=.TRUE.; Fortran source-edits per Rule #9 #26 (IYEAR-1→IYEAR matches C++ port semantics + resolves author TODO 30.07.15) + Rule #9 #30 (NEW STANDALONE auto-exit flag); 9 Rule #9 datapoints surfaced + fixed across Phase A-E early (#23-#31).
 

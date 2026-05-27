@@ -1,0 +1,317 @@
+! as per CRAFTY request, include only mgmt 0100 for extensive, and i0250 for intensively managed crops. Had more options previously/in runs from spring-summer 2023. Also re-inserted 0-input after discussion with Mark and Joanna.
+st "CerealsC3" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC3"
+)
+
+st "CerealsC30" (
+        crop_stand
+        stinclude 1
+        pft "CerealsC3"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "CerealsC30100" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC3"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "CerealsC3i0250" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC3"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "CerealsC4" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC4"
+)
+
+st "CerealsC40" (
+        crop_stand
+        stinclude 1
+        pft "CerealsC4"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+
+st "CerealsC40100" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC4"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "CerealsC4i0250" (
+	crop_stand
+	stinclude 1
+	pft "CerealsC4"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "Rice" (
+	crop_stand
+	stinclude 1
+	pft "Rice"
+)
+
+st "Rice0" (
+        crop_stand
+        stinclude 1
+        pft "Rice"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "Rice0100" (
+	crop_stand
+	stinclude 1
+	pft "Rice"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "Ricei0250" (
+	crop_stand
+	stinclude 1
+	pft "Rice"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "OilNfix" (
+	crop_stand
+	stinclude 1
+	pft "OilNfix"
+)
+
+st "OilNfix0" (
+        crop_stand
+        stinclude 1
+        pft "OilNfix"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+
+st "OilNfix0100" (
+	crop_stand
+	stinclude 1
+	pft "OilNfix"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "OilNfixi0250" (
+	crop_stand
+	stinclude 1
+	pft "OilNfix"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "OilOther" (
+	crop_stand
+	stinclude 1
+	pft "OilOther"
+)
+
+st "OilOther0" (
+        crop_stand
+        stinclude 1
+        pft "OilOther"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "OilOther0100" (
+	crop_stand
+	stinclude 1
+	pft "OilOther"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "OilOtheri0250" (
+	crop_stand
+	stinclude 1
+	pft "OilOther"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "Pulses" (
+	crop_stand
+	stinclude 1
+	pft "Pulses"
+)
+
+st "Pulses0" (
+        crop_stand
+        stinclude 1
+        pft "Pulses"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+
+st "Pulses0100" (
+	crop_stand
+	stinclude 1
+	pft "Pulses"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "Pulsesi0250" (
+	crop_stand
+	stinclude 1
+	pft "Pulses"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "StarchyRoots" (
+	crop_stand
+	stinclude 1
+	pft "StarchyRoots"
+)
+
+st "StarchyRoots0" (
+        crop_stand
+        stinclude 1
+        pft "StarchyRoots"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "StarchyRoots0100" (
+	crop_stand
+	stinclude 1
+	pft "StarchyRoots"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "StarchyRootsi0250" (
+	crop_stand
+	stinclude 1
+	pft "StarchyRoots"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "FruitAndVeg" (
+	crop_stand
+	stinclude 1
+	pft "FruitAndVeg"
+)
+
+st "FruitAndVeg0" (
+        crop_stand
+        stinclude 1
+        pft "FruitAndVeg"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "FruitAndVeg0100" (
+	crop_stand
+	stinclude 1
+	pft "FruitAndVeg"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "FruitAndVegi0250" (
+	crop_stand
+	stinclude 1
+	pft "FruitAndVeg"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "Sugarbeet" (
+	crop_stand
+	stinclude 1
+	pft "Sugarbeet"
+)
+
+st "Sugarbeet0" (
+        crop_stand
+        stinclude 1
+        pft "Sugarbeet"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "Sugarbeet0100" (
+	crop_stand
+	stinclude 1
+	pft "Sugarbeet"
+	isforpotyield 1
+	N_appfert_mt 0.010
+)
+
+st "Sugarbeeti0250" (
+	crop_stand
+	stinclude 1
+	pft "Sugarbeet"
+	hydrology "irrigated_sat"
+	isforpotyield 1
+	N_appfert_mt 0.025
+)
+
+st "CC4G_MEG" (
+        crop_stand
+        stinclude 1
+        intercrop "nointercrop"
+        pft "CC4G_MEG"
+)
+
+st "CC4G_MEG0" (
+        crop_stand
+        stinclude 1
+        intercrop "nointercrop"
+        pft "CC4G_MEG"
+        isforpotyield 1
+        N_appfert_mt 0.0
+)
+
+st "CC4G_MEG0100" (
+        crop_stand
+        stinclude 1
+		intercrop "nointercrop"
+        pft "CC4G_MEG"
+        isforpotyield 1
+        N_appfert_mt 0.010
+)
+
+st "CC4G_MEGi0250" (
+        crop_stand
+        stinclude 1
+		intercrop "nointercrop"
+        pft "CC4G_MEG"
+        hydrology "irrigated_sat"
+        isforpotyield 1
+        N_appfert_mt 0.025
+)

@@ -13,6 +13,27 @@ namespace regrid {
 
     constexpr double EARTH_RADIUS_KM = 6371.0;
 
+    // [Block 8.2.5 Phase E δ-B-variant Rule #9 datapoint #33: auto-detect whether
+    //  line 1 of an input file is a header (legacy assumption) or actual numeric
+    //  data (our IMOGEN engine outputs from both Fortran imogen_lpjg.f and the
+    //  C++ port climatemodel.cpp::RUN_IMOGEN_ENGINE() emit pure data with NO
+    //  header). Pre-fix, FastRegrid silently treated line 1 as header in both
+    //  precompute_mappings (skipped 1 source cell from the regrid pool) and
+    //  regrid_file (wrote a "ghost" header row reformatting the source's first
+    //  data row into the output). Returns true iff line is parseable as
+    //  >=3 whitespace-separated numeric tokens with NO trailing non-numeric
+    //  tokens — i.e., a true data row of shape <lon> <lat> <val>...
+    //  Header-bearing inputs (e.g., "longitude latitude val1 val2") still
+    //  parse as has-header (the first token is non-numeric). - DKB block 8.2.5]
+    static bool is_numeric_data_line(const std::string& line) {
+        if (line.empty()) return false;
+        std::istringstream iss(line);
+        double v;
+        int count = 0;
+        while (iss >> v) ++count;
+        return count >= 3 && iss.eof();
+    }
+
     Regridder::Regridder(const RegridConfig& config) : config_(config) {}
 
     std::vector<GridPoint> Regridder::read_grid_list(const std::string& filename) const {
@@ -68,7 +89,14 @@ namespace regrid {
 
         std::vector<SpatialData> sample_data;
         std::string line;
-        std::getline(sample_file, line); // Skip header
+        // Rule #9 #33 fix: auto-detect line 1 = header vs data; rewind to re-read if data
+        std::streampos pos_before_line1 = sample_file.tellg();
+        std::getline(sample_file, line);
+        if (is_numeric_data_line(line)) {
+            sample_file.clear();
+            sample_file.seekg(pos_before_line1);
+        }
+        // else: line 1 was a true header; remain consumed (legacy behavior)
         while (std::getline(sample_file, line)) {
             std::istringstream iss(line);
             SpatialData sd;
@@ -196,13 +224,23 @@ namespace regrid {
             return;
         }
 
-        std::string header_line;
-        std::getline(in_file, header_line);
-        std::istringstream header_stream(header_line);
-        std::vector<std::string> headers;
-        std::string header;
-        while (header_stream >> header) headers.push_back(header);
-        write_headers(out_file, headers);
+        // Rule #9 #33 fix: auto-detect line 1 = header vs data
+        std::streampos pos_before_line1 = in_file.tellg();
+        std::string first_line;
+        std::getline(in_file, first_line);
+        if (is_numeric_data_line(first_line)) {
+            // Line 1 is data, NOT header; rewind so the data-read loop sees it.
+            // Do NOT emit a header to the output (preserves no-header input shape).
+            in_file.clear();
+            in_file.seekg(pos_before_line1);
+        } else {
+            // Line 1 was a true header; emit reformatted header (legacy behavior)
+            std::istringstream header_stream(first_line);
+            std::vector<std::string> headers;
+            std::string header;
+            while (header_stream >> header) headers.push_back(header);
+            write_headers(out_file, headers);
+        }
 
         if (config_.data_layout == DataLayout::YEAR_BY_YEAR) {
             std::vector<SpatialData> year_data;

@@ -1,7 +1,21 @@
 # Production-run configuration reference
 
 **Version**: v1.0 (initial draft)
-**Last updated**: 2026-05-23 early morning (session 10 day 1 close — POST-BLOCK-8.2 ✅ DONE; 5-SSP CO2 trajectory addendum)
+**Last updated**: 2026-05-27 afternoon (session 12 day 2 — POST-BLOCK-8.2.5-FULL + Block 8.4 pre-cluster prep landed)
+
+> **POST-BLOCK-8.2.5-FULL + Block 8.4 pre-cluster prep addendum (2026-05-27 session 12 day 2)**:
+>
+> Block 8.2.5 FULL CLOSE landed BOTH switchable-regrid pipelines (δ-B Fortran + δ-B-variant trunk-C++) + 50-cell biome-stratified production-config Phase F smoke side-by-side acceptance + **Phase G user choice = δ-B-variant (trunk-C++ engine throughout)** for v1.0 GMD paper Track 2 cluster production runs. Cluster production .ins authored at this commit:
+>
+> | Component | State |
+> |---|---|
+> | δ-B-variant 62892-grid library (5 × 18 GB; **CHOSEN for paper**) | `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/` (gitignored; rsync workstation→cluster pre-Track-2-production) |
+> | δ-B Fortran 62892-grid library (5 × 18 GB; v1+ switchable alternative) | `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` (gitignored) |
+> | 10 cluster production run-dirs (5 SSPs × hist+scen) | `forks/trunk_r13078_runs/<SSP>_cluster_<phase>/` (14 .ins files each + setup_run_tseq.sh + state/ subdir for _hist) — committed to git; production knobs nyear_spinup=500 / freenyears=100 / npatch=25 / gridlist=62538-cell / save_state=1+save_years="2020" hist → restart=1+restart_year=2020 scen per user's wpeat hist+ssp{126,…}_wpeat reference |
+> | Cluster launch infrastructure | `scripts/cluster/setup_run_tseq.sh` (template; cp'd to each cluster run-dir) + revamped `scripts/cluster/setup_run.sh` (named-flag CLI) + `scripts/cluster/run_coupled.sbatch` (alternative unified launcher); both paths documented at `scripts/cluster/README.md` |
+> | Cluster pre-flight checklist | git pull cluster mirror to v0.24.0 tag → cmake+make trunk binary at `forks/trunk_r13078/build_owl/guess` → rsync 90 GB δ-B-variant 62892 library workstation→cluster → optional `./guess` symlinks per Track-1 muscle memory → block 8.3 cluster smoke → block 8.5 MPI pre-flight → Track 2 production runs |
+>
+> Full evidence: `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` (~400 LOC; 8-gate scorecard for Phase D + E + F + Phase G chosen-pipeline disclosure + Rule #9 #23-#33 + Rule #10 #25 + §5 per-biome differential + §6 Methods §2.2 disclosure text). Tag `v0.24.0-switchable-regrid-strategy-complete` reserved for block 8.2.5 close (this commit).
 
 > **POST-BLOCK-8.2 5-SSP CO2 trajectory addendum (2026-05-23 session 10 day 1 close)**:
 >

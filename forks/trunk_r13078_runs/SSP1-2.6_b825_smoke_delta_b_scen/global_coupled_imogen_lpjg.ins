@@ -1,0 +1,81 @@
+! Instruction file with global PFTs to be used for IMOGEN-LPJG coupling
+! w/ I/O module.
+!
+! See the file data/env/readme_env.txt for information about some
+! data files.
+!
+! Make sure to start LPJ-GUESS with -input imogen when using this
+! instruction file.
+!
+
+!import "global.ins"
+!import "crop_n.ins"
+!import "wetlandpfts.ins"
+
+!parameters needed by imogen input model. Uncomment where necessary
+param "searchradius" (num 50)         	!Search radius for imogen climate data
+!lon_offset_to_midpoint			!If specified, longitude offset of Imogen climate to grid middle point
+!lat_offset_to_midpoint			!If specified, latitude offset of Imogen climate to grid middle point
+param "ndep_timeseries" (str "RCP26")	!Nitrogen deposition time series to use (historic, rcp26, rcp45, rcp60 or rcp85) default= historic
+param "firsthistyear" (num 1871)	!the first year in the imogen climate [range 1871..2300]
+param "lasthistyear" (num 2100)		!the last year in the imogen climate [range 1871..2300]
+monthly_imogen 1			!imogen produced monthly climate data (default=true)
+param "searchradius_soil" (num 0)
+
+!///////////////////////////////////////////////////////////////////////
+! Forcing Data & gridlists
+!
+
+!Atmospheric CO2 content (ppmv) (used only by guessio.cpp)
+!param "co2" (num 340)
+
+! Nitrogen deposition (kg/ha/year)
+!param "ndep" (num 2)
+
+!state_path "state/%Y/"
+!param "file_gridlist" (str "gridlist_hurtt_RNDM_midpoint_3698_10cells.txt")
+!param "file_gridlist_cf" (str "gridlist.txt")
+nyear_spinup 30             ! number of years to spin up the simulation for
+freenyears 15       ! Number of years to spin up without N limitation (needed to build up a N pool)
+ifdyn_phu_limit 20    ! Whether to limit dynamic phu calculation to a period specified by nyear_dyn_phu
+nyear_dyn_phu 15    ! Number of years to calculate dynamic phu if dynamic_phu_limit is 1
+
+! DKB: actual historical
+!searchradius 0
+firsthistyear 1901
+firstoutyear 1901
+lasthistyear 2100
+lastoutyear 2100
+!restart 0         ! Whether to start from a state file
+!restart_year 2015
+!save_state 0         ! Whether to save a state file
+!save_years "1871 1960 2014 2015 2100"
+
+! You may need to specify the full pathname (including directory) here
+!param "file_temp" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/YY/T_anom.dat") 	! imogen temperature data
+!param "file_prec" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/YY/P_anom.dat")  	! imogen precipitation data
+!param "file_insol" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/YY/SW_anom.dat")  	! imogen insolation data
+!param "file_wetdays" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/YY/WET.dat")  	! imogen wet-days data
+!param "file_dtr" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/YY/DTEMP_anom.dat")
+!param "file_ndep" (str "/bg/data/lpj/LPJ-GUESS/input/ndep_cruncep/GlobalNitrogenDepositionRCP26.bin")								! no imogen nitrogen !deposition data
+!param "file_co2" (str "/home/bampoh-d/Desktop/LandSyMM/imogen/common/IMOGEN/imogen_ipsl_startup_climate/ipsl_imogen_startup_climate_ssp126/CO2_all.dat")	! imogen CO2 data
+
+param "file_temp" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\T_anom.dat") 	! imogen temperature data
+param "file_prec" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\P_anom.dat")  	! imogen precipitation data
+param "file_insol" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\SW_anom.dat")  	! imogen insolation data
+param "file_wetdays" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\WET.dat")  	! imogen wet-days data
+param "file_dtr" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\DTEMP_anom.dat")
+param "file_co2" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\CO2.dat")! imogen CO2 data
+param "file_wind" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\W_anom.dat")
+param "file_relhum" (str "C:\GitHub\dbampoh\LPJG-IMOGEN-COUPLED-MODEL-FRAMEWORK\Common-directory\IMOGEN\output\YYYY\Rh_anom.dat")
+
+
+param "file_soildata" (str "soilmap_center_interpolated.dat") ! LPJ soil code 
+!param "file_simfire"  (str "SimfireInput.bin")
+
+!///////////////////////////////////////////////////////////////////////
+! Imogen input currently only works with the INTERP weather generator and
+! the fire model GLOBFIRM (or no fire with NOFIRE).
+
+firemodel "GLOBFIRM"
+weathergenerator "INTERP"

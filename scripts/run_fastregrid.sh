@@ -100,11 +100,21 @@ cp_nonregrid_files() {
     # Top-level engine state files (one-shot) at IMOGEN/ root
     local in_root="$(dirname "${in_base}")"
     local out_root="$(dirname "${out_base}")"
-    for f in CO2_all.dat RF_all.dat VARYEAR.dat; do
-        if [ -f "${in_root}/${f}" ]; then
-            cp "${in_root}/${f}" "${out_root}/${f}"
-        fi
-    done
+    # [Block 8.2.5 Phase E δ-B-variant Rule #9 datapoint #32: when in_base + out_base
+    #  are SIBLINGS under the same IMOGEN/ parent (always true for both pipelines
+    #  since intermediate + final dirs live under IMOGEN/), dirname(in_base) ==
+    #  dirname(out_base) and cp self-copies, which errors and (with set -e at top
+    #  of script) terminates the script. Benign for single-step δ-B (triggers at
+    #  end of script after success), but FATAL for chained δ-B-variant (kills
+    #  STEP 2 IDW before it starts). Skip the cp when paths are the same — they
+    #  ARE the same file in that case; no copy needed. - DKB block 8.2.5]
+    if [ "${in_root}" != "${out_root}" ]; then
+        for f in CO2_all.dat RF_all.dat VARYEAR.dat; do
+            if [ -f "${in_root}/${f}" ]; then
+                cp "${in_root}/${f}" "${out_root}/${f}"
+            fi
+        done
+    fi
 }
 
 echo "================================================================================" | tee "${LOG_FILE}"

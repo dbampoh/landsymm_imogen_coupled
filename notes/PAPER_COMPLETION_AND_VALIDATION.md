@@ -263,7 +263,47 @@ The `paper/` subdir in the rebuild repo is currently empty (only `README.md`); p
 
 ### 4.5 Paper Methods §2.2 draft text — v1.0 prescribed-mode coupling architecture (drafted at session 8.0.3 follow-up; 2026-05-20 ~7:12 PM; **POST-BLOCK-8.2 honest-disclosure refinement 2026-05-23 session 10 day 1 close; POST-BLOCK-8.2.4 trunk-engine-throughout tightening 2026-05-26 session 11 day 2 close**)
 
-#### 4.5.0 POST-BLOCK-8.2.4 trunk-engine-throughout framing (2026-05-26; LOCKED IN per block 8.2.4 byte-identity verification)
+#### 4.5.0a POST-BLOCK-8.2.5 chosen-pipeline disclosure (2026-05-27; LOCKED IN per block 8.2.5 Phase G user choice = δ-B-variant trunk-C++ engine throughout)
+
+> **✅ CHOSEN PIPELINE FOR v1.0 GMD PAPER TRACK 2 = δ-B-variant** (trunk-C++ engine throughout) per block 8.2.5 Phase G user decision (2026-05-27 ~15:30 CEST, session 12 day 2; after full Phase F 50-cell biome-stratified production-config smoke side-by-side evidence). Decision criteria:
+> - **Methodological consistency** with Methods §2.2 framing locked at block 8.2.4 (see §4.5.0b below) — δ-B-variant uses trunk_r13078 C++ engine throughout (engine + LPJG + natural-emission preprocessor); the alternative δ-B pipeline uses Fortran `imogen/code/imogen_lpjg.f` engine which is NOT in trunk_r13078 (Fortran tree is fork-shared in our repo but not native to trunk_r13078).
+> - **Numerical precision** — δ-B-variant uses double-precision C++ throughout (`std::double`); δ-B uses default single-precision Fortran in many declarations. Fortran-vs-C++ produces ~15-31 ppm secular CO2 drift across SSPs at 2100 (B62 hypothesis: single-vs-double precision accumulated rounding in C-cycle solver; not blocking v1.0 since both within IPCC AR6 / Friedlingstein 2025 GCB published ranges). δ-B-variant is B62-clean.
+> - **Output format ergonomics** — δ-B-variant CO2_all.dat: 201 clean lines (1900-2100); δ-B Fortran CO2_all.dat: 523 lines with multi-call-per-year duplicates requiring de-duplication for plots.
+> - **Phase F per-biome NPP literature compliance** (Smith2014/Pugh2019/Hickler2012/Friedlingstein2025GCB ranges) — δ-B-variant 8/10 biomes in range @ 2000 vs δ-B's 7/10; both 7/10 @ 2100 (TIE).
+> - **Warm/wet biome fidelity** — δ-B-variant favors tropical/temperate forest NPP (+12 to +24%), better matching expected literature values for productive biomes.
+>
+> **δ-B Fortran-engine pipeline retained in repo as v1+ switchable alternative** per B57/B59 v1+ trajectory. The 5 × 18 GB δ-B Fortran 62892-grid libraries at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` remain available for: (a) v1+ cross-engine validation studies; (b) v1.1+ live-coupling trajectory that may use Fortran engine for tighter coupling per F-12 Option B exploration; (c) reviewer-requested supplementary materials if the v1.0 paper review requests Fortran-engine comparison figures.
+>
+> **Paper Methods §2.2 PROPOSED addition for the chosen-pipeline disclosure** (to be folded into the canonical Methods §2.2 text in §4.5.0b below at paper-writing era):
+>
+> ```
+> Track 2 (T_seq sequential-standalone) production runs use the δ-B-variant
+> pipeline (chosen at block 8.2.5 Phase G after side-by-side acceptance
+> against the alternative δ-B Fortran-engine pipeline): (i) intermediary_py
+> adapter outputs (RCMIP/CMIP6-backboned anthropogenic CO2 + CH4 + N2O
+> emissions; pre-baked offline LPJG natural fluxes per the live-coupling-
+> prerequisite deferral at v1+) feed the trunk_r13078 C++ IMOGEN engine via
+> `-input imogencfx` standalone mode (skip_inprocess_engine_run=0; engine
+> writes 1631-cell native climate per year-dir);
+> (ii) chained FastRegrid (version_B clone with Linux-adapted CLI + auto-
+> detect-numeric-header) performs NN 1631→3696 (mimics predecessor Fortran
+> engine internal REGRID_CLIM step) then IDW 3696→62538 (Haversine; --radius 0
+> disables sparse-source filter); CO2.dat and ocean-state files preserved
+> unchanged;
+> (iii) trunk_r13078 LPJG via `-input imogencfx` standalone mode
+> (skip_inprocess_engine_run=1; reads pre-baked 62538-cell climate library)
+> produces ecosystem state outputs at 62538-cell production resolution.
+> Choice rationale: methodological consistency with trunk_r13078-throughout
+> framing; double-precision C-cycle solver avoiding the ~15-31 ppm single-vs-
+> double precision drift; warm/wet biome NPP fidelity per side-by-side
+> 50-cell biome-stratified Phase F production-config smoke evidence. The
+> alternative δ-B Fortran-engine pipeline remains in the rebuild repository
+> as a v1+ switchable alternative.
+> ```
+>
+> Full Phase F evidence (10-biome × 5-cell × 1901-2100 × save_state/restart × both pipelines parallel; 7-8/10 literature-range compliance per pipeline; per-biome bias pattern climate-forcing-driven not CO2-driven) at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` §5.
+
+#### 4.5.0b POST-BLOCK-8.2.4 trunk-engine-throughout framing (2026-05-26; LOCKED IN per block 8.2.4 byte-identity verification; PRESERVED in original §4.5.0 location as engine-side framing prerequisite for §4.5.0a chosen-pipeline disclosure above)
 
 > **✅ TRUNK-ENGINE-THROUGHOUT FRAMING LOCKED IN** at block 8.2.4 close (2026-05-26 session 11 day 2). Block 8.2.4 forward-ported the engine-side slice of LEDGER §1.2 Installment-2 (~1300 LOC) into `forks/trunk_r13078/`, bringing trunk's C++ IMOGEN engine to **functional byte-identity** with rebuild's lpjguess engine. Trunk's freshly-built `build_b824/guess` binary produced all 5 SSP engine libraries at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/` (5 × 443 MB = ~2.2 GB; 1900-2101). **Phase G byte-identity verification: 250/250 ✅ md5 matches** (5 SSPs × 5 sentinel years × 10 climate variables) between trunk's NEW engine output and rebuild's lpjguess-engine reference. CO2 trajectory values numerically match exactly (SSP1-2.6 2100 = 427.62 ppm peak-then-decline; SSP2-4.5 = 590.815; SSP3-7.0 = 826.34; SSP4-6.0 = 631.473; SSP5-8.5 = 1092.59; all within IPCC AR6 / Friedlingstein 2025 GCB ranges). **B61 ✅ CLOSED** at this block. Full evidence at `_chat_artifacts/b8_2_4_trunk_engine_forwardport_2026-05-24/B8_2_4_evaluation_2026-05-26.md`.
 

@@ -217,3 +217,99 @@ minimal adaptation. To adapt:
   SLURM template (cross-reference for the gridlist-split + mpirun pattern)
 
 — Generated at step 16 (2026-05-08) of the unified-codebase rebuild.
+
+---
+
+## Block 8.4 pre-cluster prep — Track 2 T_seq cluster launch (added at block 8.2.5 FULL close 2026-05-27 session 12 day 2)
+
+At block 8.2.5 FULL close (Phase G user choice = δ-B-variant trunk-C++ engine throughout), 10 cluster production run-dirs were authored at `forks/trunk_r13078_runs/<SSP>_cluster_<phase>/` (5 SSPs × hist+scen) mirroring the user's established Track-1 wpeat hist+ssp{126,…}_wpeat pattern at `/media/bampoh-d/landsymm_imogen_runs_cluster_mirror_2026-05-21/`. Each cluster run-dir contains 14 .ins files + a `setup_run_tseq.sh` wrapper + (for `_hist` dirs) a `state/` subdir.
+
+### Original Track 1 cluster workflow (user's established pattern; verified 2026-05-27)
+
+```
+1. cd <run-setup-dir>                                  (e.g., integrated-4.1-ins2_landsymm_ssp126_wpeat/)
+2. mkdir state/                                        (manual creation before initiating)
+3. ./setup_run.sh                                      (5-line run-dir-local wrapper)
+4.   → setup_run_owl_with_scratch_lpj_work.sh \        (the IMK-IFU workhorse)
+       <runname> main.ins "extra-ins-files" \
+       gridlist_in_62892_and_climate.txt cfx ""        (cfx = Track 1 inputmethod)
+       2 owl genius 8 genius 128                       (2 nodes × 128 CPUs = 256 ranks @ genius)
+     - Creates per-rank dirs on /bg/scratch/...
+     - cp .ins files to each rank dir
+     - Splits gridlist into 256 chunks
+     - Generates submit.sh + startguess.sh in work dir
+5. cd <work-dir>                                       (scratch dir where rank dirs live)
+6. ./startguess.sh                                     (calls sbatch submit.sh)
+7. srun mpi_run_guess_on_tmp.sh × 256 ranks
+     - Each: guess -parallel -input cfx main.ins        (on its gridlist chunk)
+8. afterok: finishup_lpj_work_owl.sh                   (concat + compress + dated output dir
+                                                         in <run-setup-dir>/)
+9. state/ subdir in <run-setup-dir>/ contains saved state files (hist phase only)
+```
+
+### Revamped `scripts/cluster/` (v1.0 unified-codebase rebuild; this dir) — workflow comparison
+
+| Component | Original (IMK-IFU `owl_hpc_cluster_scripts/`) | Revamped (this dir) | Notes |
+|---|---|---|---|
+| Top-level entry | User's per-run-dir 5-line `setup_run.sh` | `run_coupled.sbatch` (unified CLI with `--scenario`, `--coupling-mode`, `--production` etc.) | Revamped designed around rebuild's `runs/<SSP>/`; for Track 2 T_seq we use per-cluster-dir `setup_run_tseq.sh` wrapper |
+| setup_run.sh interface | Positional 12-arg | Named flags | Same functional purpose |
+| Default INPUT_MODULE | `cfx` (Track 1) | `imogen` (loose-coupling) | We override to `imogencfx` for Track 2 T_seq |
+| Coupling mode | N/A (cfx = loose by design) | `loose` only (tight + cluster BLOCKED until F-12 Option C) | T_seq is conceptually loose (pre-baked climate) |
+| Binary | `compiled/<archvariant>/guess` symlink | `lpjguess/build_mpi/guess` (rebuild) or `forks/trunk_r13078/build_owl/guess` (Track 2 T_seq) | We point at `forks/trunk_r13078/build_owl/guess` for Track 2 T_seq |
+| mpi_run script | `mpi_run_guess_on_tmp.sh` (rsync-to-tmp) | `mpi_run_guess.sh` (rsync-to-scratch) | Functionally same |
+| finishup | `finishup_lpj_work_owl.sh` | `finishup_lpj_work.sh` | Functionally same |
+| State path | Implicit (manually-created state/ in run-dir) | **Explicit `state_path` in main.ins** (absolute cluster path) | Cleaner; our cluster .ins set state_path absolute per `forks/trunk_r13078_runs/<SSP>_cluster_hist/state/` |
+
+### Track 2 T_seq cluster launch — two viable paths
+
+**Path B — Per-cluster-dir `setup_run_tseq.sh` wrapper** (RECOMMENDED; mirrors your Track-1 mental model exactly):
+
+```bash
+# Sequence: hist FIRST then scen (scen restarts from hist saved state)
+
+# 1. HIST phase (5 SSPs; can be parallel via 5 separate SBATCH jobs)
+cd forks/trunk_r13078_runs/SSP1-2.6_cluster_hist
+./setup_run_tseq.sh                  # invokes scripts/cluster/setup_run.sh with imogencfx + cluster paths
+cd $WORK_BASE/SSP1-2.6_cluster_hist  # cluster work dir
+bash startguess.sh                   # sbatch submit.sh + chain finishup
+# (repeat for SSP2-4.5_cluster_hist, ..., SSP5-8.5_cluster_hist)
+
+# 2. (Wait for all HIST runs to complete + state/ populated)
+
+# 3. SCEN phase (5 SSPs; each restarts from corresponding <SSP>_cluster_hist/state/)
+cd forks/trunk_r13078_runs/SSP1-2.6_cluster_scen
+./setup_run_tseq.sh
+cd $WORK_BASE/SSP1-2.6_cluster_scen
+bash startguess.sh
+# (repeat for SSP2-4.5_cluster_scen, ..., SSP5-8.5_cluster_scen)
+```
+
+The `setup_run_tseq.sh` wrapper auto-detects `$(pwd)` for runname + scenario-dir, hardcodes `--inputmethod imogencfx`, points `--binary` at `forks/trunk_r13078/build_owl/guess`, and invokes the workhorse `scripts/cluster/setup_run.sh` with all the right named-flag args. Override allocation via env: `NNODES=2 CPU_PER_NODE=128 PARTITION=genius WALLTIME=03:00:00 ./setup_run_tseq.sh`.
+
+**Path A — Unified `run_coupled.sbatch` launcher** (alternative; uses rebuild's `--scenario` CLI pattern):
+
+```bash
+# Note: run_coupled.sbatch was designed around rebuild's runs/<SSP>/ paths; for Track 2 T_seq
+# it requires --scenario-dir override to point at our forks/trunk_r13078_runs/<SSP>_cluster_<phase>/.
+# This path may require minor adaptation; verify CLI surface before use.
+
+scripts/cluster/run_coupled.sbatch \
+  --scenario-dir forks/trunk_r13078_runs/SSP1-2.6_cluster_hist \
+  --coupling-mode loose \
+  --inputmethod imogencfx \
+  --binary forks/trunk_r13078/build_owl/guess \
+  --production \
+  --nodes 2 --cpu-per-node 128 --partition genius --walltime 03:00:00
+```
+
+The Path B per-dir wrapper is the more familiar pattern + matches your established Track-1 workflow precisely. Path A is provided for unified-launcher consistency with rebuild's other operational scripts.
+
+### Pre-cluster checklist (after `git pull` cluster to v0.24.0)
+
+1. **Rebuild trunk binary on cluster**: `cd forks/trunk_r13078 && mkdir -p build_owl && cd build_owl && cmake -DCMAKE_BUILD_TYPE=Release .. && make -j$(nproc)` (per block 8.1 confirmation B48-immune on cluster)
+2. **Rsync δ-B-variant 62892 library** workstation→cluster: 5 × 18 GB to `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/` (5-10 min over gigabit). Note: this 90 GB of binary data is gitignored — git won't track it, but it physically lives inside the cluster mirror dir tree. This mirrors the workstation layout exactly.
+3. **(Optional, mirrors your Track-1 muscle memory) Create `./guess` symlinks** in each cluster run-dir: `for d in forks/trunk_r13078_runs/SSP*_cluster_*; do (cd $d && ln -s ../../trunk_r13078/build_owl/guess guess); done`. Not required because `setup_run_tseq.sh` passes `--binary` explicitly to `setup_run.sh`, but adding the symlink lets you `./guess --help` from within the run-dir for ad-hoc inspection (matches your Track-1 convention).
+4. **Verify cluster LU + ndep + popdens + simfire + soilmap paths exist** (per your wpeat references in main.ins; should be there from your Track-1 runs)
+5. **Block 8.3 cluster smoke test**: pick one SSP × hist phase + small smoke gridlist (e.g., gridlist_test2.txt) + verify end-to-end runs cleanly before full production launch
+6. **Block 8.5 cluster MPI pre-flight**: verify chosen-pipeline trunk-T_seq scales correctly on genius/256 × 3-day walltime
+7. **Track 2 production launches**: 5 SSPs × hist (~1-3 h cluster wall each) → 5 SSPs × scen (~0.5-1 h each); total ~5-15 h cluster wall per session 11 prompt §1B + B81 reconnaissance estimate.
