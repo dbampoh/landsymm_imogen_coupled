@@ -149,25 +149,78 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
-### ✅ BLOCK 8.2.5 LANDED + POST-BLOCK-8.2.5-FULL OPERATIONAL ORDERING (2026-05-27 afternoon session 12 day 2)
+### ✅ BLOCK 8.2.5 LANDED + BLOCK 8.4 PRE-CLUSTER PREP CONSOLIDATED + POST-BLOCK-8.2.5+8.4 OPERATIONAL ORDERING (2026-05-27 evening session 12 day 2)
 
-**Block 8.2.5 ✅ DONE** at this close commit — switchable-regrid-strategy wiring Phase A-H ALL LANDED. Both pipelines built (5 × 18 GB δ-B Fortran 62892-grid library at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` + 5 × 18 GB δ-B-variant trunk-C++ 62892-grid library at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`; both 62538-line per climate-var per year-dir post Rule #9 #33 auto-detect-numeric-header fix; both PAPER-READY). **Phase G user choice (~15:30 CEST 2026-05-27) = δ-B-variant** (trunk-C++ engine throughout) for v1.0 GMD paper Track 2 cluster production runs per Methods §2.2 framing locked at block 8.2.4 + double-precision numerics (B62-clean) + warm/wet biome NPP fidelity. **δ-B Fortran-engine pipeline retained as v1+ switchable alternative** per B57/B59 v1+ trajectory. **B57 + B59 ✅ CLOSED**. Full evidence at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` (~400 LOC).
+**Block 8.2.5 ✅ DONE** at this close commit — switchable-regrid-strategy wiring Phase A-H ALL LANDED. Both pipelines built (5 × 18 GB δ-B Fortran 62892-grid library at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` + 5 × 18 GB δ-B-variant trunk-C++ 62892-grid library at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`; both 62538-line per climate-var per year-dir post Rule #9 #33 auto-detect-numeric-header fix; both PAPER-READY). **Phase G user choice (~15:30 CEST 2026-05-27) = δ-B-variant** (trunk-C++ engine throughout) for v1.0 GMD paper Track 2 cluster production runs per Methods §2.2 framing locked at block 8.2.4 + double-precision numerics (B62-clean) + warm/wet biome NPP fidelity. **δ-B Fortran-engine pipeline retained as v1+ switchable alternative** per B57/B59 v1+ trajectory. **B57 + B59 ✅ CLOSED**. Full evidence at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` (~430 LOC).
 
-**POST-BLOCK-8.2.5-FULL NEXT** (user direction = cluster path; rejected local 3696-grid alternative due to spatial-resolution disclosure concerns + Track-1 apples-to-apples comparison preservation):
+**Block 8.4 pre-cluster prep ✅ ALSO DONE** at this close commit (PULLED FORWARD per user direction at session 12 day 2 ~16:23 CEST to consolidate cluster setup into ONE commit + minimize cluster-side firefighting): 10 cluster production run-dirs at `forks/trunk_r13078_runs/<SSP>_cluster_<phase>/` (5 SSPs × hist+scen mirroring user's wpeat hist+ssp{126,…}_wpeat layout) × 14 .ins files each (140 .ins total) with production-grade knobs (`nyear_spinup=500`, `freenyears=100`, `npatch=25`, `save_state`/`restart` per user's wpeat pattern) + cluster paths for climate/LU/ndep/popdens/simfire/soilmap (ndep histsoc-wetdry-lpjguess fallback for SSP2-4.5+SSP4-6.0 per block 8.1 D5); NEW `scripts/cluster/setup_run_tseq_template.sh` (~150 LOC) cp'd to each cluster run-dir as `setup_run_tseq.sh`; `scripts/cluster/README.md` ~100 LOC expansion documenting original Track-1 vs revamped workflow comparison + T_seq launch Path A + Path B + pre-cluster checklist. **Existing `forks/trunk_r13078_runs/<SSP>/` dirs kept as-is** (implicit `_local` role; have block-8.0.3 acceptance + block-8.2.4 trunk-engine library); `<SSP>_cluster_<phase>/` added as siblings (less disruptive than session-11 two-track-restructure proposal).
+
+**POST-BLOCK-8.2.5+8.4 NEXT** (user direction = cluster path; rejected local 3696-grid alternative due to spatial-resolution disclosure concerns + Track-1 apples-to-apples comparison preservation):
 
 | # | Block | Wall | Notes |
 |---|---|---|---|
-| 1 | **Cluster prep** | ~half-day | git pull cluster mirror at `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/` to v0.24.0 tag (cluster mirror was at HEAD `9561f1e6` per block 8.1 reconnaissance; needs jump to v0.24.0); trunk binary rebuild via cmake+make in `build_owl/`; rsync 90 GB δ-B-variant 62892 library workstation→cluster (target: `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`) + 2.2 GB native 1631 library for provenance |
-| 2 | **Block 8.3 cluster end-to-end smoke** | ~0.5-1 day | Cluster .ins for small smoke gridlist + SBATCH wrapper (`-input imogencfx` + skip_inprocess_engine_run=1 + `mpirun -np N guess -parallel`) + first cluster runtime test on owl genius/256 × ~1-2 hour walltime + SCP outputs back + diff vs local Phase F smoke results; tag candidate `v0.25.0-cluster-trunk-tseq-smoke-complete` |
-| 3 | **Block 8.4 cluster production-config delta + two-track restructure** | ~1-1.5 days | Restructure `forks/trunk_r13078_runs/<SSP>/` → `<SSP>_local/` + `<SSP>_cluster/` per session-11 pivot #2 (manual not programmatic); main_hist.ins + main_scen.ins per SSP × 5 SSPs (mirror our local Phase F smoke pattern but cluster paths); landcover/crop.ins cluster paths (`/bg/data/lpj/bampoh-d/landsymm_lu/...` per user's wpeat pattern); setup_run.sh + run_coupled.sbatch T_seq retargeting; adopt newer site-wide orchestrator improvements per block 8.1 D3 finding; 4-LOC /bg/home path-translation case-add per block 8.1 D4 finding |
-| 4 | **Block 8.5 cluster MPI pre-flight** | ~0.5 day | Verify chosen-pipeline trunk-T_seq scales correctly on genius/256 × 3-day walltime |
-| 5 | **(Optional) Block 8.7 intermediate-cell production smoke** | ~0.5 day | ~1000-cell confidence-builder before full 62538-cell launch |
-| 6 | **Track 2 production runs** | ~5-15 h cluster wall | 5 SSPs × 62538 cells × 1900-2100 × strict production (npatch=25, spinup=500, save_state/restart per user's wpeat hist+ssp126 pattern) on owl genius/256 × 3-day walltime; outputs to cluster scratch then SCP back |
+| 1 | **Cluster prep** | ~half-day | git pull cluster mirror at `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/` to v0.24.0 tag (cluster mirror was at HEAD `9561f1e6` per block 8.1 reconnaissance; needs jump to v0.24.0); trunk binary rebuild via cmake+make in `forks/trunk_r13078/build_owl/`; rsync 90 GB δ-B-variant 62892 library workstation→cluster (target: `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`) + 2.2 GB native 1631 library for provenance; optional `./guess` symlink creation per cluster run-dir per Track-1 muscle memory |
+| 2 | **Block 8.3 cluster end-to-end smoke** | ~0.5-1 day | Cluster .ins for small smoke gridlist (override `file_gridlist` in `forks/trunk_r13078_runs/SSP1-2.6_cluster_hist/main.ins` temporarily OR use Path A `--scenario` override) + launch via Path B `./setup_run_tseq.sh` (recommended; mirrors Track-1 mental model) OR Path A `scripts/cluster/run_coupled.sbatch` (unified launcher) + first cluster runtime test on owl genius/256 × ~1-2 hour walltime + SCP outputs back + diff vs local Phase F smoke results; tag candidate `v0.25.0-cluster-trunk-tseq-smoke-complete` |
+| 3 | ~~Block 8.4 cluster production-config delta + two-track restructure~~ | ~~~1-1.5 days~~ | **✅ DONE at this close commit (pulled forward into Phase H per user direction)**. Cluster .ins + setup_run_tseq.sh wrappers + workflow docs all consolidated. See §1.1 "Block 8.4 pre-cluster prep artifacts" subsection below for inventory. |
+| 4 | **Block 8.5 cluster MPI pre-flight** | ~0.5 day | Verify chosen-pipeline trunk-T_seq scales correctly on genius/256 × 3-day walltime; may be inferable from block 8.3 smoke if smoke uses full 256-rank allocation |
+| 5 | **(Optional) Block 8.7 intermediate-cell production smoke** | ~0.5 day | ~1000-cell confidence-builder before full 62538-cell launch; may be subsumed into block 8.3/8.5 depending on smoke gridlist choice |
+| 6 | **Track 2 production runs** | ~5-15 h cluster wall | 5 SSPs × 62538 cells × 1900-2100 × strict production (npatch=25, spinup=500, save_state/restart per user's wpeat hist+ssp126 pattern) on owl genius/256 × 3-day walltime; outputs to cluster scratch then SCP back. HIST phase first (5 SSPs; can be parallel via 5 SBATCH jobs or serial for queue-friendliness; each via `cd <SSP>_cluster_hist && ./setup_run_tseq.sh && cd $WORK_BASE/<runname> && bash startguess.sh`); SCEN phase after HIST + state/ populated (each restarts from corresponding `<SSP>_cluster_hist/state/`) |
 | 7 | **Track 1 baseline** | already done | user's existing wpeat production runs at `/bg/data/lpj/bampoh-d/landsymm_imogen_runs/integrated-4.1-ins2_landsymm_{hist,ssp*}_wpeat/` (no re-run needed; block 8.6 moot) |
-| 8 | **SCP Track 2 outputs back + validation triad + paper figures + Methods §2.2 update + Results + Discussion writing** | ~3-5 weeks paper writing | Axis 1 rebuild vs predecessor (per F-13 scripts) + Axis 2 physical sensibility (vs IPCC AR6 / Friedlingstein 2025 GCB) + Axis 3 Track 1 vs Track 2 + Axis 4 framework consistency; for Axis 1 + Axis 4, aggregate higher-res outputs to comparison resolution as needed (no need at 62892-native paper-resolution) |
+| 8 | **SCP Track 2 outputs back + validation triad + paper figures + Methods §2.2 update + Results + Discussion writing** | ~3-5 weeks paper writing | Axis 1 rebuild vs predecessor (per F-13 scripts) + Axis 2 physical sensibility (vs IPCC AR6 / Friedlingstein 2025 GCB; ecosystem vs Smith2014/Pugh2019/Hickler2012/Saunois2020/Davidson2000/Tian2020) + Axis 3 Track 1 vs Track 2 + Axis 4 framework consistency; Methods §2.2 fold §4.5.0a chosen-pipeline disclosure text from `notes/PAPER_COMPLETION_AND_VALIDATION.md` |
 | 9 | **v1.0 GMD submission** | target ~5-9 weeks from this close | — |
 
-**Total active work to start of validation phase: ~4-6 working days + ~1 day cluster runs.**
+**Total active work to start of validation phase: ~3-5 working days cluster prep + ~5-15 hours cluster wall** (Block 8.4 already done; was ~4-6 days pre-consolidation).
+
+#### 1.1 Block 8.4 pre-cluster prep artifacts inventory + Path A vs Path B launch options
+
+**Artifacts landed at this close commit** (per `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` §7):
+
+- **10 cluster production run-dirs**: `forks/trunk_r13078_runs/<SSP>_cluster_<phase>/` for SSP ∈ {SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP4-6.0, SSP5-8.5} × phase ∈ {hist, scen}. Each contains 14 .ins files (main + landcover + crop + nitrogen + dispersal + global_cf + global_co2_*.ins + Nfert_v3.ins + soil_cf.ins + 4 other paramfiles) + `setup_run_tseq.sh` (cp from `scripts/cluster/setup_run_tseq_template.sh`) + (for `_hist` dirs) a `state/` subdir for save_state checkpoint.
+- **Production knobs** (wpeat-mirror exactly): `nyear_spinup=500`, `freenyears=100`, `npatch=25`, `run_landcover=1`, `run_peatland=1`. HIST: `save_state=1` + `save_years="2020"` + `state_path=<absolute path to state/>`. SCEN: `restart=1` + `restart_year=2020` + `state_path=<same absolute path as HIST's save_path>`.
+- **Cluster paths** in main.ins / landcover.ins / crop.ins: climate from `/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/<YYYY>/` (chosen δ-B-variant pipeline); LU from `/bg/data/lpj/bampoh-d/landsymm_lu/{hildaplus_hist,plum_scen/ssp<NNN>}/...` per user's wpeat pattern; ndep from `/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/n-deposition/{histsoc-ssp<NNN>soc-wetdry-lpjguess,histsoc-wetdry-lpjguess}/...` with histsoc-wetdry-lpjguess fallback for SSP2-4.5+SSP4-6.0 per block 8.1 D5; popdens from `/bg/data/lpj/LPJ-GUESS/input/isimip/isimip3/pop/lpjg-popd/...`; simfire from `/bg/data/lpj/LPJ-GUESS/input/fire/SimfireInput.bin`; soilmap from `/bg/data/lpj/bampoh-d/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat`.
+- **NEW launcher template**: `scripts/cluster/setup_run_tseq_template.sh` (~150 LOC) — T_seq-specific cluster launcher. Auto-detects runname + scenario-dir from `$(pwd)`; hardcodes `--inputmethod imogencfx`; points `--binary` at `forks/trunk_r13078/build_owl/guess`; passes through allocation knobs via env (`NNODES`, `CPU_PER_NODE`, `PARTITION`, `WALLTIME`); invokes the workhorse `scripts/cluster/setup_run.sh` with all the right named-flag args + pre-flight sanity checks (binary exists, main.ins exists, climate libraries exist on cluster).
+- **Workflow doc expansion**: `scripts/cluster/README.md` +~100 LOC NEW section "Block 8.4 pre-cluster prep — Track 2 T_seq cluster launch" documenting (a) original Track-1 cluster workflow as verified from user's narrative + script inspection, (b) revamped-vs-original scripts side-by-side comparison table, (c) **Path A + Path B T_seq launch options** (full bash recipes for each + pros/cons + when-to-use guidance), (d) pre-cluster checklist (git pull + binary rebuild + 90 GB rsync + optional `./guess` symlinks).
+
+**Path A — Unified `run_coupled.sbatch` launcher** (alternative; uses rebuild's `--scenario` CLI pattern):
+
+```bash
+# From repo root:
+sbatch scripts/cluster/run_coupled.sbatch \
+  --scenario SSP1-2.6 \
+  --coupling-mode tseq \
+  --inputmethod imogencfx \
+  --binary forks/trunk_r13078/build_owl/guess \
+  --nnodes 1 --cpu-per-node 256 --partition genius --walltime 3-00:00:00
+# Then check job status with sacct/squeue; outputs land per-rank in scratch, finishup_lpj_work.sh concatenates back
+```
+
+**Path B — Per-cluster-dir `setup_run_tseq.sh` wrapper** (RECOMMENDED; mirrors your Track-1 mental model exactly):
+
+```bash
+# 1. cd to the target cluster run-dir:
+cd forks/trunk_r13078_runs/SSP1-2.6_cluster_hist
+
+# 2. (Optional) override allocation via env:
+# NNODES=2 CPU_PER_NODE=128 PARTITION=genius WALLTIME=03:00:00 ./setup_run_tseq.sh
+
+# 3. Invoke per-cluster-dir wrapper (auto-detects runname + scenario-dir + invokes scripts/cluster/setup_run.sh):
+./setup_run_tseq.sh
+
+# 4. Output at end: "Work dir at /bg/scratch/$JOBID/.../" — note this path
+
+# 5. cd to work dir + start runs (mirrors your Track-1 manual two-step pattern):
+cd $WORK_BASE/SSP1-2.6_cluster_hist  # adjust per setup_run_tseq.sh actual output
+bash startguess.sh
+
+# 6. (Wait for SLURM job + finishup_lpj_work.sh; outputs land back in original run-dir + state/ at <SSP>_cluster_hist/state/ for SCEN restart)
+```
+
+**When to use which path** (per `scripts/cluster/README.md` §"Block 8.4 pre-cluster prep — Track 2 T_seq cluster launch"):
+
+- **Path B is RECOMMENDED for Track 2 T_seq cluster production runs** — matches your established Track-1 muscle memory precisely (cd to run-dir → ./setup_run.sh → cd to work dir → bash startguess.sh → outputs back in run-dir). The wrapper auto-detects everything; only allocation knobs are env-overridable.
+- **Path A is provided for unified-launcher consistency** with rebuild's other operational scripts (the `scripts/run_coupled.sh` workstation orchestrator uses the same CLI pattern). Useful if you ever want to script multi-SSP batched launches from a single command-line.
+
+For full Path A + Path B + workflow comparison + pre-cluster checklist details, see **`scripts/cluster/README.md` §"Block 8.4 pre-cluster prep — Track 2 T_seq cluster launch"** (~100 LOC NEW section landed at this close commit).
 
 ---
 
