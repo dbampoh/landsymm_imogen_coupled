@@ -286,6 +286,21 @@ bash startguess.sh
 
 The `setup_run_tseq.sh` wrapper auto-detects `$(pwd)` for runname + scenario-dir, hardcodes `--inputmethod imogencfx`, points `--binary` at `forks/trunk_r13078/build_owl/guess`, and invokes the workhorse `scripts/cluster/setup_run.sh` with all the right named-flag args. Override allocation via env: `NNODES=2 CPU_PER_NODE=128 PARTITION=genius WALLTIME=03:00:00 ./setup_run_tseq.sh`.
 
+**GRIDLIST env-override** (added at block 8.3 cluster smoke prep 2026-05-28 per Rule #9 #34 fix; landed in setup_run_tseq_template.sh + cp'd to all 10 cluster `<SSP>_cluster_<phase>/setup_run_tseq.sh`): the production gridlist (`data/gridlist/gridlist_in_62892_and_climate.txt`; 62538 cells) is the default; override at invocation for smoke runs without editing any script:
+
+```bash
+# Block 8.3 smoke (1024-cell biome-stratified-anchored; 4 cells/rank for 256-rank MPI; 50 Phase F anchor cells preserved at lines 1-50)
+GRIDLIST="$(realpath ../../../data/gridlist/gridlist_b830_cluster_smoke_1024cells_seed42.txt)" \
+  NNODES=4 CPU_PER_NODE=64 PARTITION=milan WALLTIME=06:00:00 \
+  ./setup_run_tseq.sh
+
+# Production (default; just no GRIDLIST env)
+NNODES=2 CPU_PER_NODE=128 PARTITION=genius WALLTIME=3-00:00:00 \
+  ./setup_run_tseq.sh
+```
+
+The wrapper passes the override path to `setup_run.sh --gridlist <PATH>`, which (a) copies the gridlist to the work-dir, (b) sed-replaces `gridlist.txt` placeholder in all .ins with the override basename per rank for proper MPI gridlist-split-parallelism (cluster main.ins now uses `(str "gridlist.txt")` placeholder per Rule #9 #34 fix; Track-1 wpeat-compatible convention), and (c) splits the gridlist into 256 per-rank chunks at `runNN/<basename>`. **Cell-count discipline**: pick N such that `N % NPROCESS == 0` to ensure all ranks loaded (e.g., 256, 512, 768, 1024 cells for 256-rank); otherwise some ranks have no gridlist file → guess fails → finishup `--dependency=afterok` chain breaks. Verification: `lines_per_run = ceil(N/R); chunks = ceil(N/lines_per_run); idle_ranks = R - chunks; need idle_ranks == 0`. Production gridlist 62538/256 satisfies this with lines_per_run=245 → 256 chunks → 0 idle.
+
 **Path A — Unified `run_coupled.sbatch` launcher** (alternative; uses rebuild's `--scenario` CLI pattern):
 
 ```bash

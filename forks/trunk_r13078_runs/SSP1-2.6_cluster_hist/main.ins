@@ -123,8 +123,11 @@ FILE_LPJG_CH4_N2O_FLUX  ""
 ! larger gridlists requires re-running rebuild engine with larger gridlist first).
 !param "file_gridlist"    (str "gridlist_in_62892_and_climate.txt")    ! Production (62538 cells; cluster-target)
 !param "file_gridlist_cf" (str "gridlist_in_62892_and_climate.txt")
-param "file_gridlist"     (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/data/gridlist/gridlist_in_62892_and_climate.txt")
-param "file_gridlist_cf"  (str "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/data/gridlist/gridlist_in_62892_and_climate.txt")
+! [Rule #9 #34 fix; block 8.3 cluster smoke prep 2026-05-28; setup_run.sh sed-replaces
+!  "gridlist.txt" with --gridlist basename per rank for MPI gridlist-split parallelism;
+!  matches Track-1 wpeat convention. Original absolute-path version preserved in `.preR9_34.bak`.]
+param "file_gridlist"     (str "gridlist.txt")
+param "file_gridlist_cf"  (str "gridlist.txt")
 
 ! Soil map (LOCAL: predecessor mirror; CLUSTER: /bg/data/lpj/bampoh-d/soil/...)
 param "file_soildata"     (str "/bg/data/lpj/bampoh-d/soil/soilmap_center_interpolated.remapv10_old_62892_gL.dat")

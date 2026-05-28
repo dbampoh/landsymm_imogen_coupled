@@ -74,7 +74,11 @@ APPEND_NTASKS="${APPEND_NTASKS:-8}"
 # Track-2 T_seq specifics
 INPUTMETHOD="imogencfx"
 BINARY="${REPO_ROOT}/forks/trunk_r13078/build_owl/guess"
-GRIDLIST="${REPO_ROOT}/data/gridlist/gridlist_in_62892_and_climate.txt"
+# GRIDLIST defaults to production 62538-cell gridlist; override via env for smoke
+# (e.g., `GRIDLIST=$REPO_ROOT/data/gridlist/gridlist_b830_cluster_smoke_1024cells_seed42.txt ./setup_run_tseq.sh`)
+# Rule #9 #34 fix at block 8.3 cluster smoke prep 2026-05-28: env-overridable per Track-1
+# muscle memory + cluster-citizenship smoke-vs-production decoupling.
+GRIDLIST="${GRIDLIST:-${REPO_ROOT}/data/gridlist/gridlist_in_62892_and_climate.txt}"
 EXTRA_INSFILES="crop.ins crop_n.ins global.ins global_soiln.ins landcover.ins crop_n_pftlist.simplePFT.remap10_g2p.ins crop_n_stlist.simplePFT.remap10_g2p.N0-60-200-1000.ins crop_n_stlist.simplePFT.remap10_g2p.agreed_treatments.ins wetlandpfts.ins imogen_intermediary.ins pasture_n_stlist.ins pasture_n_stlist_agreed_treatments.ins global_coupled_imogen_lpjg.ins"
 
 # Pre-flight sanity

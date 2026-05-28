@@ -149,6 +149,41 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
+### 🔧 BLOCK 8.3 CLUSTER SMOKE PREP — Rule #9 datapoint #34 fix landed BEFORE smoke launch (2026-05-28 afternoon session 13 day 1; cluster-native via Cursor Remote-SSH owl01amd)
+
+**Block 8.3 itself remains in progress** (smoke staging next; tag `v0.25.0-cluster-trunk-tseq-smoke-complete` REMAINS RESERVED). At this PREP commit, Rule #9 datapoint #34 surfaced + fixed BEFORE any cluster wall-time burned: tracing the LPJ-GUESS `-parallel` gridlist-resolution mechanism (per `forks/trunk_r13078/command_line_version/main.cpp:69-77` — each rank cd's into `./run<rank+1>` so all relative .ins paths resolve from `runNN/`) revealed that all 10 cluster `main.ins` files authored at block 8.4 Phase H (commit `0b2806e7`) had `file_gridlist` set to absolute path → under MPI every rank would resolve to the same 62538-cell production gridlist independently → 256× duplicated work + finishup-concat broken + state/ misalignment for SCEN restart. Fix matches Daniel's Track-1 wpeat reference convention (`(str "gridlist.txt")` placeholder; setup_run.sh sed-replaces with --gridlist basename per rank for proper gridlist-split-parallelism). Patches landed: (1) Patch 1: 10 cluster main.ins file_gridlist + file_gridlist_cf → `(str "gridlist.txt")` (~50/-20 LOC tracked; +3-line Rule #9 #34 fix annotation per file with `.preR9_34.bak` safety-backup reference); (2) Patch 2: `scripts/cluster/setup_run_tseq_template.sh` + 10 cp's `<SSP>_cluster_<phase>/setup_run_tseq.sh` GRIDLIST env-overridable via `${GRIDLIST:-default}` idiom (~55/-11 LOC tracked); (3) NEW `data/gridlist/gridlist_b830_cluster_smoke_1024cells_seed42.txt` (1024 cells; 50 Phase F anchor cells preserved at lines 1-50 + 974 random seed=42 from production-minus-Phase-F; clean 4 cells/rank for 256-rank MPI; subsumes Block 8.5 cluster MPI pre-flight scope); (4) pre-flight cluster-native fixes (gitignored: state/ subdirs + ./guess symlinks for all 10 dirs); (5) audit-evidence bundle stub at `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/`. **Verified other suspect cluster .ins paths safe** under T_seq mode (`skip_inprocess_engine_run=1` bypasses imogen_intermediary.ins `../../../` paths per imogencfx.cpp:547; main.ins lines 107-111 null FILE_LPJG_*/FILE_*_EMITS workstation paths to ""). **Block 8.3 cluster smoke launch recipe** (revised post-Rule #9 #34 fix; cluster-citizenship optimized for current cluster load — milan partition 9 idle nodes vs genius 75% busy with 2 pending jobs in queue):
+
+```bash
+ssh owl  # or use Cursor Remote-SSH-attached terminal
+cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP1-2.6_cluster_hist
+
+# Stage smoke run-dir at /bg/data/lpj/work/bampoh-d/...; does NOT sbatch yet
+GRIDLIST="$(realpath ../../../data/gridlist/gridlist_b830_cluster_smoke_1024cells_seed42.txt)" \
+  NNODES=4 CPU_PER_NODE=64 PARTITION=milan WALLTIME=06:00:00 \
+  ./setup_run_tseq.sh
+
+# Inspect staged work-dir BEFORE submitting (verify rank dirs + gridlist split)
+ls -la /bg/data/lpj/work/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP1-2.6_cluster_hist/run1/
+wc -l /bg/data/lpj/work/.../SSP1-2.6_cluster_hist/run1/gridlist_b830_cluster_smoke_1024cells_seed42.txt
+# Expected: 4 cells per rank × 256 ranks = 1024 cells total
+
+# Submit + monitor (cluster-citizenship: gentle on partition load)
+cd /bg/data/lpj/work/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP1-2.6_cluster_hist
+bash startguess.sh
+squeue -u $USER
+
+# Post-run: 8-acceptance-gate evaluation + diff vs Phase F first-50-cells subset
+# (G0 SLURM exits clean; G1 256 ranks all completed; G2 year-range coverage 1900-2020 spinup+hist;
+#  G3 output file presence; G4 apples-to-apples diff vs Phase F first 50 cells; G5 physical sensibility;
+#  G6 state/ populated for SCEN restart; G7 cluster citizenship clean — no scratch overflow + quota OK)
+```
+
+Rule #9 datapoint #34 + concrete Patch 1 + Patch 2 details + verification math (1024/256 = 4 cells/rank exact; setup_run.sh split produces 256 chunks; 0 idle ranks; finishup_lpj_work.sh `--dependency=afterok` chain proceeds cleanly) at `notes/FOLLOWUPS.md` Status dashboard top entry + `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 NEW "Block 8.3 cluster smoke PREP" entry + `CHANGELOG.md` [Unreleased] full ~70-LOC narrative entry. Audit-evidence bundle stub + 1024-cell gridlist composition + reproducibility script + 8-acceptance-gate scope at `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/gridlist_b830_cluster_smoke_1024cells_seed42_metadata.txt` (~6.3 KB; gitignored).
+
+**POST-BLOCK-8.3-PREP NEXT**: stage smoke per recipe above (STOP for Daniel review pre-sbatch) → `bash startguess.sh` post-review → 8-acceptance-gate evaluation + diff vs Phase F → block 8.3 close commit + tag `v0.25.0-cluster-trunk-tseq-smoke-complete` + full 9-surface cascade (folds in 4 deferred surfaces: STEP_17c §1.7.8 + PAPER_COMPLETION §4.5.0 [methodology unaffected; just acknowledge cluster smoke landed] + forks/README.md + forks/trunk_r13078_runs/README.md) → block 8.5 cluster MPI pre-flight (likely subsumed by 4 cells/rank smoke) → Track 2 production runs.
+
+---
+
 ### ✅ BLOCK 8.2.5 LANDED + BLOCK 8.4 PRE-CLUSTER PREP CONSOLIDATED + POST-BLOCK-8.2.5+8.4 OPERATIONAL ORDERING (2026-05-27 evening session 12 day 2)
 
 **Block 8.2.5 ✅ DONE** at this close commit — switchable-regrid-strategy wiring Phase A-H ALL LANDED. Both pipelines built (5 × 18 GB δ-B Fortran 62892-grid library at `runs/<SSP>/Common-directory-fortranengine/IMOGEN/output_62892/` + 5 × 18 GB δ-B-variant trunk-C++ 62892-grid library at `forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/`; both 62538-line per climate-var per year-dir post Rule #9 #33 auto-detect-numeric-header fix; both PAPER-READY). **Phase G user choice (~15:30 CEST 2026-05-27) = δ-B-variant** (trunk-C++ engine throughout) for v1.0 GMD paper Track 2 cluster production runs per Methods §2.2 framing locked at block 8.2.4 + double-precision numerics (B62-clean) + warm/wet biome NPP fidelity. **δ-B Fortran-engine pipeline retained as v1+ switchable alternative** per B57/B59 v1+ trajectory. **B57 + B59 ✅ CLOSED**. Full evidence at `_chat_artifacts/b8_2_5_switchable_regrid_2026-05-26/B8_2_5_evaluation_2026-05-27.md` (~430 LOC).
