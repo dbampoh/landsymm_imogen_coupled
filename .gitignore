@@ -294,4 +294,4 @@ Thumbs.db
 # - 2026-05-08 session 2: ../_chat_artifacts/CHAT_HANDOFF_2026-05-08_session2.md
 
 # Chat-transfer bundle + audit-evidence bundles (moved out of git tracking 2026-05-28; canonical location is alpha _chat_artifacts/ at parent dir landsymm_lpjg_imogen_coupled_model/_chat_artifacts/)
-_chat_artifacts/
+_chat_artifacts
