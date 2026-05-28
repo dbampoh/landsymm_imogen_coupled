@@ -182,6 +182,14 @@ forks/trunk_r13078_runs/*/*.out
 forks/trunk_r13078_runs/*/state/
 forks/trunk_r13078_runs/*/saved_state*/
 forks/trunk_r13078_runs/*/output/
+# Block 8.3 cluster smoke + Track 2 production: finishup_lpj_work.sh's dated
+# output-YYYY-MM-DD/ delivery dirs (gzipped + concatenated per-rank .out files
+# + supporting .ins + guess + guess_runs.log.gz + md5_gz.txt). Per-cluster-dir;
+# can grow to ~few-hundred-MB per phase × 5 SSPs × 2 phases = ~few-GB total.
+forks/trunk_r13078_runs/*/output-*/
+forks/trunk_r13078_runs/*/*-submitted_*.sh
+forks/trunk_r13078_runs/*/append_guess_x.*
+forks/trunk_r13078_runs/*/guess_x.*
 forks/trunk_r13078_runs/*/.b803_*.pid
 forks/trunk_r13078_runs/*/b803_*.log
 

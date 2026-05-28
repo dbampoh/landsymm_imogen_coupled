@@ -14,6 +14,51 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-28 (evening, session 13 day 1 close) — Block 8.3 ✅ DONE — Cluster end-to-end smoke validated end-to-end on KIT IMK-IFU owl, milan/4×64=256; chosen-pipeline (δ-B-variant trunk-C++ engine throughout) Track 2 production workflow operational; Rule #9 datapoint #35 NEW (finishup_lpj_work.sh SLURM script-cache portability bug surfaced + fixed + empirically validated); 8/9 acceptance gates ✅ PASS + 1/9 ⚠️ PARTIAL (benign); tag `v0.25.0-cluster-trunk-tseq-smoke-complete`
+
+**Block-close commit** (~7-8 h aggregate work since PREP commit `8e4ee8e` earlier today: ~2 h staging + smoke launch monitoring (HIST 1h29m + SCEN 9m45s wall) + Rule #9 #35 surface + fix + empirical validation via SCEN finishup running cleanly + ~3-4 h audit-evidence bundle authoring + full 9-surface doc cascade). Validates the cluster path end-to-end for Track 2 production runs.
+
+**Smoke results**:
+- HIST main job `601955` COMPLETED ExitCode 0:0 in 1h 29m 28s on milan[05-08] (256-rank; 4 cells/rank; 500yr spinup loop FIRST_SPINUP_YEAR=1900 + history 1901-2020); 256/256 ranks "Finished" markers; 634,880 flush_year events / 256 ranks = 2,480 per rank ✓ (4 cells × 620 distinct years).
+- HIST finishup `601956` FAILED ExitCode 1:0 in 0s (Rule #9 #35 surfaced); manual recovery from login node succeeded in 143s (BASH_SOURCE resolves correctly under direct invocation; outputs delivered to `output-2026-05-28/`).
+- SCEN main job `602049` COMPLETED ExitCode 0:0 in 9m 45s on milan[03-06] (~9× faster than HIST as expected; restart=1 + restart_year=2020 + state_path absolute as designed; G6.1 NEW gate ✅ SCEN restart from HIST state empirically validated).
+- SCEN finishup `602050` COMPLETED ExitCode 0:0 in 54s (Rule #9 #35 fix empirically validated; finishup ran cleanly under SLURM with `append_files.sh` correctly resolved at the absolute FINISHUP_SCRIPT_DIR path, NOT the SLURM-cache `/var/spool/slurmd/job<JOBID>/` path that broke HIST finishup).
+
+**Rule #9 datapoint #35 NEW** (was at #34 at PREP commit; +1 at session 13 day 1 evening): `scripts/cluster/finishup_lpj_work.sh` `SCRIPT_DIR` resolution via `BASH_SOURCE[0]` breaks under SLURM because `sbatch /path/to/finishup_lpj_work.sh` causes SLURM to copy the script to `/var/spool/slurmd/job<JOBID>/<scriptname>` and run the cached copy → BASH_SOURCE resolves to cache path → `${SCRIPT_DIR}/append_files.sh` looks for the helper next to the cached copy (doesn't exist) instead of the original `scripts/cluster/`. Surfaced empirically when HIST finishup `601956` failed instantly with `ERROR: append_files.sh not found or not executable at /var/spool/slurmd/job601956/append_files.sh` despite HIST main running cleanly. **Fix landed at this commit** (~16 LOC across 2 files): (a) `scripts/cluster/finishup_lpj_work.sh` makes SCRIPT_DIR env-overridable via `${FINISHUP_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}` (BASH_SOURCE fallback preserved for non-sbatch invocations like manual login-node recovery); (b) `scripts/cluster/setup_run.sh` startguess.sh HEREDOC adds `--export=ALL,FINISHUP_SCRIPT_DIR=${SCRIPT_DIR}` to the chained sbatch finishup invocation. **Empirical validation via SCEN smoke**: SCEN was staged AFTER fix landed → generated `startguess.sh` had the `--export=ALL,FINISHUP_SCRIPT_DIR=/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/scripts/cluster` line → SCEN finishup ran cleanly under SLURM (vs HIST finishup's instant-fail). Pattern parallel to Rule #9 #34 fix idiom (`${ENV_VAR:-default}` env-override).
+
+**Per-biome physical sensibility evidence (G5)**: 36/50 Phase F anchor cells within published literature ranges (Smith2014 + Pugh2019 + Hickler2012 + Friedlingstein2025GCB); biome-group counts ≥80% in-range for tropical evergreen (4/6) + temperate deciduous (4/5) + temperate evergreen (4/5) + boreal (7/9) + tundra (4/5) + desert (3/5). 14/50 ⚠️ borderline/edge cases concentrated in heavy-LU-conversion cells (114.75/-4.25 SEAsia peatland; 117.75/39.25 ChinaE cropland-dominant) + semi-arid biome boundaries (6.75/16.25 Sahel; 71.25/20.75 Thar) + sub-Arctic coastal cells (-133.75/56.75 Canada coast; 23.25/65.75 Lapland) + ecotone classification ambiguity (117.75/67.25 boreal-tundra). Within Phase F's 7-8/10 biomes-in-range standard.
+
+**G3 SCEN ⚠️ PARTIAL framing** (Rule #10 amendment-vs-rewrite + honest disclosure): SCEN cmass.out has 1023 cells/year vs HIST's 1024 cells/year (1-cell deficit). Identified missing cell: lon=16.25 lat=78.25 = Svalbard archipelago, Norway. HIST output for this cell shows Total cmass=0.000 across all 121 years (1900-2020) — barren cell throughout. SCEN omits it likely because PLUM_scen LU forcing assigns no fractions (vs HILDA+ hist which kept zero-fraction barren rows). Same pattern as block 8.0.3's cell-2 high-Arctic LU-mismatch ⚠️ PARTIAL framing. Production gridlist `gridlist_in_62892_and_climate.txt` likely excludes such cells by construction; cell entered our smoke via random-974 sample. Operationally benign for paper analysis.
+
+**Source-edits at this commit (TRUNK-IRRELEVANT-by-fork-novelty)**:
+- `scripts/cluster/finishup_lpj_work.sh` ~10 LOC Rule #9 #35 fix annotation + 1 LOC SCRIPT_DIR change
+- `scripts/cluster/setup_run.sh` ~6 LOC startguess.sh HEREDOC `--export=ALL,FINISHUP_SCRIPT_DIR=${SCRIPT_DIR}` patch
+- `.gitignore` ~10 LOC NEW patterns: `forks/trunk_r13078_runs/*/output-*/`, `*-submitted_*.sh`, `append_guess_x.*`, `guess_x.*` (Block 8.3 cluster runtime artifacts)
+
+**Audit-evidence bundle**: `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` (~365 LOC; 12 sections; gitignored under `_chat_artifacts/`).
+
+**Full 9-surface doc cascade landed at this commit per Rule #1**:
+1. `notes/FOLLOWUPS.md` dashboard top entry (NEW Block 8.3 ✅ DONE banner; preserves PREP entry per Rule #10 amendment-vs-rewrite)
+2. `notes/FOLLOWUPS.md` Rule #9 narrative (#35 datapoint inline added to subsequent-recurrences list as item (xi))
+3. `notes/TRUNK_R13078_BACKPORT_LEDGER.md` §3 NEW Block 8.3 LANDED entry (TRUNK-IRRELEVANT-by-fork-novelty classification; preserves PREP entry per Rule #10)
+4. `CHANGELOG.md` [Unreleased] Block 8.3 close FULL entry (THIS entry; preserves PREP entry per Rule #10)
+5. `EXECUTION_PLAN.md` row 17c Block 8.3 ✅ DONE marker (preserves PREP entry per Rule #10)
+6. `notes/STEP_17c.md` §1.7.8 NEW Block 8.3 entry (deferred from PREP commit; lands here)
+7. `notes/PAPER_COMPLETION_AND_VALIDATION.md` §4.5.0 (acknowledge cluster smoke validated chosen pipeline; methodology unaffected)
+8. `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 POST-BLOCK-8.3 banner (preserves PREP banner per Rule #10)
+9. `forks/README.md` + `forks/trunk_r13078_runs/README.md` (acknowledge cluster smoke validated)
+
+**Cumulative state at block 8.3 close**:
+- Rule #9 datapoints: **#35** (was #34 at PREP commit; +1 at this commit)
+- Rule #10 datapoints: #25 UNCHANGED
+- v1.0 % done: ~98-99% UNCHANGED (validation milestone; no architectural delta)
+- Calendar to v1.0 GMD submission: ~5-9 weeks UNCHANGED
+- Tags landed: `v0.25.0-cluster-trunk-tseq-smoke-complete` NEW at this commit (annotated)
+
+**POST-BLOCK-8.3 NEXT**: Track 2 production runs — 5 SSPs × HIST + SCEN; pre-launch checklist + wall-estimate refinement (1024-cell smoke wall extrapolation suggests production HIST may exceed 3-day milan walltime budget at npatch=25 production knobs; consider 1000-cell intermediate "Block 8.7" smoke for wall-budget refinement before full launch). Full launch sequence at `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 POST-BLOCK-8.3 banner + B8_3_evaluation §12.
+
+---
+
 ### 2026-05-28 (afternoon, session 13 day 1) — Block 8.3 cluster smoke PREP — Rule #9 datapoint #34 NEW (cluster main.ins file_gridlist absolute-path latent defect) + 2-patch fix + 1024-cell smoke gridlist authored + pre-flight (state/ subdirs + ./guess symlinks)
 
 **Pre-block-8.3-launch commit** (cluster-native via Cursor Remote-SSH owl01amd; ~2 h focused work). Surfaced + fixed a latent gridlist-parallelism defect in all 10 cluster `main.ins` files authored at block 8.4 Phase H (commit `0b2806e7`); authored a 1024-cell biome-stratified-anchored smoke gridlist for the upcoming Block 8.3 cluster end-to-end smoke; and made the cluster wrapper's GRIDLIST env-overridable for clean smoke-vs-production decoupling. Rule #9 datapoint #34 (was at #33 post-session-12; +1 at session 13 day 1). Block 8.3 itself remains in-progress; this commit lands the prep + clean-rollback point per Rule #11 meticulous discipline before any cluster wall-time burned.

@@ -66,7 +66,15 @@ echo "SLURM job   : ${SLURM_JOBID:-<unset; manual invocation>}"
 NPROC="${SLURM_NTASKS:-4}"
 
 # Resolve append_files.sh
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# [Rule #9 #35 fix; block 8.3 cluster smoke close 2026-05-28] When SLURM submits this
+# script via `sbatch /path/to/finishup_lpj_work.sh`, it copies the script to
+# /var/spool/slurmd/job<JOBID>/<scriptname> and runs that cached copy → BASH_SOURCE
+# resolves to the cache path → ${SCRIPT_DIR}/append_files.sh looks for the helper
+# next to the cached copy (doesn't exist) instead of the original scripts/cluster/.
+# Fix: env-overridable FINISHUP_SCRIPT_DIR with BASH_SOURCE fallback for non-sbatch
+# invocations (e.g., manual login-node recovery). setup_run.sh's generated
+# startguess.sh now passes --export=ALL,FINISHUP_SCRIPT_DIR=<absolute> to sbatch.
+SCRIPT_DIR="${FINISHUP_SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 APPEND_FILES="${SCRIPT_DIR}/append_files.sh"
 if [[ ! -x "${APPEND_FILES}" ]]; then
   echo "ERROR: append_files.sh not found or not executable at ${APPEND_FILES}"

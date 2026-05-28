@@ -263,6 +263,14 @@ The `paper/` subdir in the rebuild repo is currently empty (only `README.md`); p
 
 ### 4.5 Paper Methods §2.2 draft text — v1.0 prescribed-mode coupling architecture (drafted at session 8.0.3 follow-up; 2026-05-20 ~7:12 PM; **POST-BLOCK-8.2 honest-disclosure refinement 2026-05-23 session 10 day 1 close; POST-BLOCK-8.2.4 trunk-engine-throughout tightening 2026-05-26 session 11 day 2 close**)
 
+#### 4.5.0a-cluster POST-BLOCK-8.3 cluster smoke validation note (2026-05-28 session 13 day 1 close; chosen-pipeline operational on cluster)
+
+> **✅ BLOCK 8.3 ✅ DONE — Chosen δ-B-variant pipeline empirically validated on KIT IMK-IFU owl cluster** (2026-05-28 evening, session 13 day 1 close; tag `v0.25.0-cluster-trunk-tseq-smoke-complete`). Cluster end-to-end smoke ran 1024-cell biome-stratified-anchored gridlist (50 Phase F anchors + 974 random seed=42 from production-minus-Phase-F) on milan partition × 4 nodes × 64 CPUs/node = 256 ranks. **HIST main job 601955 completed in 1h29m (ExitCode 0:0); SCEN main job 602049 completed in 9m45s (ExitCode 0:0; restart from HIST state empirically validated)**. 8/9 acceptance gates ✅ PASS + 1/9 ⚠️ PARTIAL (benign Svalbard barren-cell SCEN edge case). Per-biome physical sensibility consistent with Phase F (36/50 anchor cells in published literature ranges; matches Phase F's 7-8/10 standard). 2 Rule #9 datapoints surfaced + fixed at PREP commit (#34) + close commit (#35); both fixes empirically validated.
+>
+> **Methodology unchanged** by Block 8.3 close — Methods §2.2 chosen-pipeline disclosure (§4.5.0a above) and trunk-engine-throughout framing (§4.5.0b below) remain unchanged. Block 8.3 was an operational validation milestone (cluster path now operational for full 5-SSP × HIST + SCEN Track 2 production runs); no architectural or methodological delta. Chosen pipeline (δ-B-variant; trunk-C++ engine throughout) operationally proven on cluster with 256-rank MPI.
+>
+> **For paper Methods §2.2 + Discussion**: cluster smoke evidence (G0-G7 + G6.1) is available at `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` (~365 LOC; 12 sections including 8-acceptance-gate scorecard + per-biome NPP table for 50 Phase F anchor cells + Phase F apples-to-apples evidence package + cluster citizenship + resource usage). Apples-to-apples diff vs Phase F local outputs (workstation-side validation step) deferred to post-rsync of cluster outputs to workstation.
+
 #### 4.5.0a POST-BLOCK-8.2.5 chosen-pipeline disclosure (2026-05-27; LOCKED IN per block 8.2.5 Phase G user choice = δ-B-variant trunk-C++ engine throughout)
 
 > **✅ CHOSEN PIPELINE FOR v1.0 GMD PAPER TRACK 2 = δ-B-variant** (trunk-C++ engine throughout) per block 8.2.5 Phase G user decision (2026-05-27 ~15:30 CEST, session 12 day 2; after full Phase F 50-cell biome-stratified production-config smoke side-by-side evidence). Decision criteria:

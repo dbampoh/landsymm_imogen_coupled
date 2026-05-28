@@ -240,8 +240,14 @@ SLURM_JOBID=\$(sbatch submit.sh)
 JOB_GUESS_ID=\$(echo \${SLURM_JOBID} | sed 's,Submitted batch job ,,g')
 cp -v submit.sh \$(basename \$PWD)-submitted_\$(date +%F_%H-%M-%S).sh
 
+# Rule #9 #35 fix at block 8.3 cluster smoke close 2026-05-28: pass
+# FINISHUP_SCRIPT_DIR via --export so finishup_lpj_work.sh can locate
+# its append_files.sh helper despite SLURM's script-cache copying the
+# script to /var/spool/slurmd/job<JOBID>/. See scripts/cluster/finishup_lpj_work.sh
+# inline comment for full mechanism + manual login-node recovery fallback.
 sbatch -p ${APPEND_PARTITION} --ntasks=${APPEND_NTASKS} --time=1-00:00:00 \\
   --dependency=afterok:\${JOB_GUESS_ID} \\
+  --export=ALL,FINISHUP_SCRIPT_DIR=${SCRIPT_DIR} \\
   ${SCRIPT_DIR}/finishup_lpj_work.sh ${WORK_DIR}/${RUN_DIR} ${LOCAL_DIR}
 EOL
 chmod +x startguess.sh
