@@ -14,6 +14,84 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-05-29 (~00:30 CEST, session 13 day 1 close — Block 8.3 close FULL addendum) — Track 2 production strategy locked in: (1) Production gridlist refinement (PLUM-mask-aligned 62,512-cell); (2) Track-1-style shared HIST with SSP2-4.5 as shared HIST baseline (4× HIST wall savings; ~9 days); (3) setup_run_tseq.sh allocation defaults → milan/8×64=512 (interchangeable with genius/4×128=512); (4) WALLTIME default → 3-day; (5) 4 SCEN main.ins state_path retargeted to SSP2-4.5_cluster_hist/state/; (6) B64 NEW audit-item for SSP4-6.0 IMOGEN HIST anomaly + intermediary_py provenance verification (v1+ investigation; non-blocking)
+
+**Block 8.3 close FULL addendum commit** (post-tag-landing; spans ~3-4 h aggregate work post-tag-landing through ~midnight session 13 day 1). Daniel's Rule #13 follow-up on SCEN smoke 1-cell missing-output edge case + Q1 (HIST climate sharing across SSPs) + Q2 (SCEN per-biome sensibility) led to multiple Track-2-production-strategy refinements all consolidated into this single commit.
+
+**Refinement 1 — Production gridlist PLUM-mask alignment** (Svalbard SCEN-missing-cell investigation): Investigates the SCEN smoke's 1-cell missing-output edge case (Svalbard barren cell at lon=16.25 lat=78.25 missing from SCEN cmass.out per Block 8.3 G3 ⚠️ PARTIAL framing) → traces root cause to PLUM SSP scenario LU files not covering 26 production-gridlist cells in extreme high-Arctic locations → systemic 26-cell scope confirmed across all 5 PLUM SSPs (ssp{126,245,370,460,585} share IDENTICAL mask; 62864 unique cells each; 0-diff in pairwise comparisons).
+
+**Diagnosis** (concrete log evidence at SCEN run87/guess.log):
+```
+Commencing simulation for gridcell at (16.25,78.25)
+Problems with 16.250,78.250 in landcover fractions input file.
+Error: could not find stand at (16.25,78.25) in landcover/management data file(s)
+Error: could not find stand at (16.25,78.25) in input data files
+```
+LPJG handles gracefully: prints two error lines, no crash, cell silently skipped from output. HIST run87/guess.log shows the same cell processed cleanly (HILDA+ historical LU file DOES cover it with `0.000001 NATURAL + 0.999999 BARREN` = 100% barren noise floor).
+
+**Numerical scope verification**:
+- HIST LU file (HILDA+ historical `LU.remapv10_old_62892_gL_peatland.txt`): 62,892 unique cells (= predecessor's full grid)
+- All 5 PLUM SSP LU files (`landcover_peatland.txt`): 62,864 unique cells; 0-diff across SSPs (identical mask)
+- Production gridlist (`gridlist_in_62892_and_climate.txt`): 62,538 cells
+- Production cells in HIST LU: 62,538 / 62,538 = 100% ✅
+- Production cells in PLUM SSP LU: 62,512 / 62,538 = 99.96% (26 cells missing)
+- 26 missing cells: 23 Svalbard archipelago (lat 77.25-79.25, lon 14.75-17.25) + 1 NW Canadian Arctic (-113.75, 61.75) + 1 Yukon/Mackenzie (-122.25, 65.25) + 1 SE Russia/Caspian-Aral border (53.25, 41.75); all 100% barren in HILDA+ with zero analytical value
+
+**Refinement 2 — Track-1-style shared HIST with SSP2-4.5 as shared baseline** (Q1 follow-up): Investigation of HIST climate library byte-identity across 5 SSPs revealed: (a) **SSP1-2.6 + SSP2-4.5 + SSP3-7.0 + SSP5-8.5 are byte-identical for years 1900-2000** (max abs T_anom diff = exactly 0.000K vs SSP2-4.5 baseline); (b) SSP4-6.0 anomalous throughout 1900-2014 (max 0.32K T_anom single-cell-month at year 2000; mean 0.000008K globally = 8 microkelvin; 0.006-0.24 ppm CO2); (c) all 5 SSPs diverge starting year 2014 (CMIP6 SSP-divergence period; max 0.08K T_anom + 1.5 ppm CO2 spread at 2020). Magnitude across 5 SSPs at year 2020: mean global T_anom diff ~0.002K (= 2 millikelvin; far below typical climate model noise ~0.05-0.1K) + CO2 spread ~1.5 ppm (= 0.35%; below CMIP6 inter-model spread ~5-10 ppm at hist end). **Scientifically negligible for ecosystem-state-relevance**. Daniel's option (B) Track-1-style shared HIST decision: run 1 HIST for SSP2-4.5 (middle-of-the-road business-as-usual; in the SSP1/2/3/5 byte-identical cluster, avoiding SSP4 anomaly) + 5 SCEN restart from `SSP2-4.5_cluster_hist/state/` → saves ~9 days cluster wall (5 × ~52h → 1 × ~52h HIST + 5 × ~10h SCEN ≈ 4.25 days vs ~13 days for 5 SSP-specific HIST).
+
+**Refinement 3 — setup_run_tseq.sh allocation defaults → milan/8×64=512** (interchangeable with genius/4×128=512 since both = 512 ranks): Allocation defaults switched from genius/2×128=256 to milan/8×64=512 per Daniel's preference (cluster citizenship + immediate availability + 1.75× speedup over milan/4 baseline). **INTERCHANGEABILITY documented in setup_run_tseq.sh**: 8 milan nodes × 64 CPUs = 4 genius nodes × 128 CPUs = **512 ranks total**. State files are per-rank (run0.state … run511.state); HIST + SCEN must use SAME total rank count for state-restart alignment, but partition + per-node CPU layout can vary. setup_run.sh's gridlist split is deterministic given NPROCESS=512 (per-rank chunks identical between milan/8×64 and genius/4×128). Drop-in alternative: `NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh` when milan is busy + genius has ≥4 idle nodes.
+
+**Refinement 4 — WALLTIME default → 3-00:00:00** (3-day; max for milan + genius partitions per `scontrol show partition`): production HIST per-SSP wall on milan/8×64=512 ~52h at npatch=25/spinup=500 per Block 8.3 smoke extrapolation; 3-day budget gives margin for slowest cells. SCEN per-SSP ~10h wall (no spinup; restart from shared HIST state); 3-day budget generous but harmless. For smoke runs, override with shorter walltime (e.g., `WALLTIME=06:00:00`).
+
+**Refinement 5 — 4 SCEN main.ins state_path retargeted to SSP2-4.5_cluster_hist/state/**: Track-1-style shared HIST decision means 4 of 5 SCEN main.ins now point at SSP2-4.5's HIST state/ for restart (SSP1-2.6, SSP3-7.0, SSP4-6.0, SSP5-8.5 SCEN); SSP2-4.5 SCEN already correctly points at its own SSP2-4.5_cluster_hist/state/. Original state_path lines preserved at `main.ins.preB83close_track1.bak` per Rule #10 amendment-vs-rewrite. Inline annotation in each patched main.ins documents the Track-1-style shared HIST rationale + cross-refs the quantified 0.002K mean T_anom + 1.5 ppm CO2 evidence.
+
+**Refinement 6 — B64 NEW audit-item filed** (Hypothesis 2 ✅ RESOLVED at workstation-agent verification 2026-05-29 ~01:00 CEST; **Hypothesis 1 ✅ CONFIRMED + REMEDIATION PLANNED at workstation-agent diagnostic 2026-05-29 ~01:30 CEST**; Hypothesis 3 now MOOT; non-blocking for v1.0 Phase 1 + Phase 3a launches; required before Phase 3b SSP4-6.0 SCEN launch):
+  - **Hypothesis 1 ✅ CONFIRMED** via concrete evidence at workstation-agent 5-SSP RF cross-comparison at year 2000: ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth around year 2000 instead of real CMIP6 historical with Pinatubo 1991 RF drop + recovery + other forcings)**. CMIP6 historical period (1850-2014) RF values MUST be shared across all SSPs; 4-way match → 1.133761 IS the canonical CMIP6 historical at year 2000; ssp460 is the outlier with corrupted historical trajectory (Tier-2 SSP4-6.0 generation pathway gap; CMIP6 SSP4-6.0 was less-prioritized; file may have been generated by interpolating between sparse SSP4-6.0 data points without splicing the shared CMIP6 historical period). Scenario period 2015-2100 in ssp460 file appears reasonable (year 2050 = 3.395 W/m² between ssp245=3.32 + ssp370=3.78; year 2100 = 5.002 W/m² between ssp245=4.20 + ssp370=6.86; reasonable SSP4-6.0 trajectory). **REMEDIATION PLANNED on workstation** (~30-45 min total wall): 5-step splice fix:
+    1. Backup corrupted file at `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt.CORRUPTED_HISTORICAL_BACKUP_2026-05-29` (Rule #10 amendment-vs-rewrite forensic preservation)
+    2. Splice corrected file: shared CMIP6 historical 1850-2014 (165 rows from ssp126 source-of-truth; byte-identical across ssp126/245/370/585) + ssp460 scenario 2015-2100 (86 rows; reasonable SSP4-6.0 trajectory) → 251-row corrected file
+    3. Re-run `scripts/run_trunk_engine_only.sh SSP4-6.0` (~5-10 min wall)
+    4. Re-run `scripts/run_fastregrid.sh SSP4-6.0 delta_b_variant` (~5-10 min wall)
+    5. Re-rsync ONLY SSP4-6.0 climate library to cluster (~5-10 min over gigabit)
+  - **Hypothesis 2 ✅ RESOLVED** at workstation-agent verification 2026-05-29 ~01:00 CEST. Provenance chain confirmed clean: anthropogenic emissions ARE intermediary_py-derived (RCMIP Phase 2 v5.1.0 + IPCC 2019-Refinement Tier-1 + PLUM v2 + FAIR + Joos ocean + CMIP6 MRI-ESM2-0 patterns; per Decision #1 Option B); legacy IIASA paths at imogen_intermediary.ins lines 141 + 148 are commented out + INERT (preserved for predecessor-comparison reproducibility per Axis 1 of validation triad but not consumed at production runs); FILE_NON_CO2_VALS is CMIP6 non-CO2 RF time-series by intentional architectural design (CH4+N2O are pass-through, NOT engine-evolved). Methodologically clean for paper Methods §2.2; paper-ready Methods §2.2 text + per-SSP file accounting table + provenance chain ASCII diagram drafted at `notes/PAPER_COMPLETION_AND_VALIDATION.md` §4.5.0a-cluster.
+  - **Hypothesis 3 (CMIP6 SSP4-6.0 GCM pattern data quirk) → MOOT** since Hypothesis 1 fully explains the observed SSP4-only anomaly via the corrupted ssp460 historical RF input file (no need to investigate GCM pattern data; fix is at the RF input file level).
+  - **Cluster-side disambiguating evidence at this addendum commit**: my md5sum analysis confirmed SSP4-6.0 anomaly is SSP4-ONLY (SSP1/2/3/5 byte-identical for 1900-2000) → workstation-agent then narrowed to corrupted ssp460 historical RF file. **Production launch implications**: Phase 1 (1× SSP2-4.5 HIST shared baseline) + Phase 3a (4-of-5 SCEN: SSP1-2.6, SSP2-4.5, SSP3-7.0, SSP5-8.5) UNAFFECTED by ssp460 issue and CAN LAUNCH AS PLANNED. Phase 3b (5th SCEN = SSP4-6.0) DEFERRED until corrected SSP4-6.0 climate library is rsync'd to cluster post-workstation-side remediation. Workstation remediation (~30-45 min wall) is non-blocking for cluster Phase 1 + 3a which can run in parallel.
+  - Full B64 narrative + concrete evidence + remediation recipe at `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6.
+
+**Refinements landed at this commit (file inventory)**:
+1. **NEW** `data/gridlist/gridlist_in_62892_and_climate_and_PLUMmask.txt` (62,512 cells; 795,642 bytes; tracked) — production gridlist intersected with PLUM SSP mask coverage; preserves production-gridlist cell ordering. Production canonical going forward; old gridlist `gridlist_in_62892_and_climate.txt` (62,538 cells) preserved for backward compat per Rule #10 amendment-vs-rewrite.
+2. **`scripts/cluster/setup_run_tseq_template.sh`** (~25 LOC delta total) — GRIDLIST default → new PLUM-mask-aligned gridlist + WALLTIME default → `3-00:00:00` + NNODES default → 8 + CPU_PER_NODE default → 64 + PARTITION default → milan + extensive inline documentation of milan/8×64 ↔ genius/4×128 interchangeability + Block 8.3 smoke wall extrapolation evidence.
+3. **10 cluster `setup_run_tseq.sh`** (cp from updated template) — same delta in each per-cluster-dir wrapper.
+4. **4 SCEN main.ins** (SSP1-2.6, SSP3-7.0, SSP4-6.0, SSP5-8.5 cluster_scen): state_path retargeted to SSP2-4.5_cluster_hist/state/ (~6 LOC inline annotation + 1 LOC path change per file).
+5. **NEW B64 audit-item** at `notes/FOLLOWUPS.md`.
+
+**Doc cascade addendum** (5 surfaces tracked + 1 gitignored):
+- CHANGELOG.md [Unreleased] (THIS entry; FULL addendum above the Block 8.3 close FULL entry; preserves close per Rule #10)
+- notes/FOLLOWUPS.md dashboard banner amendment (above the Block 8.3 close banner; preserves close per Rule #10) + B64 NEW audit-item row
+- notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md §1 POST-BLOCK-8.3 banner amendment (Track-1-style shared HIST + milan/8×64 default + interchangeability documentation + new launch sequence)
+- notes/PRODUCTION_RUN_CONFIG.md banner addendum (production gridlist + allocation default updates)
+- _chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md §13 expanded (gitignored; root-cause diagnosis + scope analysis + Track-1-style decision rationale + B64 NEW + production launch recipe)
+
+**Backport classification**: ALL TRUNK-IRRELEVANT-by-fork-novelty. No trunk fork source touched. Cumulative LEDGER §1 accumulators UNCHANGED.
+
+**Cumulative state at this addendum commit**:
+- Rule #9 datapoints: #35 UNCHANGED (this is a Rule #13 follow-up + ad-hoc refinement, not a new defect)
+- Rule #10 datapoints: #25 UNCHANGED
+- B-rows: **B64 NEW** (SSP4-6.0 IMOGEN HIST anomaly hypothesis + intermediary_py file provenance verification; v1+ investigation; non-blocking for v1.0)
+- v1.0 % done: ~98-99% UNCHANGED
+- Calendar to v1.0 GMD submission: ~5-9 weeks UNCHANGED
+- Tag `v0.25.0-cluster-trunk-tseq-smoke-complete` UNCHANGED at predecessor commit `2d94a941`
+
+**POST-ADDENDUM NEXT — Track 2 production launch sequence (revised)**:
+1. **Run 1 HIST for SSP2-4.5** (shared baseline) on milan/8×64=512 (or genius/4×128=512 if milan is busy; both yield 512 ranks). Estimated wall: ~52h (milan) / ~38h (genius); within 3-day max walltime budget. Saves state at year 2020 to `forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/`.
+2. **Wait for HIST to complete + state/ populated** (verify via `ls forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/ | wc -l` = 513 entries: 512 .state + meta.bin).
+3. **Launch 5 SCEN runs in parallel** (each restarts from `SSP2-4.5_cluster_hist/state/`; each SSP's SCEN main.ins state_path retargeted at this commit). Same NNODES + CPU_PER_NODE as HIST (512 ranks). Each SCEN ~10h wall.
+4. **Total estimated wall**: ~52-62h HIST + ~10h SCEN (5 in parallel; resource-permitting) = ~3-4 days total cluster wall (vs ~13 days for the original 5 SSP-specific HIST plan).
+5. **rsync outputs back to workstation** post-completion (5 SSPs × HIST = 1 dataset; 5 SSPs × SCEN = 5 datasets); proceed with Track 2 paper analysis.
+
+Allocation flexibility: milan/8×64=512 default, genius/4×128=512 drop-in interchangeable for 512-rank state-compatible runs. Override via env: `NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh`.
+
+---
+
 ### 2026-05-28 (evening, session 13 day 1 close) — Block 8.3 ✅ DONE — Cluster end-to-end smoke validated end-to-end on KIT IMK-IFU owl, milan/4×64=256; chosen-pipeline (δ-B-variant trunk-C++ engine throughout) Track 2 production workflow operational; Rule #9 datapoint #35 NEW (finishup_lpj_work.sh SLURM script-cache portability bug surfaced + fixed + empirically validated); 8/9 acceptance gates ✅ PASS + 1/9 ⚠️ PARTIAL (benign); tag `v0.25.0-cluster-trunk-tseq-smoke-complete`
 
 **Block-close commit** (~7-8 h aggregate work since PREP commit `8e4ee8e` earlier today: ~2 h staging + smoke launch monitoring (HIST 1h29m + SCEN 9m45s wall) + Rule #9 #35 surface + fix + empirical validation via SCEN finishup running cleanly + ~3-4 h audit-evidence bundle authoring + full 9-surface doc cascade). Validates the cluster path end-to-end for Track 2 production runs.

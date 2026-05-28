@@ -1,9 +1,25 @@
 # Production-run configuration reference
 
 **Version**: v1.0 (initial draft)
-**Last updated**: 2026-05-27 afternoon (session 12 day 2 — POST-BLOCK-8.2.5-FULL + Block 8.4 pre-cluster prep landed)
+**Last updated**: 2026-05-29 ~00:30 CEST (session 13 day 1 close — Block 8.3 cluster smoke ✅ DONE + FULL addendum landed: Track 2 production strategy locked in)
 
-> **POST-BLOCK-8.2.5-FULL + Block 8.4 pre-cluster prep addendum (2026-05-27 session 12 day 2)**:
+> **POST-BLOCK-8.3-FULL-ADDENDUM (2026-05-29 session 13 day 1 close)**:
+>
+> Track 2 production strategy LOCKED IN at Block 8.3 close FULL addendum. 6 refinements:
+>
+> | Component | State (post-addendum) |
+> |---|---|
+> | **Production gridlist** (canonical) | `data/gridlist/gridlist_in_62892_and_climate_and_PLUMmask.txt` (62,512 cells; production gridlist ∩ PLUM SSP scenario LU coverage; PLUM-mask-aligned for clean symmetric HIST + SCEN output). Old `gridlist_in_62892_and_climate.txt` (62,538 cells) preserved for backward compat per Rule #10 amendment-vs-rewrite. |
+> | **HIST sharing strategy** (Track 1-style) | **1 shared HIST for SSP2-4.5** (middle-of-the-road business-as-usual) + **5 SCEN restart** from `SSP2-4.5_cluster_hist/state/`. 4 SCEN main.ins (SSP1-2.6, SSP3-7.0, SSP4-6.0, SSP5-8.5) state_path retargeted at addendum commit. SSP2-4.5 SCEN already correctly points at its own _cluster_hist/state/. Original lines preserved at `.preB83close_track1.bak`. Saves ~9 days cluster wall (~3-4 days total vs ~13 days for original 5 SSP-specific HIST plan). |
+> | **Allocation defaults** | `setup_run_tseq.sh` defaults: `NNODES=8`, `CPU_PER_NODE=64`, `PARTITION=milan`, `WALLTIME=3-00:00:00` (3-day max for milan + genius). milan/8×64=512 ranks; **interchangeable** with genius/4×128=512 (also 512 ranks; state-restart-compatible across partition variants). Drop-in alternative: `NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh`. |
+> | **Estimated production wall** | HIST ~52h on milan/8×64 / ~38h on genius/4×128 (within 3-day max); Phase 3a SCEN ~10h × 4 (parallel-ready: SSP1, SSP2, SSP3, SSP5); Phase 3b SCEN ~10h × 1 (SSP4-6.0 after workstation remediation). Total ~3-4 days cluster wall. |
+> | **B64 NEW audit-item filed** | SSP4-6.0 IMOGEN HIST climate anomaly hypotheses investigation. **Hypothesis 2 (intermediary_py-vs-legacy-CMIP6 provenance) ✅ RESOLVED** at workstation-agent verification 2026-05-29 ~01:00 CEST (provenance chain clean; intermediary_py-derived anthro emissions; legacy IIASA paths INERT; FILE_NON_CO2_VALS prescribed-RF design intentional per Huntingford2010+Smith2018 GMD). **Hypothesis 1 (per-SSP nonco2 RF historical file divergence) ✅ CONFIRMED + REMEDIATION PLANNED** at workstation-agent diagnostic 2026-05-29 ~01:30 CEST: 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical canonical CMIP6 historical) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth, NOT real CMIP6 historical with Pinatubo signal)**. Root cause: ssp460 file has corrupted historical (1850-2014) from Tier-2 SSP4-6.0 generation pathway gap; scenario period (2015-2100) is reasonable. Remediation (~30-45 min total wall on workstation): backup → splice shared 1850-2014 historical from ssp126 + ssp460 scenario 2015-2100 → re-run trunk-cpp-engine SSP4-6.0 → re-FastRegrid → re-rsync 18 GB SSP4-6.0 climate library to cluster. Hypothesis 3 (GCM pattern data quirk) MOOT since Hyp 1 explains anomaly fully. **Production launch implications**: Phase 1 + Phase 3a (4-of-5 SCEN: SSP1, SSP2, SSP3, SSP5) UNAFFECTED + can launch as planned; Phase 3b (SSP4-6.0 SCEN) DEFERRED until corrected SSP4-6.0 climate library is rsync'd post-remediation; workstation remediation overlaps cluster Phase 1 or 3a → 0 calendar-day delta on cluster side. See `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6 for full detail. |
+>
+> **Track 2 launch sequence** (FINAL; revised post-Hypothesis-1-confirmation): Phase 1 (1× SSP2-4.5 HIST) → Phase 2 (wait for state/ populated) → Phase 3a (4-of-5 SCEN parallel: SSP1, SSP2, SSP3, SSP5) → Phase 3b (SSP4-6.0 SCEN after workstation remediation completes + corrected library rsync'd to cluster). See `notes/CLUSTER_SETUP_AND_PRODUCTION_RUNS.md` §1 POST-BLOCK-8.3 banner amendment + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13 FULL addendum.
+>
+> ---
+>
+> **PRIOR POST-BLOCK-8.2.5-FULL + Block 8.4 pre-cluster prep addendum (2026-05-27 session 12 day 2; preserved for forensic value per Rule #10 amendment-vs-rewrite)**:
 >
 > Block 8.2.5 FULL CLOSE landed BOTH switchable-regrid pipelines (δ-B Fortran + δ-B-variant trunk-C++) + 50-cell biome-stratified production-config Phase F smoke side-by-side acceptance + **Phase G user choice = δ-B-variant (trunk-C++ engine throughout)** for v1.0 GMD paper Track 2 cluster production runs. Cluster production .ins authored at this commit:
 >

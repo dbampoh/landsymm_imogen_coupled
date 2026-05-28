@@ -149,6 +149,83 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 ## 1. Recommended session-8+ ordering (the operational plan)
 
+### ✅ BLOCK 8.3 LANDED + FULL ADDENDUM (2026-05-29 ~00:30 CEST session 13 day 1 close) — Track 2 production strategy LOCKED IN: PLUM-mask gridlist + Track-1-style shared HIST (SSP2-4.5 = shared baseline) + milan/8×64=512 default (genius/4×128=512 interchangeable) + 3-day walltime + 4 SCEN main.ins state_path retargeting + B64 NEW v1+ investigation
+
+**FULL Addendum** (post-tag-landing through ~midnight session 13 day 1; ~3-4 h aggregate work). Daniel's Rule #13 follow-up on Block 8.3 SCEN smoke 1-cell missing-output edge case + Q1 (HIST climate sharing across SSPs) + Q2 (SCEN per-biome sensibility) led to multiple Track-2-production-strategy refinements all consolidated into this single addendum.
+
+**6 refinements landed**:
+
+1. **Production gridlist PLUM-mask alignment** — NEW `data/gridlist/gridlist_in_62892_and_climate_and_PLUMmask.txt` (62,512 cells; production ∩ PLUM mask). 26 missing cells: 23 Svalbard archipelago + 1 NW Canadian Arctic + 1 Yukon/Mackenzie + 1 SE Russia/Caspian-Aral; all 100% barren in HILDA+ historical with zero analytical value. Both HIST + SCEN now produce 62,512 cells consistently.
+
+2. **Track-1-style shared HIST with SSP2-4.5 as shared baseline** — Q1 investigation revealed: (a) SSP1/2/3/5 byte-identical for 1900-2000 (max abs T_anom diff = exactly 0.000K vs SSP2-4.5); (b) SSP4-6.0 anomalous throughout 1900-2014 (max 0.32K + mean 8 microkelvin globally); (c) all 5 diverge starting 2014 (CMIP6 SSP-divergence period; max 0.08K + 1.5 ppm CO2 spread at 2020). Magnitude across 5 SSPs at year 2020: mean global T_anom diff ~0.002K + CO2 spread ~1.5 ppm — scientifically negligible. **Decision (option B): run 1 HIST for SSP2-4.5** (middle-of-the-road business-as-usual; in SSP1/2/3/5 byte-identical cluster avoiding SSP4 anomaly) + 5 SCEN restart from SSP2-4.5_cluster_hist/state/ → saves ~9 days cluster wall. Paper Methods §2.2 footnote: "HIST simulations 1900-2020 use SSP2-4.5 IMOGEN engine climate library as shared baseline; cross-SSP differences in HIST climate forcing are <0.002K mean global T_anom and <1.5 ppm CO2 by 2020 — well below model precision; ecosystem state at 2020 is effectively SSP-invariant; per-SSP divergence emerges from 2021 onward via SSP-specific SCEN climate libraries."
+
+3. **setup_run_tseq.sh allocation defaults → milan/8×64=512** (interchangeable with genius/4×128=512; both = 512 ranks). Cluster-citizenship + immediate availability + 1.75× speedup over milan/4 baseline. **Interchangeability**: state files are per-rank (run0.state…run511.state); HIST + SCEN must use SAME total rank count for state-restart alignment, but partition + per-node CPU layout can vary. Drop-in alternative: `NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh` when milan is busy + genius has ≥4 idle nodes.
+
+4. **WALLTIME default → 3-00:00:00** (3-day; max for milan + genius). Production HIST per-SSP wall on milan/8×64=512 ~52h / on genius/4×128=512 ~38h; both within 3-day budget.
+
+5. **4 SCEN main.ins state_path retargeted** to SSP2-4.5_cluster_hist/state/ (SSP1-2.6, SSP3-7.0, SSP4-6.0, SSP5-8.5 SCEN); SSP2-4.5 SCEN already correctly points at its own. Original lines preserved at `.preB83close_track1.bak` per Rule #10 amendment-vs-rewrite.
+
+6. **B64 NEW audit-item filed** (Hypothesis 2 ✅ RESOLVED at workstation-agent verification 2026-05-29 ~01:00 CEST; **Hypothesis 1 ✅ CONFIRMED + REMEDIATION PLANNED at workstation-agent diagnostic 2026-05-29 ~01:30 CEST**; Hypothesis 3 now MOOT; non-blocking for Phase 1 + 3a; required before Phase 3b): **Concrete evidence**: workstation-agent 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth, not real CMIP6 historical with Pinatubo signal)**. Root cause: `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt` has corrupted historical (1850-2014) from Tier-2 SSP4-6.0 generation pathway gap; scenario period (2015-2100) is reasonable. Anthropogenic emissions provenance ✅ confirmed clean (intermediary_py-derived; legacy IIASA paths INERT preserved for predecessor-comparison reproducibility per Axis 1; FILE_NON_CO2_VALS prescribed-RF design intentional per Huntingford2010+Smith2018 GMD). **REMEDIATION PLANNED on workstation** (~30-45 min total wall): backup → splice (shared CMIP6 historical 1850-2014 from ssp126 source-of-truth + ssp460 scenario 2015-2100) → re-run trunk-cpp-engine for SSP4-6.0 → re-FastRegrid → re-rsync 18 GB SSP4-6.0 climate library to cluster. **Cluster Track 2 launch NOT blocked**: Phase 1 (SSP2-4.5 HIST shared baseline) + Phase 3a (4-of-5 SCEN: SSP1, SSP2, SSP3, SSP5) UNAFFECTED + can launch as planned in parallel with workstation remediation. Phase 3b (SSP4-6.0 SCEN) waits for corrected library rsync. See `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6 for full detail + 5-step remediation recipe.
+
+**Track 2 production launch sequence (REVISED — Track-1-style shared HIST)**:
+
+```bash
+ssh owl  # or use Cursor Remote-SSH-attached terminal
+cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
+
+# === PHASE 1: Run 1 HIST for SSP2-4.5 (shared baseline) ===
+# Defaults: NNODES=8 CPU_PER_NODE=64 PARTITION=milan WALLTIME=3-00:00:00 GRIDLIST=PLUM-mask 62512-cell
+cd forks/trunk_r13078_runs/SSP2-4.5_cluster_hist
+./setup_run_tseq.sh   # if milan busy: NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh
+cd $WORK_BASE/SSP2-4.5_cluster_hist
+bash startguess.sh
+# Estimated wall: ~52h (milan/8x64) or ~38h (genius/4x128); within 3-day max
+
+# === PHASE 2: WAIT for HIST to complete + state/ populated ===
+# Verify: ls forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/ | wc -l = 513 (512 .state + meta.bin)
+
+# === PHASE 3a: Launch 4-of-5 SCEN runs in parallel (each restarts from SSP2-4.5_cluster_hist/state/) ===
+# REVISED post-B64 Hypothesis 1 confirmation (2026-05-29 ~01:30 CEST): SSP4-6.0 SCEN deferred to Phase 3b
+# until corrected SSP4-6.0 climate library is rsync'd from workstation post-remediation
+# (~30-45 min wall on workstation: backup + splice + re-run engine SSP4-6.0 + re-FastRegrid + re-rsync 18 GB)
+# CRITICAL: same NNODES + CPU_PER_NODE as HIST (NPROCESS=512) for state-restart alignment
+cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
+for SSP in SSP1-2.6 SSP2-4.5 SSP3-7.0 SSP5-8.5; do   # NOTE: SSP4-6.0 EXCLUDED until Phase 3b
+  cd forks/trunk_r13078_runs/${SSP}_cluster_scen
+  ./setup_run_tseq.sh   # SCEN main.ins state_path → SSP2-4.5_cluster_hist/state/ (already retargeted at this commit)
+  cd $WORK_BASE/${SSP}_cluster_scen
+  bash startguess.sh
+  cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
+done
+# Each SCEN ~10h wall (no spinup; restart from shared HIST state at year 2020)
+
+# === PHASE 3b: SSP4-6.0 SCEN (run AFTER workstation remediation completes + corrected library rsync'd) ===
+# Trigger: Daniel signals "SSP4-6.0 climate library refresh complete" after re-rsync to cluster path
+# `forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/` (~18 GB)
+# Then submit SSP4-6.0 SCEN with same defaults:
+cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0_cluster_scen
+./setup_run_tseq.sh
+cd $WORK_BASE/SSP4-6.0_cluster_scen
+bash startguess.sh
+# ~10h wall
+
+# === PHASE 4: Total estimated cluster wall ~3-4 days (vs ~13 days for original 5 SSP-specific HIST plan) ===
+# Workstation remediation overlaps Phase 1 HIST or Phase 3a SCEN → 0 calendar-day delta on cluster side
+```
+
+**Allocation flexibility — milan/8×64=512 ↔ genius/4×128=512**:
+- Both yield NPROCESS=512 ranks (state-restart-compatible)
+- HIST + SCEN can use DIFFERENT partitions if each maintains the 512-rank total
+- Example: HIST on milan/8x64 (52h) → state/ populated → SCEN on genius/4x128 (10h each) if milan is then busy + genius has 4 idle nodes
+- setup_run.sh's gridlist split is deterministic given NPROCESS: per-rank chunks identical between milan/8x64 and genius/4x128 → state files align across partition variants
+
+**Sequencing decision (Daniel's choice for SCEN parallel vs serial)**:
+- **Parallel** (5 SBATCH jobs simultaneously): 5 SCEN concurrent if 5 × allocation = ≤ partition capacity; ~10h total cluster wall
+- **Serial** (1 SBATCH at a time): 5 × 10h = ~50h total cluster wall
+- **Hybrid** (2-3 SCEN at a time): balanced
+
+---
+
 ### ✅ BLOCK 8.3 LANDED — Cluster end-to-end smoke validated; chosen-pipeline Track 2 production workflow operational on owl (2026-05-28 evening session 13 day 1 close; cluster-native via Cursor Remote-SSH owl01amd; tag `v0.25.0-cluster-trunk-tseq-smoke-complete`)
 
 **Block 8.3 ✅ DONE** at session 13 day 1 close commit. Cluster path validated end-to-end for the chosen-pipeline (δ-B-variant trunk-C++ engine throughout) Track 2 production workflow on KIT IMK-IFU owl, milan partition × 4 nodes × 64 CPUs/node = 256 ranks. Both HIST + SCEN smoke phases ran cleanly: HIST main `601955` ExitCode 0:0 in 1h29m (256-rank; 4 cells/rank; 500yr spinup loop FIRST_SPINUP_YEAR=1900 + history 1901-2020) + SCEN main `602049` ExitCode 0:0 in 9m45s (~9× faster; restart=1 + restart_year=2020 + state_path absolute; G6.1 NEW gate ✅ SCEN restart from HIST state empirically validated). **8/9 acceptance gates ✅ PASS + 1/9 ⚠️ PARTIAL** (benign Svalbard barren-cell SCEN edge case; HIST showed Total cmass=0.000 throughout for that cell; not a defect; matches block 8.0.3 cell-2 high-Arctic LU-mismatch pattern). **Rule #9 datapoint #35 NEW**: finishup_lpj_work.sh SLURM script-cache portability bug surfaced empirically when HIST finishup `601956` failed instantly + fix landed (env-overridable FINISHUP_SCRIPT_DIR with BASH_SOURCE fallback in finishup_lpj_work.sh + `--export=ALL,FINISHUP_SCRIPT_DIR=${SCRIPT_DIR}` in setup_run.sh's startguess.sh HEREDOC) + empirically validated by SCEN finishup `602050` running cleanly under SLURM in 54s vs HIST's 0s instant-fail. Per-biome physical sensibility (G5): 36/50 anchor cells within Phase F published Smith2014/Pugh2019/Hickler2012/Friedlingstein2025GCB literature ranges; matches Phase F's 7-8/10 standard. Audit-evidence bundle at `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` (~365 LOC; 12 sections; gitignored). Full 9-surface doc cascade landed at this commit per Rule #1.

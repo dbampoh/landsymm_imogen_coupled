@@ -271,6 +271,111 @@ The `paper/` subdir in the rebuild repo is currently empty (only `README.md`); p
 >
 > **For paper Methods §2.2 + Discussion**: cluster smoke evidence (G0-G7 + G6.1) is available at `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` (~365 LOC; 12 sections including 8-acceptance-gate scorecard + per-biome NPP table for 50 Phase F anchor cells + Phase F apples-to-apples evidence package + cluster citizenship + resource usage). Apples-to-apples diff vs Phase F local outputs (workstation-side validation step) deferred to post-rsync of cluster outputs to workstation.
 
+> **Paper Methods §2.2 PROPOSED text** (drafted at session 13 day 1 close 2026-05-29 ~01:00 CEST per workstation-agent verification of intermediary_py provenance; full provenance chain: intermediary_py emissions CSVs → adapter LPJG-format outputs → trunk_r13078 C++ engine → 1631-grid native climate library → FastRegrid chained NN+IDW → 62538-grid PAPER-READY library → cluster Track 2 LPJG @ 62512 cells; zero legacy IIASA content in chain):
+>
+> ```
+> The trunk_r13078 C++ IMOGEN engine consumed per-SSP emissions inputs generated
+> by the intermediary_py/imogen_ghg_controller Python pipeline (Decision #1 Option B
+> per Mar 2026 architectural decision). The pipeline integrates RCMIP Phase 2
+> v5.1.0 anthropogenic emissions backbone (Nicholls et al. 2020, GMD; harmonized
+> to 1850-2014 historical + 2015-2100 per-SSP futures) with IPCC 2019-Refinement
+> Tier-1 AFOLU CH4+N2O methodologies operating on PLUM v2 land-use activity data
+> (Alexander et al. 2018 ESD; Rabin et al. 2020 ESD); FAIR (Smith et al. 2018 GMD)
+> for non-CO2 budget reconciliation; Joos et al. 2013 ocean uptake formulation;
+> and CMIP6 MRI-ESM2-0 climate patterns. Per-SSP outputs at
+> intermediary_py/imogen_ghg_controller/outputs/imogen_inputs/imogen_inputs_<SSP>.csv
+> were converted to LPJG-format ASCII files via tools/imogen_inputs_to_lpjg_format.py,
+> then consumed by the engine via FILE_SCEN_EMITS (anthropogenic CO2),
+> FILE_CH4_N2O_EMITS (anthropogenic CH4+N2O), FILE_LPJG_FLUX (LPJG natural CO2
+> flux; pre-baked offline), and FILE_LPJG_CH4_N2O_FLUX (LPJG natural CH4+N2O
+> flux; pre-baked offline). CMIP6 historical+per-SSP non-CO2 radiative forcing
+> time-series for CH4+N2O were prescribed directly via FILE_NON_CO2_VALS (from
+> imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/). The legacy IIASA-derived emissions
+> backbone used by the predecessor codebase (DKB_dataset_totals/) was retained
+> in imogen/emiss/DKB_dataset_totals/ but explicitly NOT consumed at production
+> runs (commented out in imogen_intermediary.ins lines 141 + 148; preserved for
+> predecessor-comparison reproducibility per Axis 1 of validation triad).
+>
+> Track 2 HIST simulations 1900-2020 use a single shared baseline IMOGEN climate
+> library (SSP2-4.5; middle-of-the-road business-as-usual scenario; in the
+> SSP1/2/3/5 byte-identical cluster). Cross-SSP differences in HIST climate
+> forcing across the 5 SSP scenarios are <0.002 K mean global T_anom and
+> <1.5 ppm CO2 by year 2020 — well below model precision and below CMIP6
+> inter-model spread. Ecosystem state at year 2020 is therefore effectively
+> SSP-invariant for the rebuild. Per-SSP divergence emerges from year 2021
+> onward via SSP-specific SCEN climate libraries; all 5 SCEN simulations
+> restart from the shared SSP2-4.5 HIST state at year 2020.
+> ```
+>
+> **Per-SSP file accounting** (paper-ready table; workstation-agent verified 2026-05-29 ~01:00 CEST):
+>
+> | SSP | Anthro CO2 (FILE_SCEN_EMITS) | Anthro CH4+N2O (FILE_CH4_N2O_EMITS) | LPJG natural CO2 (FILE_LPJG_FLUX) | LPJG natural CH4+N2O (FILE_LPJG_CH4_N2O_FLUX) | CMIP6 non-CO2 RF (FILE_NON_CO2_VALS) | Source CSV (intermediary_py) |
+> |---|---|---|---|---|---|---|
+> | SSP1-2.6 | runs/SSP1-2.6/inputs/co2_anthro_emissions.txt | runs/SSP1-2.6/inputs/ch4_n2o_anthro_emissions.txt | runs/SSP1-2.6/inputs/imogen_lpjg_flux.txt | runs/SSP1-2.6/inputs/imogen_lpjg_ch4_n2o_flux.txt | imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp126.txt | imogen_inputs_SSP1-2.6.csv |
+> | SSP2-4.5 | runs/SSP2-4.5/inputs/co2_anthro_emissions.txt | runs/SSP2-4.5/inputs/ch4_n2o_anthro_emissions.txt | runs/SSP2-4.5/inputs/imogen_lpjg_flux.txt | runs/SSP2-4.5/inputs/imogen_lpjg_ch4_n2o_flux.txt | imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp245.txt | imogen_inputs_SSP2-4.5.csv |
+> | SSP3-7.0 | runs/SSP3-7.0/inputs/co2_anthro_emissions.txt | runs/SSP3-7.0/inputs/ch4_n2o_anthro_emissions.txt | runs/SSP3-7.0/inputs/imogen_lpjg_flux.txt | runs/SSP3-7.0/inputs/imogen_lpjg_ch4_n2o_flux.txt | imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp370.txt | imogen_inputs_SSP3-7.0.csv |
+> | SSP4-6.0 | runs/SSP4-6.0/inputs/co2_anthro_emissions.txt | runs/SSP4-6.0/inputs/ch4_n2o_anthro_emissions.txt | runs/SSP4-6.0/inputs/imogen_lpjg_flux.txt | runs/SSP4-6.0/inputs/imogen_lpjg_ch4_n2o_flux.txt | imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt | imogen_inputs_SSP4-6.0.csv |
+> | SSP5-8.5 | runs/SSP5-8.5/inputs/co2_anthro_emissions.txt | runs/SSP5-8.5/inputs/ch4_n2o_anthro_emissions.txt | runs/SSP5-8.5/inputs/imogen_lpjg_flux.txt | runs/SSP5-8.5/inputs/imogen_lpjg_ch4_n2o_flux.txt | imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp585.txt | imogen_inputs_SSP5-8.5.csv |
+>
+> **Provenance chain (paper-ready ASCII diagram)**:
+>
+> ```
+> intermediary_py emissions CSVs (RCMIP Phase 2 v5.1.0 + CMIP6 MRI-ESM2-0 + IPCC 2019-Refinement Tier-1 + Joos ocean uptake + FAIR non-CO2 backbone)
+>     │
+>     │  tools/imogen_inputs_to_lpjg_format.py adapter
+>     ▼
+> runs/<SSP>/inputs/ (4 LPJG-format ASCII files per SSP)
+>     │
+>     │  Consumed by trunk_r13078 C++ engine via
+>     │  forks/trunk_r13078_runs/<SSP>/imogen_intermediary.ins (FILE_SCEN_EMITS,
+>     │  FILE_CH4_N2O_EMITS, FILE_LPJG_FLUX, FILE_LPJG_CH4_N2O_FLUX) +
+>     │  FILE_NON_CO2_VALS (CMIP6 non-CO2 RF time-series for CH4+N2O; prescribed pass-through)
+>     ▼
+> Trunk C++ engine run (block 8.2.4; engine-side fork-parity reached; 250/250 byte-identity
+>                       with rebuild's lpjguess engine per B8_2_4 acceptance)
+>     │
+>     ▼
+> forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output/  ← 1631-grid native (5 × ~443 MB)
+>     • 10 per-cell climate variables: T_anom, P_anom, SW_anom, WET, DTEMP_anom,
+>                                      Rh_anom, W_anom, Tmin_anom, Tmax_anom (engine-evolved)
+>     • CO2.dat per-year: engine-evolved atm CO2 trajectory (via Joos ocean + C-cycle solver)
+>     • CO2_all.dat at IMOGEN/ root: 8-column file incl. CH4+N2O
+>       (CH4+N2O are prescribed-input pass-through from FILE_NON_CO2_VALS per Rule #10 #25;
+>        CO2 column is engine-evolved per-year)
+>     │
+>     │  FastRegrid chained pipeline (block 8.2.5 phase E δ-B-variant):
+>     │  Step 1: NN 1631→3696  (per-cell climate vars only)
+>     │  Step 2: IDW 3696→62538 (per-cell climate vars only)
+>     │  CO2.dat + CO2_all.dat NOT regridded — cp'd as-is (per Rule #9 #23)
+>     │  per Rule #9 #33 fix (auto-detect-numeric-header) post 2026-05-27
+>     ▼
+> forks/trunk_r13078_runs/<SSP>/Common-directory/IMOGEN/output_62892_cppengine/  ← rsync'd to cluster at session 12 day 3
+>     (5 × ~18 GB; 62538 cells per file per year; 201 year-dirs 1900-2100;
+>      CO2.dat + CO2_all.dat byte-identical to engine source per Rule #9 #23)
+>     │
+>     │  Cluster Track 2 production runs consume via imogencfx input module
+>     │  Production gridlist (62,512 cells = climate library ∩ PLUM SSP mask;
+>     │  PLUM-mask aligned at Block 8.3 close FULL addendum 2026-05-29)
+>     ▼
+> Cluster Track 2 production runs (post-Block-8.3-close FULL addendum)
+>     • 1× SSP2-4.5 HIST (shared baseline; Track-1-style)
+>     • 5× SCEN restarts from SSP2-4.5_cluster_hist/state/
+>       — Phase 3a: 4 SCEN parallel-ready (SSP1, SSP2, SSP3, SSP5)
+>       — Phase 3b: SSP4-6.0 SCEN AFTER workstation-side ssp460 RF file
+>                   remediation completes + corrected SSP4-6.0 climate library
+>                   re-rsync'd to cluster (~30-45 min workstation wall;
+>                   non-blocking for cluster Phase 1 + 3a)
+>     • 62,512-cell production gridlist
+> ```
+>
+> **B64 SSP4-6.0 ssp460 historical RF file remediation note (paper-relevant)** (workstation-agent diagnostic 2026-05-29 ~01:30 CEST):
+>
+> Concrete evidence of corrupted historical (1850-2014) in `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt` was identified during Block 8.3 cluster smoke sanity-checks: 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical canonical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth instead of real CMIP6 historical with Pinatubo signal)**. Root cause: CMIP6 SSP4-6.0 was a Tier-2 scenario (less-prioritized; less standardization); the ssp460 file was generated by interpolating between sparse SSP4-6.0 data points without splicing the shared CMIP6 historical period (a generation-pathway gap that didn't surface for the Tier-1 ssp126/245/370/585 files). Scenario period (2015-2100) is reasonable. **Remediation** (~30-45 min total wall on workstation): backup → splice (shared CMIP6 historical 1850-2014 from any of ssp126/245/370/585 source-of-truth; byte-identical for HIST + ssp460 scenario 2015-2100 from current file) → re-run trunk-cpp-engine for SSP4-6.0 only → re-FastRegrid for SSP4-6.0 only → re-rsync 18 GB SSP4-6.0 climate library to cluster. After remediation, all 5 SSPs use canonical CMIP6 historical RF; paper Methods §2.2 narrative remains as drafted above (no methodology change required); all 5 SCEN runs produce paper-quality output.
+>
+> **For paper Methods §2.2 (post-remediation)**: above text stands as-is. The corrupted-then-corrected ssp460 file is a minor footnote (worth mentioning in Discussion or Supplementary as a CMIP6 Tier-2 input data quality finding caught during smoke-test sanity checks) but does not alter the methodology framing. Production results for all 5 SSPs use the corrected ssp460 file.
+>
+> Methodologically clean: zero legacy IIASA content in the chain. Authoritative source-of-truth: `forks/trunk_r13078_runs/<SSP>/imogen_intermediary.ins` file paths + comments.
+
 #### 4.5.0a POST-BLOCK-8.2.5 chosen-pipeline disclosure (2026-05-27; LOCKED IN per block 8.2.5 Phase G user choice = δ-B-variant trunk-C++ engine throughout)
 
 > **✅ CHOSEN PIPELINE FOR v1.0 GMD PAPER TRACK 2 = δ-B-variant** (trunk-C++ engine throughout) per block 8.2.5 Phase G user decision (2026-05-27 ~15:30 CEST, session 12 day 2; after full Phase F 50-cell biome-stratified production-config smoke side-by-side evidence). Decision criteria:

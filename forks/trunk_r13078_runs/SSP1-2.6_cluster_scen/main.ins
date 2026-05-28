@@ -216,7 +216,15 @@ lastoutyear               2100             ! [b825 smoke] match lasthistyear (ph
 !///////////////////////////////////////////////////////////////////////////////////////
 save_state                0                ! [b825 smoke] SCEN: do not save (restart only)
 ! [b825 smoke] SCEN: save_years commented (restart phase)
-state_path                "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP1-2.6_cluster_hist/state/"  ! [cluster production] per-SSP state at hist dir
+! [Block 8.3 close addendum 2026-05-29 ≈00:30 CEST; Track 1-style shared HIST decision]:
+! Original state_path pointed at this SSP's own _cluster_hist/state/. Switched to shared
+! SSP2-4.5_cluster_hist/state/ per Daniel's direction at Block 8.3 close addendum:
+! HIST is run ONCE for SSP2-4.5 (middle-of-the-road business-as-usual; Track 1-style sharing
+! per CMIP6 protocol where historical 1900-2014 is shared across all SSPs). Per quantitative
+! analysis: cross-SSP T_anom max|abs|diff is 0.08K + mean 0.002K at year 2020; CO2 spread
+! 1.5 ppm; well below model precision; ecosystem state at 2020 is effectively SSP-invariant.
+! Original state_path preserved at main.ins.preB83close_track1.bak.
+state_path                "/bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/"  ! [Track 1-style shared HIST] all 5 SCEN restart from SSP2-4.5 HIST state
 restart                   1                ! [b825 smoke] SCEN: restart from hist saved state
 restart_year              2020             ! [b825 smoke] SCEN: restart from 2020
 
