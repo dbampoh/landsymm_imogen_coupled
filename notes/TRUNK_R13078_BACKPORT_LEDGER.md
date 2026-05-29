@@ -2247,6 +2247,14 @@ All gates ✅ PASS. **Rule #9 datapoint #15 carries forward unchanged** (no new 
 
 ---
 
+### B64 ✅ CLOSED (session 13 day 2, 2026-05-29 ~14:00 CEST): SSP4-6.0 ssp460 RF file remediation complete + empirically validated; Track 2 Phase 1 launched
+
+**Date**: 2026-05-29 ~14:00 CEST (session 13 day 2). **TRUNK-IRRELEVANT-by-novelty** (the corrupted file is a CMIP6-era Tier-2 data input at `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/`; remediation = workstation-side input-file splice + downstream re-run + re-rsync; NO `forks/trunk_r13078/` source-edit; not eligible for backport debt; accumulators UNCHANGED).
+
+Daniel's local workstation chat agent executed the 5-step ssp460 remediation (~33 min total wall) + rsynced corrected 18 GB SSP4-6.0 climate library to cluster (~02:30-03:30 CEST). Cluster-side verification ~03:35 CEST: 5-way SSP T_anom byte-identity 1900-2010 (corrupted +21% bias removed; year 2000 = 1.133761 W/m² canonical). **Rule #10 self-correction #26**: actual splice boundary = **2010/2011** (not 2014/2015 as planned-remediation docs assumed; rebuild's intermediary_py RF files use 2010/2011 scenario-start). **CO2-decoupling nuance**: SSP4-6.0 year-2100 CO2 = 631.42 ppm UNCHANGED (engine-evolved CO2 decoupled from prescribed non-CO2 RF; only per-cell climate vars 1900-2010 changed). Corrupted file preserved at `.CORRUPTED_HISTORICAL_BACKUP_2026-05-29`. **Track 2 Phase 1** SSP2-4.5 HIST launched as genius job 602830 (4×128=512; PD; backfill predicts Mon ~09:18 CEST). Phase 3a/3b split ELIMINATED → all 5 SCEN parallel-ready post-HIST. B64 closure cascade = 5 tracked doc surfaces; tag UNCHANGED at `2d94a941`.
+
+---
+
 ### Block 8.3 close FULL ADDENDUM (session 13 day 1, 2026-05-29 ~00:30 CEST close; post-tag-landing follow-up): Track 2 production strategy LOCKED IN — PLUM-mask gridlist + Track-1-style shared HIST (SSP2-4.5 = shared baseline) + milan/8×64=512 default (genius/4×128=512 interchangeable) + 3-day walltime + 4 SCEN main.ins state_path retargeting + B64 NEW v1+ investigation (Hypothesis 2 RESOLVED at workstation-agent verification)
 
 **Date**: 2026-05-29 ~00:30 CEST (session 13 day 1 close; post-tag-landing follow-up; tag `v0.25.0-cluster-trunk-tseq-smoke-complete` UNCHANGED at predecessor commit `2d94a941`).

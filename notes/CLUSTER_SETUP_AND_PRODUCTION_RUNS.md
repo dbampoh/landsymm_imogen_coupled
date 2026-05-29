@@ -165,7 +165,7 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 5. **4 SCEN main.ins state_path retargeted** to SSP2-4.5_cluster_hist/state/ (SSP1-2.6, SSP3-7.0, SSP4-6.0, SSP5-8.5 SCEN); SSP2-4.5 SCEN already correctly points at its own. Original lines preserved at `.preB83close_track1.bak` per Rule #10 amendment-vs-rewrite.
 
-6. **B64 NEW audit-item filed** (Hypothesis 2 ✅ RESOLVED at workstation-agent verification 2026-05-29 ~01:00 CEST; **Hypothesis 1 ✅ CONFIRMED + REMEDIATION PLANNED at workstation-agent diagnostic 2026-05-29 ~01:30 CEST**; Hypothesis 3 now MOOT; non-blocking for Phase 1 + 3a; required before Phase 3b): **Concrete evidence**: workstation-agent 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth, not real CMIP6 historical with Pinatubo signal)**. Root cause: `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt` has corrupted historical (1850-2014) from Tier-2 SSP4-6.0 generation pathway gap; scenario period (2015-2100) is reasonable. Anthropogenic emissions provenance ✅ confirmed clean (intermediary_py-derived; legacy IIASA paths INERT preserved for predecessor-comparison reproducibility per Axis 1; FILE_NON_CO2_VALS prescribed-RF design intentional per Huntingford2010+Smith2018 GMD). **REMEDIATION PLANNED on workstation** (~30-45 min total wall): backup → splice (shared CMIP6 historical 1850-2014 from ssp126 source-of-truth + ssp460 scenario 2015-2100) → re-run trunk-cpp-engine for SSP4-6.0 → re-FastRegrid → re-rsync 18 GB SSP4-6.0 climate library to cluster. **Cluster Track 2 launch NOT blocked**: Phase 1 (SSP2-4.5 HIST shared baseline) + Phase 3a (4-of-5 SCEN: SSP1, SSP2, SSP3, SSP5) UNAFFECTED + can launch as planned in parallel with workstation remediation. Phase 3b (SSP4-6.0 SCEN) waits for corrected library rsync. See `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6 for full detail + 5-step remediation recipe.
+6. **B64 ✅ CLOSED at session 13 day 2 2026-05-29 ~14:00 CEST** (Hypothesis 2 ✅ RESOLVED; **Hypothesis 1 ✅ CONFIRMED + REMEDIATION LANDED + EMPIRICALLY VALIDATED**; Hypothesis 3 MOOT). **Remediation complete**: Daniel's workstation chat agent did the 5-step splice fix (~33 min total wall) + rsynced corrected 18 GB SSP4-6.0 climate library to cluster (~02:30-03:30 CEST); cluster-side verification ~03:35 CEST confirmed 5-way SSP T_anom byte-identity 1900-2010 (corrupted +21% bias removed; year 2000 non-CO2 RF = 1.133761 W/m² canonical). **Rule #10 self-correction #26**: actual splice boundary = **2010/2011** (not 2014/2015 as planned-remediation docs assumed; rebuild's intermediary_py RF files use 2010/2011 scenario-start). **CO2-decoupling nuance**: SSP4-6.0 year-2100 CO2 = 631.42 ppm UNCHANGED (engine-evolved CO2 decoupled from prescribed non-CO2 RF; only per-cell climate vars 1900-2010 changed). Phase 3a/3b split ELIMINATED → all 5 SCEN parallel-ready. Original detail (filed-at-addendum): **Concrete evidence**: workstation-agent 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth, not real CMIP6 historical with Pinatubo signal)**. Root cause: `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt` has corrupted historical (1850-2014) from Tier-2 SSP4-6.0 generation pathway gap; scenario period (2015-2100) is reasonable. Anthropogenic emissions provenance ✅ confirmed clean (intermediary_py-derived; legacy IIASA paths INERT preserved for predecessor-comparison reproducibility per Axis 1; FILE_NON_CO2_VALS prescribed-RF design intentional per Huntingford2010+Smith2018 GMD). **REMEDIATION PLANNED on workstation** (~30-45 min total wall): backup → splice (shared CMIP6 historical 1850-2014 from ssp126 source-of-truth + ssp460 scenario 2015-2100) → re-run trunk-cpp-engine for SSP4-6.0 → re-FastRegrid → re-rsync 18 GB SSP4-6.0 climate library to cluster. **Cluster Track 2 launch NOT blocked**: Phase 1 (SSP2-4.5 HIST shared baseline) + Phase 3a (4-of-5 SCEN: SSP1, SSP2, SSP3, SSP5) UNAFFECTED + can launch as planned in parallel with workstation remediation. Phase 3b (SSP4-6.0 SCEN) waits for corrected library rsync. See `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6 for full detail + 5-step remediation recipe.
 
 **Track 2 production launch sequence (REVISED — Track-1-style shared HIST)**:
 
@@ -184,33 +184,23 @@ bash startguess.sh
 # === PHASE 2: WAIT for HIST to complete + state/ populated ===
 # Verify: ls forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/ | wc -l = 513 (512 .state + meta.bin)
 
-# === PHASE 3a: Launch 4-of-5 SCEN runs in parallel (each restarts from SSP2-4.5_cluster_hist/state/) ===
-# REVISED post-B64 Hypothesis 1 confirmation (2026-05-29 ~01:30 CEST): SSP4-6.0 SCEN deferred to Phase 3b
-# until corrected SSP4-6.0 climate library is rsync'd from workstation post-remediation
-# (~30-45 min wall on workstation: backup + splice + re-run engine SSP4-6.0 + re-FastRegrid + re-rsync 18 GB)
-# CRITICAL: same NNODES + CPU_PER_NODE as HIST (NPROCESS=512) for state-restart alignment
+# === PHASE 3: Launch ALL 5 SCEN runs in parallel (each restarts from SSP2-4.5_cluster_hist/state/) ===
+# [B64 CLOSED 2026-05-29 session 13 day 2]: Phase 3a/3b split ELIMINATED. SSP4-6.0 ssp460 RF file
+# remediation complete + corrected 18 GB SSP4-6.0 climate library rsync'd to cluster + empirically
+# validated (5-way SSP T_anom byte-identity 1900-2010). All 5 SCEN now launch together.
+# CRITICAL: same NNODES + CPU_PER_NODE as HIST (NPROCESS=512) for state-restart alignment.
+# If HIST ran genius/4x128=512, SCEN must also use 512 ranks (genius/4x128 OR milan/8x64; interchangeable).
 cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
-for SSP in SSP1-2.6 SSP2-4.5 SSP3-7.0 SSP5-8.5; do   # NOTE: SSP4-6.0 EXCLUDED until Phase 3b
+for SSP in SSP1-2.6 SSP2-4.5 SSP3-7.0 SSP4-6.0 SSP5-8.5; do
   cd forks/trunk_r13078_runs/${SSP}_cluster_scen
-  ./setup_run_tseq.sh   # SCEN main.ins state_path → SSP2-4.5_cluster_hist/state/ (already retargeted at this commit)
+  NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh   # match HIST 512-rank allocation; SCEN main.ins state_path → SSP2-4.5_cluster_hist/state/
   cd $WORK_BASE/${SSP}_cluster_scen
   bash startguess.sh
   cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
 done
 # Each SCEN ~10h wall (no spinup; restart from shared HIST state at year 2020)
 
-# === PHASE 3b: SSP4-6.0 SCEN (run AFTER workstation remediation completes + corrected library rsync'd) ===
-# Trigger: Daniel signals "SSP4-6.0 climate library refresh complete" after re-rsync to cluster path
-# `forks/trunk_r13078_runs/SSP4-6.0/Common-directory/IMOGEN/output_62892_cppengine/` (~18 GB)
-# Then submit SSP4-6.0 SCEN with same defaults:
-cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm/forks/trunk_r13078_runs/SSP4-6.0_cluster_scen
-./setup_run_tseq.sh
-cd $WORK_BASE/SSP4-6.0_cluster_scen
-bash startguess.sh
-# ~10h wall
-
 # === PHASE 4: Total estimated cluster wall ~3-4 days (vs ~13 days for original 5 SSP-specific HIST plan) ===
-# Workstation remediation overlaps Phase 1 HIST or Phase 3a SCEN → 0 calendar-day delta on cluster side
 ```
 
 **Allocation flexibility — milan/8×64=512 ↔ genius/4×128=512**:
