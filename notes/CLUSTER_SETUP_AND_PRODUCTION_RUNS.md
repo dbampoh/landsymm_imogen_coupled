@@ -167,40 +167,42 @@ _(Preserved verbatim below per Rule #10 amendment-vs-rewrite corollary. The sess
 
 6. **B64 ✅ CLOSED at session 13 day 2 2026-05-29 ~14:00 CEST** (Hypothesis 2 ✅ RESOLVED; **Hypothesis 1 ✅ CONFIRMED + REMEDIATION LANDED + EMPIRICALLY VALIDATED**; Hypothesis 3 MOOT). **Remediation complete**: Daniel's workstation chat agent did the 5-step splice fix (~33 min total wall) + rsynced corrected 18 GB SSP4-6.0 climate library to cluster (~02:30-03:30 CEST); cluster-side verification ~03:35 CEST confirmed 5-way SSP T_anom byte-identity 1900-2010 (corrupted +21% bias removed; year 2000 non-CO2 RF = 1.133761 W/m² canonical). **Rule #10 self-correction #26**: actual splice boundary = **2010/2011** (not 2014/2015 as planned-remediation docs assumed; rebuild's intermediary_py RF files use 2010/2011 scenario-start). **CO2-decoupling nuance**: SSP4-6.0 year-2100 CO2 = 631.42 ppm UNCHANGED (engine-evolved CO2 decoupled from prescribed non-CO2 RF; only per-cell climate vars 1900-2010 changed). Phase 3a/3b split ELIMINATED → all 5 SCEN parallel-ready. Original detail (filed-at-addendum): **Concrete evidence**: workstation-agent 5-SSP RF cross-comparison at year 2000 → ssp126/245/370/585 = 1.133761 W/m² (4-way byte-identical CMIP6 historical baseline) vs **ssp460 = 1.369924 W/m² (~21% higher; synthetic monotonic ~2%/yr exponential growth, not real CMIP6 historical with Pinatubo signal)**. Root cause: `imogen/emiss/CMIP6/Non-Co2-CH4-N2O-RF/nonco2_ch4_n2o_RF_historical_ssp460.txt` has corrupted historical (1850-2014) from Tier-2 SSP4-6.0 generation pathway gap; scenario period (2015-2100) is reasonable. Anthropogenic emissions provenance ✅ confirmed clean (intermediary_py-derived; legacy IIASA paths INERT preserved for predecessor-comparison reproducibility per Axis 1; FILE_NON_CO2_VALS prescribed-RF design intentional per Huntingford2010+Smith2018 GMD). **REMEDIATION PLANNED on workstation** (~30-45 min total wall): backup → splice (shared CMIP6 historical 1850-2014 from ssp126 source-of-truth + ssp460 scenario 2015-2100) → re-run trunk-cpp-engine for SSP4-6.0 → re-FastRegrid → re-rsync 18 GB SSP4-6.0 climate library to cluster. **Cluster Track 2 launch NOT blocked**: Phase 1 (SSP2-4.5 HIST shared baseline) + Phase 3a (4-of-5 SCEN: SSP1, SSP2, SSP3, SSP5) UNAFFECTED + can launch as planned in parallel with workstation remediation. Phase 3b (SSP4-6.0 SCEN) waits for corrected library rsync. See `notes/FOLLOWUPS.md` B64 row + `_chat_artifacts/b8_3_cluster_smoke_2026-05-28/B8_3_evaluation_2026-05-28.md` §13.8.6 for full detail + 5-step remediation recipe.
 
-**Track 2 production launch sequence (REVISED — Track-1-style shared HIST)**:
+> **⚡ SESSION 13 DAY 5 UPDATE (2026-06-02) — PHASE 1 HIST ✅ COMPLETE & BANKED; PHASE 3 SCEN MUST LAUNCH AT 509 RANKS (not 512). See FOLLOWUPS #36/#37 + CHAT_HANDOFF Appendix E.**
+> - **PHASE 1 DONE**: SSP2-4.5 HIST result at `forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/output-2026-06-02/` (32 GB, 57 gz, 62,512/62,512 cells through 2020) + `state/` 509/509 saved. (Ran as job 604703 milan/8×64; throttled + end-barrier-deadlocked but FULLY SALVAGED — see below.)
+> - **TWO Rule #9 fixes now baked in / required for SCEN**:
+>   - **#36 stdout throttle FIXED** in `scripts/cluster/mpi_run_guess.sh` (per-rank stdout redirect to /scratch; no more 20 GB shared `guess_x.o` funnel). No action needed — already in the wrapper.
+>   - **#37 empty-rank deadlock**: the split leaves ranks 509/510/511 empty at 512 ranks → they fail `IMOGENCFXInput::init()`→`MPI_Finalize` while working ranks hang at `framework()`'s `MPI_Barrier`. **MUST launch SCEN at `--ntasks=509`** (unique count: `ceil(62512/509)=123` = same chunk as HIST 512 → identical cell→rank→state map for ranks 0-508; AND zero empty ranks → no deadlock).
+> - **HOW to get 509 ranks** (NPROCESS=NNODES×CPU_PER_NODE can't be prime): stage SCEN normally (NNODES=8 CPU_PER_NODE=64 → run1-512, run510-512 empty + unused), then edit the work-dir `submit.sh` to `#SBATCH --ntasks=509` (keep `--nodes=8`); srun spawns ranks 0-508 → run1-509. Gitignored per-run override (Track-1-style). Validate the FIRST SCEN run watched (fast start = #36 fixed; clean teardown = #37 avoided) before batching the rest. 5×509 won't fit at once → serial/batched.
+
+**Track 2 production launch sequence (REVISED — Track-1-style shared HIST; SCEN at 509 ranks per #37)**:
 
 ```bash
 ssh owl  # or use Cursor Remote-SSH-attached terminal
 cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
 
-# === PHASE 1: Run 1 HIST for SSP2-4.5 (shared baseline) ===
-# Defaults: NNODES=8 CPU_PER_NODE=64 PARTITION=milan WALLTIME=3-00:00:00 GRIDLIST=PLUM-mask 62512-cell
-cd forks/trunk_r13078_runs/SSP2-4.5_cluster_hist
-./setup_run_tseq.sh   # if milan busy: NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh
-cd $WORK_BASE/SSP2-4.5_cluster_hist
-bash startguess.sh
-# Estimated wall: ~52h (milan/8x64) or ~38h (genius/4x128); within 3-day max
+# === PHASE 1: ✅ DONE (SSP2-4.5 HIST shared baseline; job 604703; output-2026-06-02/ + state/ 509/509) ===
+# (kept for reference) Defaults: NNODES=8 CPU_PER_NODE=64 PARTITION=milan WALLTIME=3-00:00:00 GRIDLIST=PLUM-mask 62512-cell
+#   cd forks/trunk_r13078_runs/SSP2-4.5_cluster_hist && ./setup_run_tseq.sh && cd $WORK_BASE/... && bash startguess.sh
 
-# === PHASE 2: WAIT for HIST to complete + state/ populated ===
-# Verify: ls forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/state/ | wc -l = 513 (512 .state + meta.bin)
+# === PHASE 2: ✅ DONE — state/ populated: 509/509 .state (ranks 509-511 are empty-gridlist no-ops; expected) ===
 
-# === PHASE 3: Launch ALL 5 SCEN runs in parallel (each restarts from SSP2-4.5_cluster_hist/state/) ===
-# [B64 CLOSED 2026-05-29 session 13 day 2]: Phase 3a/3b split ELIMINATED. SSP4-6.0 ssp460 RF file
-# remediation complete + corrected 18 GB SSP4-6.0 climate library rsync'd to cluster + empirically
-# validated (5-way SSP T_anom byte-identity 1900-2010). All 5 SCEN now launch together.
-# CRITICAL: same NNODES + CPU_PER_NODE as HIST (NPROCESS=512) for state-restart alignment.
-# If HIST ran genius/4x128=512, SCEN must also use 512 ranks (genius/4x128 OR milan/8x64; interchangeable).
+# === PHASE 3: Launch 5 SCEN runs at 509 RANKS (each restarts from SSP2-4.5_cluster_hist/state/) ===
+# CRITICAL (#37): launch at --ntasks=509, NOT 512. ceil(62512/N)=123 for N in {509..512} (same cell→rank→state
+#   map as HIST), but only 509 has ZERO empty ranks → avoids the IMOGENCFXInput::init()->MPI_Finalize vs
+#   framework() MPI_Barrier deadlock. Stage at 8x64 (run1-512; run510-512 empty+unused), then --ntasks=509.
+# Stagger/serialise: 5x509 ranks won't fit at once (milan 768 / genius 1536 slots). Run first one WATCHED.
 cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
 for SSP in SSP1-2.6 SSP2-4.5 SSP3-7.0 SSP4-6.0 SSP5-8.5; do
   cd forks/trunk_r13078_runs/${SSP}_cluster_scen
-  NNODES=4 CPU_PER_NODE=128 PARTITION=genius ./setup_run_tseq.sh   # match HIST 512-rank allocation; SCEN main.ins state_path → SSP2-4.5_cluster_hist/state/
+  ./setup_run_tseq.sh                                   # stage at 8x64 (or genius 4x128); SCEN main.ins state_path -> SSP2-4.5_cluster_hist/state/
   cd $WORK_BASE/${SSP}_cluster_scen
+  sed -i 's/^#SBATCH --ntasks=512/#SBATCH --ntasks=509/' submit.sh   # <-- #37 fix: 509 ranks, no empty ranks (verify exact line first)
   bash startguess.sh
   cd /bg/data/lpj/bampoh-d/lpj-guess_imogen_landsymm
 done
-# Each SCEN ~10h wall (no spinup; restart from shared HIST state at year 2020)
+# Each SCEN ~10h wall (no spinup; restart from shared HIST state at year 2020) — likely FASTER now that #36 is fixed.
 
-# === PHASE 4: Total estimated cluster wall ~3-4 days (vs ~13 days for original 5 SSP-specific HIST plan) ===
+# === PHASE 4: output rsync -> workstation -> paper validation triad ===
 ```
 
 **Allocation flexibility — milan/8×64=512 ↔ genius/4×128=512**:

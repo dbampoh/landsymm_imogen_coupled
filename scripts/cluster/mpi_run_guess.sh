@@ -145,7 +145,17 @@ rsync -az --partial "${WORK_RUN_DIR}/" "${SCRATCH_RUN_DIR}/"
 # -----------------------------------------------------------------------------
 cd "${SCRATCH_WORK_DIR}"  # only cd to scratch_work_dir; guess -parallel cd's into runNN
 echo "  cmd: ${GUESS} ${OPTIONS}"
-"${GUESS}" ${OPTIONS}
+# [Rule #9 datapoint; Track 2 Phase 1 HIST 2026-06-02] Per-rank stdout/stderr redirect.
+# WHY: without this, all N ranks' (very verbose, per-cell-per-year ImogenOutput) stdout
+# funnels through srun->slurmstepd into ONE shared guess_x.o file. At production stdout
+# volume (122-123 cells/rank x ~620 sim-years) that single serialized writer can't drain
+# the 64 KB pipes fast enough -> ranks block in pipe_write -> severe staggered throttle
+# (observed: 8-node HIST 604703 ramped 2->4->8 nodes over 22h; guess_x.o hit 20 GB).
+# FIX: each rank writes its own stdout log to node-local /scratch (then rsync'd back to
+# the work run-dir at line ~157). Removes the funnel -> all ranks run full-tilt from t=0.
+# guess writes its own guess.log via the framework logger; this captures the cout/cerr
+# firehose separately so it never touches the shared srun stdout pipe.
+"${GUESS}" ${OPTIONS} > "${SCRATCH_RUN_DIR}/guess_stdout_rank${NRANK}.log" 2>&1
 guess_exit=$?
 wait
 
