@@ -47,6 +47,8 @@
 
 ---
 
+> **🎉 STATUS BANNER (2026-06-03, session 13 day 5) — TRACK 2 ECOSYSTEM-STATE PRODUCTION RUNS ✅ COMPLETE.** The v1.0 closed-loop (T_seq loose-coupling) production set the paper depends on is banked + physically verified on the owl cluster: HIST (SSP2-4.5 shared baseline) + 5 SCEN (SSP1-2.6/2-4.5/3-7.0/4-6.0/5-8.5), each 62,512 cells over 2020-2100, restarting from the shared HIST 2020 state. Both Rule #9 production defects found + fixed (#36 stdout-funnel throttle → per-rank redirect; #37 empty-gridlist-rank `MPI_Finalize`-vs-`MPI_Barrier` deadlock → launch at 509 ranks). Sensibility: CO₂-fertilization gradient monotonic with CO₂; smooth HIST→SCEN transition. v1.0 ~99% (production done; paper analysis/validation triad remains — see `notes/PAPER_COMPLETION_AND_VALIDATION.md`). Full detail: CHANGELOG 2026-06-03 + FOLLOWUPS #36/#37.
+
 ## Decisions settled (as of 5 May 2026)
 
 This section records the user-confirmed strategic choices that govern

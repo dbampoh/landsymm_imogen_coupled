@@ -14,6 +14,27 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-06-03 (~12:30 CEST, session 13 day 5 — Track 2 ecosystem-state production runs ✅ COMPLETE (HIST + all 5 SCENs) + physically verified) — the full v1.0 GMD-paper production set is banked
+
+**Track 2 production is COMPLETE.** All six runs done, banked, and provenance-verified on the KIT IMK-IFU owl cluster (trunk_r13078 δ-B-variant, T_seq workflow, milan/8×64 launched at 509 ranks per Rule #9 #37):
+
+| Run | Output dir | gz | size | cells | years |
+|-----|-----------|----|------|-------|-------|
+| HIST (SSP2-4.5 shared) | `SSP2-4.5_cluster_hist/output-2026-06-02/` | 57 | 32 GB | 62,512 | →2020 + state 509/509 |
+| SCEN SSP1-2.6 | `SSP1-2.6_cluster_scen/output-2026-06-03/` | 57 | 7.3 GB | 62,512 | 2020–2100 |
+| SCEN SSP2-4.5 | `SSP2-4.5_cluster_scen/output-2026-06-02/` | 57 | 7.3 GB | 62,512 | 2020–2100 |
+| SCEN SSP3-7.0 | `SSP3-7.0_cluster_scen/output-2026-06-03/` | 57 | 7.4 GB | 62,512 | 2020–2100 |
+| SCEN SSP4-6.0 | `SSP4-6.0_cluster_scen/output-2026-06-03/` | 57 | 7.3 GB | 62,512 | 2020–2100 |
+| SCEN SSP5-8.5 | `SSP5-8.5_cluster_scen/output-2026-06-03/` | 57 | 7.4 GB | 62,512 | 2020–2100 |
+
+- **All 5 SCENs launched at 509 ranks** (Rule #9 #37 mitigation) restarting from the shared SSP2-4.5 HIST 2020 state; each completed clean (`COMPLETED` 0:0, ~1.5 h at full 8-node load — both #36 stdout-redirect + #37 no-deadlock fixes validated five times over). SSP4-6.0 used the B64-corrected ssp460 library.
+- **Physical sensibility check 1 (cross-SSP CO₂ fertilization)**: global-mean `cmass` Total 2020→2100 gain is monotonic with SSP CO₂ level — SSP1-2.6 (+0.50) < SSP2-4.5 (+0.78) < SSP4-6.0 (+0.91) < SSP3-7.0 (+1.01) < SSP5-8.5 (+1.42 kgC/m²) — a textbook fertilization gradient; SSP4-6.0 lands correctly between 245 and 370 (independent physical confirmation of the B64 fix). Year-2020 means ~identical across SCENs (~2.971, 0.06% spread) confirming correct shared-state restart. Zero NaN/negatives across 62,512 cells × 5 SCENs.
+- **Physical sensibility check 2 (HIST→SCEN transition)**: smooth, continuous splice — HIST climbs ~+0.013–0.020/yr into 2020 (2.977) and SCENs continue at ~+0.019/yr with no jump/spike/discontinuity. The only feature is a benign ~0.17% offset at the exact restart year (smaller than annual variability), the expected HILDA+→PLUM land-use dataset switch at the boundary.
+- **Cluster citizenship**: milan nodes returned to pool; no jobs running. Runs threaded through the queue with zero other-user contention; genius SSP1-2.6 duplicate cancelled (moved to the faster milan serial cascade).
+- **Next**: rsync outputs + updated `_chat_artifacts` → workstation; workstation `git pull` for the committed codebase changes; workstation agent resumes paper analysis (validation triad).
+
+**Doc cascade**: this CHANGELOG + FOLLOWUPS dashboard + CLUSTER_SETUP §1 (production COMPLETE banner) + PRODUCTION_RUN_CONFIG + PAPER_COMPLETION (production-done + sensibility results) + EXECUTION_PLAN. Chat-transfer bundle (gitignored) updated with full narrative + workstation-agent handoff prompt. No source-code change this commit (runs were operational); tag `v0.25.0-cluster-trunk-tseq-smoke-complete` unchanged. Cumulative: Rule #9 #36 + #37, v1.0 % done ~99% (production runs done; paper analysis remains).
+
 ### 2026-06-02 (~02:15 CEST, session 13 day 4/5 — Track 2 Phase 1 SSP2-4.5 HIST ✅ COMPLETE & BANKED + 2 NEW Rule #9 datapoints) — production HIST salvaged despite stdout throttle + empty-rank MPI deadlock; per-rank stdout-redirect fix
 
 **Track 2 Phase 1 (SSP2-4.5 shared HIST) is COMPLETE & BANKED.** Production HIST (job **604703**, milan[03-10], 8×64=512 ranks, default UCX) ran to scientific completion for all 62,512 cells but exhibited two independent failures — both diagnosed with hard runtime evidence (htop + `/proc/<pid>/{wchan,syscall,stack}` + `gstack`), and **both application-side, NOT cluster infrastructure** (the Appendix-D "milan09 bad node" verdict is hereby SUPERSEDED). The run was fully salvaged; nothing was lost.

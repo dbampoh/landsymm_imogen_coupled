@@ -1,7 +1,11 @@
 # Production-run configuration reference
 
 **Version**: v1.0 (initial draft)
-**Last updated**: 2026-05-29 ~00:30 CEST (session 13 day 1 close — Block 8.3 cluster smoke ✅ DONE + FULL addendum landed: Track 2 production strategy locked in)
+**Last updated**: 2026-06-03 ~12:30 CEST (session 13 day 5 — **🎉 TRACK 2 PRODUCTION RUNS ✅ COMPLETE + VERIFIED**)
+
+> **🎉 PRODUCTION COMPLETE (2026-06-03, session 13 day 5)**: All 6 runs done + banked + physically verified on owl. **As-run config** (differs from the original strategy below in two operational ways discovered during launch): (1) **509 ranks, not 512** — the gridlist split `ceil(62512/512)=123` leaves ranks 509-511 empty, and empty-gridlist ranks fail `IMOGENCFXInput::init()` → `MPI_Finalize` → deadlock vs the working ranks' `framework()` `MPI_Barrier` (Rule #9 #37); launching at `--ntasks=509` (8 milan nodes; ranks 0-508 → run1-509) gives zero empty ranks + preserves the chunk-123 cell→rank→state map → restart-consistent. (2) **per-rank stdout redirect** in `mpi_run_guess.sh` (Rule #9 #36) — without it all ranks' verbose stdout funnels into one shared `guess_x.o` (hit 20 GB) → `pipe_write` throttle. With both fixes each run completed clean in ~1.5 h at full 8-node load. milan/8×64 used (genius/4×128 equivalent). Outputs: HIST 32 GB + 5 SCEN ~7.3-7.4 GB each (62512 cells, 2020-2100). All SCENs restart from shared SSP2-4.5 HIST 2020 state. See CHANGELOG 2026-06-03 + FOLLOWUPS #36/#37 for full detail.
+
+> **POST-BLOCK-8.3-FULL-ADDENDUM (2026-05-29 session 13 day 1 close)** — *strategy as planned; superseded operationally by the 509-rank as-run config above*:
 
 > **POST-BLOCK-8.3-FULL-ADDENDUM (2026-05-29 session 13 day 1 close)**:
 >

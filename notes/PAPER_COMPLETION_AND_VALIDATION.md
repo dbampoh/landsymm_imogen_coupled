@@ -2,7 +2,13 @@
 
 **Version**: v0.1 (initial draft; session 7 evening close 2026-05-19; iteratively updated through validation triad execution + paper writing)
 **Status**: 🔧 LIVING DOCUMENT — populated incrementally as the validation triad scripts are ported + enhanced, results are analyzed, paper figures are produced, and the manuscript is drafted toward GMD submission.
-**Last updated**: 2026-05-19 evening (session 7 close); first authoring + initial framing.
+**Last updated**: 2026-06-03 ~12:30 CEST (session 13 day 5 — **🎉 TRACK 2 PRODUCTION RUNS ✅ COMPLETE: the validation triad's blocking dependency is now satisfied**).
+
+> **🎉 TRACK 2 PRODUCTION COMPLETE (2026-06-03, session 13 day 5) — paper-stage work can now proceed.** The full v1.0 GMD-paper production set is banked + physically verified on the owl cluster:
+> - **6 runs**: HIST (SSP2-4.5 shared baseline, `forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/output-2026-06-02/`, 32 GB, 62,512 cells →2020 + state 509/509) + 5 SCEN (`forks/trunk_r13078_runs/<SSP>_cluster_scen/output-2026-06-0[23]/`, ~7.3-7.4 GB each, 57 gz vars, 62,512 cells, 2020-2100). SSPs: 1-2.6, 2-4.5, 3-7.0, 4-6.0 (B64-corrected lib), 5-8.5; all restart from the shared SSP2-4.5 HIST 2020 state (Track-1-style shared HIST).
+> - **Two physical sensibility checks PASSED**: (1) **CO₂-fertilization gradient** — global-mean `cmass` Total 2020→2100 gain is monotonic with SSP CO₂: SSP1-2.6 +0.50 < SSP2-4.5 +0.78 < SSP4-6.0 +0.91 < SSP3-7.0 +1.01 < SSP5-8.5 +1.42 kgC/m² (SSP4-6.0 correctly between 245/370 → B64 fix physically confirmed); 2020 means ~identical (~2.971, 0.06% spread → correct shared-state restart); 0 NaN/neg across 62,512 cells × 5 SCENs. (2) **HIST→SCEN transition** — smooth continuous splice, no jumps; benign ~0.17% restart-year offset (HILDA+→PLUM LU dataset switch, < annual variability).
+> - **Validation-triad implication**: the "Awaits Track 2 production runs" blocker on Axis 1 (LPJG ecosystem response), Axis 4 (Track-1-vs-Track-2 ecosystem comparison), and the production-horizon extension of Axis 2/3 is now **CLEARED**. Outputs will be rsync'd from cluster → workstation; resume here with the F-13 predecessor-script porting (§3) + validation-triad execution (§1) on the real production outputs.
+> - These outputs are **gitignored** (not committed); they arrive on the workstation via rsync (see the session-14 workstation-agent handoff prompt in `_chat_artifacts/`).
 
 **Audience**: anyone (current + future maintainers + future chat agents) needing to:
 - Understand the validation-triad structure for the v1.0 GMD paper
