@@ -303,3 +303,17 @@ Thumbs.db
 
 # Chat-transfer bundle + audit-evidence bundles (moved out of git tracking 2026-05-28; canonical location is alpha _chat_artifacts/ at parent dir landsymm_lpjg_imogen_coupled_model/_chat_artifacts/)
 _chat_artifacts
+
+# GMD comparative-analysis suite (scripts/Paper_Analysis): track the analysis
+# CODE only (.py/.md/.txt/.sh); the generated outputs, ISIMIP caches, backups,
+# figures, stats tables, and binary slide decks are large (~3 GB) and
+# regenerable, so they stay out of git.
+scripts/Paper_Analysis/**/_isimip_cache/
+scripts/Paper_Analysis/**/outputs_*/
+scripts/Paper_Analysis/**/_backup_*/
+scripts/Paper_Analysis/**/*.pptx
+scripts/Paper_Analysis/**/*.png
+scripts/Paper_Analysis/**/*.csv
+scripts/Paper_Analysis/**/*.xlsx
+scripts/Paper_Analysis/**/*.npz
+scripts/Paper_Analysis/**/~$*

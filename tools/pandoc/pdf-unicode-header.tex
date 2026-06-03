@@ -1,0 +1,32 @@
+% Map unicode sub/superscripts to proper LaTeX text sub/superscripts so the
+% PDF (lualatex, Latin Modern) renders units and unicode chemical formulae
+% (e.g. CO\textsubscript{2}, yr\textsuperscript{-1}) instead of dropping the
+% glyphs. Text-mode only; math-mode subscripts are unaffected.
+\usepackage{newunicodechar}
+% Subscripts (U+2080..U+2089, U+2093)
+\newunicodechar{₀}{\textsubscript{0}}
+\newunicodechar{₁}{\textsubscript{1}}
+\newunicodechar{₂}{\textsubscript{2}}
+\newunicodechar{₃}{\textsubscript{3}}
+\newunicodechar{₄}{\textsubscript{4}}
+\newunicodechar{₅}{\textsubscript{5}}
+\newunicodechar{₆}{\textsubscript{6}}
+\newunicodechar{₇}{\textsubscript{7}}
+\newunicodechar{₈}{\textsubscript{8}}
+\newunicodechar{₉}{\textsubscript{9}}
+\newunicodechar{ₓ}{\textsubscript{x}}
+% Superscripts (U+2070..U+2079, U+207B); ¹²³ are Latin-1 and render natively
+\newunicodechar{⁰}{\textsuperscript{0}}
+\newunicodechar{⁴}{\textsuperscript{4}}
+\newunicodechar{⁵}{\textsuperscript{5}}
+\newunicodechar{⁶}{\textsuperscript{6}}
+\newunicodechar{⁷}{\textsuperscript{7}}
+\newunicodechar{⁸}{\textsuperscript{8}}
+\newunicodechar{⁹}{\textsuperscript{9}}
+\newunicodechar{⁻}{\textsuperscript{\textminus}}
+% Math symbols appearing in prose (text mode) absent from Latin Modern text
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≤}{\ensuremath{\le}}
+\newunicodechar{≥}{\ensuremath{\ge}}
+\newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{−}{\ensuremath{-}}
