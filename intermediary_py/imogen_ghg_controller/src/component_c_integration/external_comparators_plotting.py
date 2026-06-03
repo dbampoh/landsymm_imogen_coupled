@@ -168,7 +168,7 @@ for ax in axes.flat: ax.set_facecolor('#fafaf8')
 
 fig.suptitle(
     'Integrated GHG Emission Trajectories vs Independent External Comparators | 1900-2100 | Five SSP-RCP Scenarios\n'
-    'Our integrated total = anthropogenic (RCMIP-substituted CH4/N2O or RCMIP EFOS for CO2) + natural (LPJ-GUESS DGVM)\n'
+    'LandSyMM integrated total = anthropogenic (RCMIP-substituted CH4/N2O or RCMIP EFOS for CO2) + natural (LPJ-GUESS DGVM)\n'
     'External comparator = atmospheric-inversion top-down totals (GMB 2025 / GNB 2024) or budget partition (GCB 2025)',
     fontsize=11, fontweight='bold', color='#1a1a1a', y=0.995)
 
@@ -251,7 +251,7 @@ def panel_residuals(ax, gas):
     ax.axhline(0, color='#888888', lw=0.7, alpha=0.5)
     ax.set_xticks(x_periods)
     ax.set_xticklabels(cmp['Period_label'].values, fontsize=8)
-    ax.set_title(f'{gas} residual: Our integrated − comparator best',
+    ax.set_title(f'{gas} residual: LandSyMM integrated − comparator best',
                  fontsize=10, fontweight='bold', color='#1a1a1a', pad=4)
     ax.set_ylabel(f'Δ ({UNIT[gas]})', **LK)
     ax.set_xlabel('Reference period', **LK)

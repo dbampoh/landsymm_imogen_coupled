@@ -160,7 +160,16 @@ SFP = 1.00
 # Organic amendment scaling — Table 5.14 (Eq. 5.3: 1 + (ROA×CFOA)^0.59)
 # Irrigated: 2 t/ha dry straw incorporated (Yan et al. global median)
 ROA_STRAW  = 2.0;  CFOA_STRAW = 1.00;  EXP_SFO = 0.59
-SFO_IRRIGATED = 1.0 + (ROA_STRAW * CFOA_STRAW) ** EXP_SFO   # = 2.508
+# KNOWN ISSUE (flagged 2026-05-30): the line below is IPCC Eq. 5.3 "Form B"
+# [ 1 + (ROA*CFOA)^0.59 ]. The published 2019 Refinement Eq. 5.3 (Vol.4 Ch.5,
+# p.5.55) is "Form A": SFo = (1 + sum_i ROA_i*CFOA_i)^0.59 — the 0.59 exponent
+# applies to the WHOLE (1 + sum). For ROA=2, CFOA=1.0 this overstates irrigated
+# SFo: Form B = 2.508 vs correct Form A = (1+2)^0.59 = 1.927 (~ +30% on the
+# amendment term). Deliberately left unfixed for now to avoid a Component-A /
+# production rerun (effect on total CH4 ~1%); see paper/PAPER_REVAMP_PLAN_AND_LOG.md
+# §13. Revisit before any final emissions release. Correct form would be:
+#   SFO_IRRIGATED = (1.0 + ROA_STRAW * CFOA_STRAW) ** EXP_SFO
+SFO_IRRIGATED = 1.0 + (ROA_STRAW * CFOA_STRAW) ** EXP_SFO   # = 2.508 (Form B; see note above)
 SFO_RAINFED   = 1.00   # straw burned/removed in rainfed systems
 
 # Pre-compute adjusted daily EF per RICE REGION × water class

@@ -296,7 +296,7 @@ def panel_residual(ax, gas, ylim=None):
     ax.axvline(1970, color='#888888', lw=0.6, ls=':', alpha=0.5)
     ax.axvline(HIST_END + 0.5, color='#888888', lw=0.7, ls=':', alpha=0.65)
     if ylim is not None: ax.set_ylim(*ylim)
-    ax.set_title(f'Δ {gas}: Our integrated − hybrid comparator (10-yr running mean)',
+    ax.set_title(f'Δ {gas}: LandSyMM integrated − hybrid comparator (10-yr running mean)',
                  fontsize=10, fontweight='bold', color='#1a1a1a', pad=4)
     ax.set_ylabel(f'Δ ({UNIT[gas]})', **LK)
     ax.set_xlabel('Year', **LK)

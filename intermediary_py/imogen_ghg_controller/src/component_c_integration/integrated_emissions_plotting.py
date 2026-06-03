@@ -416,7 +416,7 @@ def linestyle_handles():
         Line2D([], [], color='#888888', lw=1.0, ls='--',
                label='RCMIP_total (anthro pre-sub)'),
         Line2D([], [], color='#888888', lw=1.4, ls='-',
-               label='Our_anthro (post-sub)'),
+               label='LandSyMM anthro (post-sub)'),
         Line2D([], [], color='#888888', lw=1.6, ls=':',
                label='LPJ-GUESS natural (10-yr mean)'),
         Line2D([], [], color='#1a1a1a', lw=2.6, ls='-',

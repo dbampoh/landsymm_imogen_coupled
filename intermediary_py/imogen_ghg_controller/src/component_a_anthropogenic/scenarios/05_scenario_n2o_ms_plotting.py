@@ -201,7 +201,7 @@ for s in SCENARIOS:
     d=scen_data[s]
     ax.plot(d['yrs'],d['vals'],color=COLORS[s],lw=2.0,zorder=12)
 handles=[
-    Line2D([0],[0],color=C_HIST,lw=2,   label='Our IPCC Tier 1 (2019, with PRP)'),
+    Line2D([0],[0],color=C_HIST,lw=2,   label='LandSyMM IPCC Tier 1 (2019, with PRP)'),
     Line2D([0],[0],color=C_FAO, lw=1.8,ls=':',label='FAO TIER 1'),
     Line2D([0],[0],color=C_RCMIP,lw=1.5,ls=(0,(4,1,1,1)),alpha=0.75,
            label='RCMIP \u00d7 EDGAR 3.C.4+5 (hist. only)'),

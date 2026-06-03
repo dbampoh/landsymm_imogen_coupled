@@ -76,7 +76,7 @@ for ax in axes.flat: ax.set_facecolor('#fafaf8')
 fig.suptitle(
     'Comparison 2: Full GHG Emission Totals — RCMIP Published (before) vs '
     'Post-Substitution (after)\n'
-    '1900\u20132100  |  New total = RCMIP total \u2212 RCMIP agri + Our IPCC Tier 1 / PLUMv2 agri',
+    '1900\u20132100  |  New total = RCMIP total \u2212 RCMIP agri + LandSyMM IPCC Tier 1 / PLUMv2 agri',
     fontsize=10, fontweight='bold', color='#1a1a1a', y=0.995)
 
 # Reference arrays: SSP2-4.5 historical segment (1970-2019) for single difference line
@@ -181,7 +181,7 @@ ax.text(1905, 8, 'Post-substitution HIGHER than RCMIP', fontsize=7.5,
 ax.text(1905, -3, 'Post-substitution LOWER than RCMIP', fontsize=7.5,
         color='#444444', va='top')
 ax.set_title('CH4 Absolute Change from Substitution\n'
-             '(New total \u2212 RCMIP total = Our agri \u2212 RCMIP agri)', **TK)
+             '(New total \u2212 RCMIP total = LandSyMM agri \u2212 RCMIP agri)', **TK)
 ax.set_ylabel('\u0394 CH4 (Mt yr\u207b\u00b9)', **LK)
 ax.set_xlabel('Year', **LK)
 style_ax(ax)
@@ -209,7 +209,7 @@ for s in SCENARIOS:
 
 ax.axhline(0, color='#666666', lw=1.0, alpha=0.6)
 ax.set_title('N2O Absolute Change from Substitution\n'
-             '(New total \u2212 RCMIP total = Our agri \u2212 RCMIP agri)', **TK)
+             '(New total \u2212 RCMIP total = LandSyMM agri \u2212 RCMIP agri)', **TK)
 ax.set_ylabel('\u0394 N2O (Mt yr\u207b\u00b9)', **LK)
 ax.set_xlabel('Year', **LK)
 style_ax(ax)

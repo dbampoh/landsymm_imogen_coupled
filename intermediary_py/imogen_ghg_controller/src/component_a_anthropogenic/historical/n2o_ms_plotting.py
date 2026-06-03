@@ -176,7 +176,7 @@ ax.legend(fontsize=8, loc="lower left", framealpha=0.9, edgecolor=SC, fancybox=F
 ax = axes[1,1]
 ax.stackplot(yr, [reg_np19.get(r,np.zeros(51)) for r in ro], labels=ro,
              colors=[RC_COLS[r] for r in ro], alpha=0.80)
-ax.plot(yr, t_wp19,   color=C_WP19, linewidth=2.0, linestyle="-",  label="Our total WITH PRP", zorder=13)
+ax.plot(yr, t_wp19,   color=C_WP19, linewidth=2.0, linestyle="-",  label="LandSyMM total WITH PRP", zorder=13)
 ax.plot(yr, fao_wp,   color=C_FAO,  linewidth=2.0, linestyle=":",   label="FAO total WITH PRP", zorder=12)
 ax.plot(yr, fao_np,   color=C_FAO,  linewidth=1.5, linestyle="-.",  label="FAO total without PRP", zorder=12)
 ax.plot(yr, rcmip_ms, color=C_RCP,  linewidth=2.0, linestyle=RLS,   label="RCMIP total", zorder=11)

@@ -104,7 +104,7 @@ fig, axes = plt.subplots(2, 2, figsize=(16, 11))
 fig.patch.set_facecolor('#fafaf8')
 for ax in axes.flat: ax.set_facecolor('#fafaf8')
 fig.suptitle(
-    'Comparison 1: Agricultural Sector GHG Emissions — RCMIP Baseline vs Our IPCC Tier 1 / PLUMv2 Estimates\n'
+    'Comparison 1: Agricultural Sector GHG Emissions — RCMIP Baseline vs LandSyMM IPCC Tier 1 / PLUMv2 Estimates\n'
     '1900\u20132100  |  Five SSP-RCP scenarios  |  '
     'CH4: EF + MM + Rice  |  N2O: MM + Synthetic Fertilizers + Managed Soils',
     fontsize=10, fontweight='bold', color='#1a1a1a', y=0.995)
@@ -116,14 +116,14 @@ legend_handles = [
     Line2D([0],[0], color=C_RCMIP_PRE, lw=1.8, ls='--',
            label='RCMIP baseline (MAGICC AFOLU|Agriculture)\nhistorical 1900\u20132014, then SSP 2015\u20132100 [dashed]'),
     Line2D([0],[0], color=C_HIST_OUR, lw=2.2, ls='-',
-           label='Our IPCC Tier 1 historical (1970\u20132020)\n[orange solid]'),
+           label='LandSyMM IPCC Tier 1 historical (1970\u20132020)\n[orange solid]'),
     Line2D([0],[0], color='#333333', lw=1.2, ls=':',
            label='Vertical lines: 1970 (inventory start) | 2020 (hist\u2192scenario splice)'),
 ]
 for s in SCENARIOS:
     legend_handles.append(
         Line2D([0],[0], color=COLORS[s], lw=2,
-               label=f'{s}  RCMIP=dashed  Our PLUMv2=solid')
+               label=f'{s}  RCMIP=dashed  LandSyMM PLUMv2=solid')
     )
 
 # ── Panel 1: CH4 agricultural sectors ────────────────────────────────────────
@@ -191,9 +191,9 @@ n2o_handles = [
     Line2D([0],[0], color=C_RCMIP_PRE, lw=1.8, ls='--',
            label='RCMIP AFOLU baseline (dashed)'),
     Line2D([0],[0], color=C_HIST_OUR,  lw=2.2, ls='-',
-           label='Our Tier 1 historical (solid orange)'),
+           label='LandSyMM Tier 1 historical (solid orange)'),
 ] + [Line2D([0],[0], color=COLORS[s], lw=2,
-            label=f'{s}  RCMIP=dashed / Ours=solid') for s in SCENARIOS]
+            label=f'{s}  RCMIP=dashed / LandSyMM=solid') for s in SCENARIOS]
 ax.legend(handles=n2o_handles, fontsize=7, loc='upper left',
           framealpha=0.92, edgecolor=SC, fancybox=False)
 
@@ -217,11 +217,11 @@ for s in SCENARIOS:
                     alpha=0.06, color=COLORS[s])
 
 ax.axhline(0, color='#888888', lw=1.0, ls='-', alpha=0.5)
-ax.text(1905, 2, 'Our estimate ABOVE RCMIP', fontsize=7.5,
+ax.text(1905, 2, 'LandSyMM estimate ABOVE RCMIP', fontsize=7.5,
         color='#444444', va='bottom')
-ax.text(1905, -2, 'Our estimate BELOW RCMIP', fontsize=7.5,
+ax.text(1905, -2, 'LandSyMM estimate BELOW RCMIP', fontsize=7.5,
         color='#444444', va='top')
-ax.set_title('CH4 Difference: Our Estimate \u2212 RCMIP Baseline', **TK)
+ax.set_title('CH4 Difference: LandSyMM Estimate \u2212 RCMIP Baseline', **TK)
 ax.set_ylabel('\u0394 CH4 (Mt yr\u207b\u00b9)', **LK)
 ax.set_xlabel('Year', **LK)
 style_ax(ax)
@@ -246,7 +246,7 @@ for s in SCENARIOS:
                     alpha=0.06, color=COLORS[s])
 
 ax.axhline(0, color='#888888', lw=1.0, ls='-', alpha=0.5)
-ax.set_title('N2O Difference: Our Estimate \u2212 RCMIP Baseline', **TK)
+ax.set_title('N2O Difference: LandSyMM Estimate \u2212 RCMIP Baseline', **TK)
 ax.set_ylabel('\u0394 N2O (Mt yr\u207b\u00b9)', **LK)
 ax.set_xlabel('Year', **LK)
 style_ax(ax)

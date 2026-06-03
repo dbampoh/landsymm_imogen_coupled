@@ -212,7 +212,7 @@ ax.annotate('PLUM covers ~120 Mha\nvs FAO 195 Mha\n(gap explains offset)',
 
 handles = [
     Line2D([0],[0], color=C_HIST,  lw=2,
-           label='Our IPCC Tier 1 (2019 Ref., FAO area)'),
+           label='LandSyMM IPCC Tier 1 (2019 Ref., FAO area)'),
     Line2D([0],[0], color=C_FAO,   lw=1.8, ls=':', label='FAO TIER 1'),
     Line2D([0],[0], color=C_RCMIP, lw=1.5,
            ls=(0,(4,1,1,1)), alpha=0.75,
