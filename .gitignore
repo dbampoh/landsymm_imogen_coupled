@@ -317,3 +317,14 @@ scripts/Paper_Analysis/**/*.csv
 scripts/Paper_Analysis/**/*.xlsx
 scripts/Paper_Analysis/**/*.npz
 scripts/Paper_Analysis/**/~$*
+
+# [session 18 2026-06-06] corrected-climate / identical-emulator-diagnostic run
+# dirs + pattern/baseline backups + diagnostic data (large Tier-2 / run outputs;
+# code is committed, data is not).
+forks/trunk_r13078_runs/*_armB_*/
+imogen/CRUNCEP_1960_1989_PREBACKUP_*/
+imogen/patterns/*_PREBACKUP_*/
+intermediary_py/imogen_ghg_controller/outputs/_prefix_*backup*/
+scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/armB_inputs/
+scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/armB_csv/
+scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/*.log

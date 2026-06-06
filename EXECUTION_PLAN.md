@@ -40,6 +40,8 @@
 > - Part IV (Recommended sequencing) folds Parts I-III into a phased
 >   plan with rough effort estimates.
 >
+> **2026-06-06 UPDATE (session 18) — IMOGEN climate-forcing defects root-caused + fixed (see `CHANGELOG.md` 2026-06-06 + `COUPLED_MODEL_INVESTIGATION.md`).** Five pre-existing, independent issues that affected the v1.0 climate were fixed this session: (1) the C++ `gcm_anlg` "cool-bias" bug (Jan-only `dtemp_l` + non-persistent ocean heat) — the §II.2 Fortran-vs-C++ IMOGEN question is now moot for warming fidelity: the C++ engine is faithful to the Fortran and, post-oceanfix, reproduces its ~+15 K (was +0.4 K); applied to BOTH forks; (2) pattern-converter precip ×86400 unit bug (precip was scenario-invariant); (3) zero-RH/wind/pressure baseline restored via NEW CRU-JRA v2.4 baseline (`tools/crujra_to_imogen_baseline.py`) — BLAZE-relevant; (4) EBM params corrected generic→MRI-calibrated; (5) rice-CH4 SFo Form B→A. NEW `scripts/run_imogen_engine.sh` (GCM-parameterised engine wrapper). The corrected δ-B-variant 62892 climate is being regenerated for all 5 SSPs; the cluster ecosystem runs (and the paper climate/ecosystem sections) must be re-done with it.
+>
 > **Cross-references**
 > All citations to source files use the form `path:line`. Citations to
 > the master document use the form `[CMI §x.y]` (master doc section

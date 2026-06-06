@@ -7,6 +7,12 @@ made in our `lpjguess/` tree (and the related Fortran IMOGEN
 
 ---
 
+## 🔧 2026-06-06 (session 18) — `gcm_anlg` OCEANFIX applied to BOTH trees simultaneously (NO backport debt incurred)
+
+The IMOGEN-engine "cool-bias" fix (`modules/climatemodel.cpp::gcm_anlg`: compute `dtemp_l` once per year + apply to all 12 months; add `const std::vector<double>& dtemp_o_in` param + init `output.dtemp_o` from the persistent main-loop `dtempO` + pass it at the call site; `modules/climatemodel.h` signature updated) was applied to **both** `lpjguess/modules/` **and** `forks/trunk_r13078/modules/` in the SAME session — preserving the engine byte-identity established at block 8.2.4 (Installment-1.5). **No new backport debt**: the change is fork-symmetric. Binaries rebuilt: `lpjguess/{build,build_mpi}` + `forks/trunk_r13078/{build,build_b824,build_oceanfix}` (all with `-Wl,--no-as-needed -lcurl`; `build_oceanfix` is the canonical fixed binary; `build_b824` paper binary backed up `guess_PREoceanfix_paper_*`). The defect was PRE-EXISTING in both trees (and the predecessor `version_A`). Full detail: `CHANGELOG.md` 2026-06-06. NB pattern/baseline data fixes (CRU-JRA baseline, precip ×86400) are data-prep (`tools/`), not engine source — no fork-parity implication.
+
+---
+
 ## ✅ STRATEGIC RESOLUTION — Option T_seq adopted at session 8.0 C5 (2026-05-20 afternoon)
 
 **Per `notes/B47.md` canonical landing record (~400 LOC) + session 8.0 C0-C5 verification + U1-U4 pre-flight reconnaissance**: the strategic question raised at session 7 close (preserved verbatim below this section for forensic continuity) is **resolved in favor of Option T_seq** (sequential-standalone with minimal trunk_r13078 backport in two installments).
