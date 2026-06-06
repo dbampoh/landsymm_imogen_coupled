@@ -122,7 +122,7 @@ void sunny(int daynumber, int jday, int points, int year,
 GcmAnlgOutput gcm_anlg(double q, int land_pts, int n_olevs, const std::string& dir_patt,
     double f_ocean, double kappa_o, double lambda_l, double lambda_o,
     double mu, double& longmin_am, double& latmin_am, double& longmax_am,
-    double& latmax_am, int mm);
+    double& latmax_am, int mm, const std::vector<double>& dtemp_o_in);
 void solpos(int day, int /*year*/, double& sindec, double& scs);
 void fair_non_co2_ghg(double ch4_ppbv, double n2o_ppbv, double ch4_init_ppbv,
     double n2o_init_ppbv, double co2_ppmv, double co2_init_ppmv,

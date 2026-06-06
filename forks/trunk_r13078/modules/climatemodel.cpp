@@ -669,7 +669,7 @@ int RUN_IMOGEN_ENGINE() {
                 if (includeCo2 || includeNonCo2) {
                     auto anlg_output = gcm_anlg(q, GPOINTS, N_OLEVS, dirPatt, fOcean, kappaO,
                         lambdaL, lambdaO, mu, longminAm, latminAm,
-                        longmaxAm, latmaxAm, MM);
+                        longmaxAm, latmaxAm, MM, dtempO);
                     tAnom = anlg_output.t_anom_am;
                     precipAnom = anlg_output.precip_anom_am;
                     rh15mAnom = anlg_output.rh15m_anom_am;
@@ -2225,7 +2225,7 @@ void delta_temp(int n_olevs, double f_ocean, double kappa, double lambda_l,
 GcmAnlgOutput gcm_anlg(double q, int land_pts, int n_olevs, const std::string& dir_patt,
     double f_ocean, double kappa_o, double lambda_l, double lambda_o,
     double mu, double& longmin_am, double& latmin_am, double& longmax_am,
-    double& latmax_am, int mm) {
+    double& latmax_am, int mm, const std::vector<double>& dtemp_o_in) {
     // Validate inputs
     if (land_pts <= 0 || n_olevs <= 0 || mm <= 0) {
         throw std::runtime_error("land_pts, n_olevs, and mm must be positive");
@@ -2245,7 +2245,21 @@ GcmAnlgOutput gcm_anlg(double q, int land_pts, int n_olevs, const std::string& d
     output.pstar_ha_anom_am.resize(land_pts, std::vector<double>(mm, 0.0));
     output.sw_anom_am.resize(land_pts, std::vector<double>(mm, 0.0));
     output.lw_anom_am.resize(land_pts, std::vector<double>(mm, 0.0));
-    output.dtemp_o.resize(n_olevs, 0.0); // Initialize with input dtemp_o (updated by delta_temp)
+    // [oceanfix 2026-06-05] Persist the ocean thermal state across years: initialize from the
+    // caller's dtemp_o (previous year). Previously this was re-zeroed every call, so the ocean
+    // never accumulated heat -> near-zero transient warming (the spurious "cool bias").
+    if (dtemp_o_in.size() == static_cast<size_t>(n_olevs)) {
+        output.dtemp_o = dtemp_o_in;
+    } else {
+        output.dtemp_o.assign(n_olevs, 0.0);
+    }
+
+    // [oceanfix 2026-06-05] Compute the land-mean temperature anomaly ONCE per year (stepping the
+    // persistent ocean state) and apply it to ALL months below. Previously delta_temp ran only for
+    // im==0 with a per-month-zeroed dtemp_l, so only January received the anomaly.
+    double dtemp_l = 0.0;
+    delta_temp(n_olevs, f_ocean, kappa_o, lambda_l, lambda_o, mu, q, dtemp_l, output.dtemp_o);
+    std::cerr << "DTEMP_L = " << dtemp_l << std::endl;
 
     // Define month labels (equivalent to Fortran DATA DRIVE_MONTH)
     std::array<std::string, 12> drive_month = {
@@ -2258,12 +2272,7 @@ GcmAnlgOutput gcm_anlg(double q, int land_pts, int n_olevs, const std::string& d
 
     // Loop over months
     for (int im = 0; im < mm; ++im) {
-        // Calculate temperature anomalies (only in first month)
-        double dtemp_l = 0.0;
-        if (im == 0) {
-            delta_temp(n_olevs, f_ocean, kappa_o, lambda_l, lambda_o, mu, q,
-                dtemp_l, output.dtemp_o);
-        }
+        // [oceanfix] dtemp_l now computed once before this loop (applies to all months).
 
         // Construct file path (trim DIR_PATT and append DRIVE_MONTH)
         std::string driver_patt = dir_patt;
@@ -2304,9 +2313,6 @@ GcmAnlgOutput gcm_anlg(double q, int land_pts, int n_olevs, const std::string& d
         logger.info("longmax_am: " + std::to_string(longmax_am));
         logger.info("latmax_am: " + std::to_string(latmax_am));
         logger.info("\n");*/
-
-        // Log dtemp_l (equivalent to Fortran print *)
-        std::cerr << "DTEMP_L = " << dtemp_l << std::endl;
 
         // Read and process anomaly patterns for each land point
         for (int l = 0; l < land_pts; ++l) {
