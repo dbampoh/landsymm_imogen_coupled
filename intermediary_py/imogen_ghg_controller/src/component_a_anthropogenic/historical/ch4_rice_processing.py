@@ -38,7 +38,7 @@ from src.shared.paths import (
 #
 # Equation 5.3 — Organic amendment scaling factor:
 #
-#   SFo = 1 + Σ_i [ (ROA_i × CFOA_i)^0.59 ]
+#   SFo = (1 + Σ_i [ ROA_i × CFOA_i ])^0.59
 #
 # Where:
 #   CH4_Rice  = annual emissions, Gg CH4 yr-1
@@ -70,8 +70,8 @@ from src.shared.paths import (
 #    apply SFo = 1.00 for rainfed and upland; for irrigated rice we apply
 #    a global-average straw incorporation rate of 2 t/ha (Yan et al. 2005,
 #    as used in the worked example in Table 5.14b), giving:
-#      SFo = 1 + (2 × 1.00)^0.59 = 1 + 2^0.59 = 1 + 1.508 = 2.508
-#    NOTE: This makes irrigated rice emissions ~2.5× higher than no-amendment
+#      SFo = (1 + 2 × 1.00)^0.59 = 3^0.59 = 1.927
+#    NOTE: This makes irrigated rice emissions ~1.9× higher than no-amendment
 #    baseline. This is appropriate for irrigated paddy systems where straw
 #    incorporation is standard practice in Asia. For upland and rainfed
 #    where straw is typically burned or removed, SFo = 1.00.
@@ -312,7 +312,7 @@ SFP_DEFAULT = 1.00   # disaggregated: non-flooded pre-season <180 days
 # ---------------------------------------------------------------------------
 # 3E. ORGANIC AMENDMENT SCALING FACTOR (SFo) — Eq. 5.3 + Table 5.14
 # ---------------------------------------------------------------------------
-# SFo = 1 + Σ_i [ (ROA_i × CFOA_i)^0.59 ]
+# SFo = (1 + Σ_i [ ROA_i × CFOA_i ])^0.59
 #
 # For irrigated rice fields, straw incorporation is the dominant organic
 # amendment globally. Yan et al. (2005) report a global median of ~2 t/ha
@@ -321,22 +321,18 @@ SFP_DEFAULT = 1.00   # disaggregated: non-flooded pre-season <180 days
 #
 # CFOA for straw incorporated shortly before cultivation = 1.00 (Table 5.14)
 # ROA = 2.0 t/ha (dry weight)
-# SFo = 1 + (2.0 × 1.00)^0.59 = 1 + 2^0.59 = 1 + 1.508 = 2.508
+# SFo = (1 + 2.0 × 1.00)^0.59 = 3^0.59 = 1.927
 
 ROA_STRAW     = 2.0    # tonne ha-1 (dry weight), global median from Yan et al.
 CFOA_STRAW    = 1.00   # straw incorporated <30 days before cultivation, Table 5.14
 EXP_SFO       = 0.59   # exponent in Equation 5.3
 
-# KNOWN ISSUE (flagged 2026-05-30): the line below is IPCC Eq. 5.3 "Form B"
-# [ 1 + (ROA*CFOA)^0.59 ]. The published 2019 Refinement Eq. 5.3 (Vol.4 Ch.5,
-# p.5.55) is "Form A": SFo = (1 + sum_i ROA_i*CFOA_i)^0.59 — the 0.59 exponent
-# applies to the WHOLE (1 + sum). For ROA=2, CFOA=1.0 this overstates irrigated
-# SFo: Form B = 2.508 vs correct Form A = (1+2)^0.59 = 1.927 (~ +30% on the
-# amendment term). Deliberately left unfixed for now to avoid a Component-A /
-# production rerun (effect on total CH4 ~1%); see paper/PAPER_REVAMP_PLAN_AND_LOG.md
-# §13. Revisit before any final emissions release. Correct form would be:
-#   SFO_IRRIGATED = (1.0 + ROA_STRAW * CFOA_STRAW) ** EXP_SFO
-SFO_IRRIGATED = 1.0 + (ROA_STRAW * CFOA_STRAW) ** EXP_SFO
+# IPCC Eq. 5.3 "Form A" (2019 Refinement, Vol.4 Ch.5, p.5.55): the 0.59 exponent
+# applies to the WHOLE (1 + sum_i ROA_i*CFOA_i), i.e. SFo = (1 + sum)^0.59.
+# For ROA=2, CFOA=1.0: SFo = (1 + 2)^0.59 = 1.927.
+# (Fixed 2026-06-05; previously used "Form B" [ 1 + (ROA*CFOA)^0.59 ] = 2.508,
+#  which overstated the irrigated amendment term by ~30%.)
+SFO_IRRIGATED = (1.0 + ROA_STRAW * CFOA_STRAW) ** EXP_SFO
 SFO_RAINFED   = 1.00   # rainfed/upland: straw typically burned or removed
 SFO_UPLAND    = 1.00
 

@@ -58,7 +58,7 @@ PARAMETERS (2019 Refinement, Tables 5.11, 5.11A, 5.12, 5.13, 5.14)
   SFp: pre-season scaling factor = 1.00 (non-flooded, <180 days; Table 5.13)
 
   SFo: organic amendment factor:
-    Irrigated = 1 + (2.0 × 1.00)^0.59 = 2.508  [2t/ha straw, Table 5.14]
+    Irrigated = (1 + 2.0 × 1.00)^0.59 = 1.927  [2t/ha straw, Table 5.14]
     Rainfed = 1.00 (straw burned/removed)
 
 PLUM DATA INPUTS
@@ -157,19 +157,14 @@ SFW_UPLAND    = 0.00   # not represented separately in PLUM
 # Pre-season water regime — Table 5.13: non-flooded < 180 days = 1.00
 SFP = 1.00
 
-# Organic amendment scaling — Table 5.14 (Eq. 5.3: 1 + (ROA×CFOA)^0.59)
+# Organic amendment scaling — Table 5.14 (Eq. 5.3: SFo = (1 + ROA×CFOA)^0.59)
 # Irrigated: 2 t/ha dry straw incorporated (Yan et al. global median)
 ROA_STRAW  = 2.0;  CFOA_STRAW = 1.00;  EXP_SFO = 0.59
-# KNOWN ISSUE (flagged 2026-05-30): the line below is IPCC Eq. 5.3 "Form B"
-# [ 1 + (ROA*CFOA)^0.59 ]. The published 2019 Refinement Eq. 5.3 (Vol.4 Ch.5,
-# p.5.55) is "Form A": SFo = (1 + sum_i ROA_i*CFOA_i)^0.59 — the 0.59 exponent
-# applies to the WHOLE (1 + sum). For ROA=2, CFOA=1.0 this overstates irrigated
-# SFo: Form B = 2.508 vs correct Form A = (1+2)^0.59 = 1.927 (~ +30% on the
-# amendment term). Deliberately left unfixed for now to avoid a Component-A /
-# production rerun (effect on total CH4 ~1%); see paper/PAPER_REVAMP_PLAN_AND_LOG.md
-# §13. Revisit before any final emissions release. Correct form would be:
-#   SFO_IRRIGATED = (1.0 + ROA_STRAW * CFOA_STRAW) ** EXP_SFO
-SFO_IRRIGATED = 1.0 + (ROA_STRAW * CFOA_STRAW) ** EXP_SFO   # = 2.508 (Form B; see note above)
+# IPCC Eq. 5.3 "Form A" (2019 Refinement, Vol.4 Ch.5, p.5.55): the 0.59 exponent
+# applies to the WHOLE (1 + sum_i ROA_i*CFOA_i). For ROA=2, CFOA=1.0:
+# SFo = (1 + 2)^0.59 = 1.927.
+# (Fixed 2026-06-05; previously used "Form B" [ 1 + (ROA*CFOA)^0.59 ] = 2.508.)
+SFO_IRRIGATED = (1.0 + ROA_STRAW * CFOA_STRAW) ** EXP_SFO   # = 1.927 (Form A)
 SFO_RAINFED   = 1.00   # straw burned/removed in rainfed systems
 
 # Pre-compute adjusted daily EF per RICE REGION × water class
