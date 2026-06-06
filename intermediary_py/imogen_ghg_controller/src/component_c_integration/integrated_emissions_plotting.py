@@ -359,7 +359,7 @@ def draw_ch4_band(ax):
     step_line(ax, pairs, bests, color='#2166ac', lw=1.6, ls='--',
               label='GMB 2025 wet+IFW−DCC best')
 
-panel_top(axes[0, 0], df_ch4, 'CH4', 'Mt CH4 yr$^{-1}$',
+panel_top(axes[0, 0], df_ch4, 'CH4', 'Tg CH4 yr$^{-1}$',
           ylim=(0, 1300), draw_budget_band=draw_ch4_band)
 
 # -----------------------------------------------------------------------------
@@ -371,11 +371,11 @@ def draw_n2o_band(ax):
     los   = [gnb_combined(p)[1] for p in GNB_PERIODS_N]
     his   = [gnb_combined(p)[2] for p in GNB_PERIODS_N]
     step_band(ax, pairs, los, his, alpha=0.14,
-              label='GNB 2024 nat+pert range (Mt N2O)')
+              label='GNB 2024 nat+pert range (Tg N2O)')
     step_line(ax, pairs, bests, color='#2166ac', lw=1.6, ls='--',
               label='GNB 2024 nat+pert best')
 
-panel_top(axes[0, 1], df_n2o, 'N2O', 'Mt N2O yr$^{-1}$',
+panel_top(axes[0, 1], df_n2o, 'N2O', 'Tg N2O yr$^{-1}$',
           ylim=(0, 50), draw_budget_band=draw_n2o_band)
 
 # -----------------------------------------------------------------------------
@@ -387,22 +387,28 @@ def draw_co2_band(ax):
     los   = [gcb_nee_MtCO2(p)[1] for p in GCB_PERIODS]
     his   = [gcb_nee_MtCO2(p)[2] for p in GCB_PERIODS]
     step_band(ax, pairs, los, his, alpha=0.14,
-              label='GCB 2025 NEE ±1σ (Mt CO2)')
+              label='GCB 2025 NEE ±1σ (Gt CO2)')
     step_line(ax, pairs, bests, color='#2166ac', lw=1.6, ls='--',
               label='GCB 2025 NEE best')
 
-panel_top(axes[0, 2], df_co2, 'CO2', 'Mt CO2 yr$^{-1}$',
+panel_top(axes[0, 2], df_co2, 'CO2', 'Gt CO2 yr$^{-1}$',
           ylim=(-30000, 140000), draw_budget_band=draw_co2_band)
 
 # -----------------------------------------------------------------------------
 # PANEL 4-6 (bottom row): Δ panels
 # -----------------------------------------------------------------------------
-panel_diff(axes[1, 0], df_ch4, 'CH4', 'Mt CH4 yr$^{-1}$',
+panel_diff(axes[1, 0], df_ch4, 'CH4', 'Tg CH4 yr$^{-1}$',
            ylim=(-80, 450))
-panel_diff(axes[1, 1], df_n2o, 'N2O', 'Mt N2O yr$^{-1}$',
+panel_diff(axes[1, 1], df_n2o, 'N2O', 'Tg N2O yr$^{-1}$',
            ylim=(-9, 14))
-panel_diff(axes[1, 2], df_co2, 'CO2', 'Mt CO2 yr$^{-1}$',
+panel_diff(axes[1, 2], df_co2, 'CO2', 'Gt CO2 yr$^{-1}$',
            ylim=(-25000, 22000))
+
+# CO2 panels: underlying data are in Mt CO2; display the y-axis in Gt CO2 (/1000).
+from matplotlib.ticker import FuncFormatter as _FF
+_gt_fmt = _FF(lambda _v, _pos: f'{_v/1000:g}')
+axes[0, 2].yaxis.set_major_formatter(_gt_fmt)
+axes[1, 2].yaxis.set_major_formatter(_gt_fmt)
 
 # -----------------------------------------------------------------------------
 # COMPREHENSIVE LEGENDS (every panel self-contained)

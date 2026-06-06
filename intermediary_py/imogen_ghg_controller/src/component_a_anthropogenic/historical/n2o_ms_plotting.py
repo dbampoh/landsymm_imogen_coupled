@@ -1,7 +1,7 @@
 """
 N2O Managed Soils -- Standalone Plotting Script (Mt units, updated)
 Changes vs first version:
-  - All values converted to Mt yr-1
+  - All values converted to Tg yr-1
   - Regional panel: extended y-axis to 8.5 Mt; with-PRP total reference lines added
   - Component panel: note moved to top-right inside bounds
   - Empirical inter-method uncertainty band in ratio panel
@@ -129,7 +129,7 @@ ax.plot(yr, t_wp19, color=C_WP19, linewidth=2.2, label="2019 params -- with PRP"
 ax.plot(yr, fao_wp, color=C_FAO, linewidth=2.5, linestyle=":", label="FAO Agricultural Soils")
 ax.plot(yr, fao_np, color=C_FAO, linewidth=1.5, linestyle="-.", label="FAO without PRP")
 ax.set_title("Global N2O Totals -- With and Without PRP", **TK)
-ax.set_ylabel("N2O (Mt yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
+ax.set_ylabel("N2O (Tg yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
 sax(ax, (1.0, 10.5))
 ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=False)
 # Annotation to the right of legend
@@ -147,7 +147,7 @@ ax.plot(yr, edgar_tot, color=C_EDG, linewidth=1.8, linestyle="-.", label="EDGAR 
 ax.plot(yr, fao_wp, color=C_FAO, linewidth=2.5, linestyle=":", label="FAO total", zorder=12)
 ax.set_title("Direct N2O by N-Input Pathway (2019 params)",
              fontsize=10, fontweight="bold", color="#1a1a1a", pad=8)
-ax.set_ylabel("N2O (Mt yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
+ax.set_ylabel("N2O (Tg yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
 sax(ax, (0, 10.5))
 ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=False)
 # Note at top-right, anchored right edge, inside plot bounds
@@ -182,14 +182,14 @@ ax.plot(yr, fao_np,   color=C_FAO,  linewidth=1.5, linestyle="-.",  label="FAO t
 ax.plot(yr, rcmip_ms, color=C_RCP,  linewidth=2.0, linestyle=RLS,   label="RCMIP total", zorder=11)
 ax.plot(yr, edgar_tot, color=C_EDG, linewidth=1.8, linestyle="-.",  label="EDGAR total", zorder=10)
 ax.set_title("Regional Breakdown (2019 without PRP) + with-PRP totals", **TK)
-ax.set_ylabel("N2O (Mt yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
+ax.set_ylabel("N2O (Tg yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
 sax(ax, (0, 8.5))
 ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=False)
 
 fig.text(0.5, 0.003,
-    f"2020: NoPRP={t_np19[-1]:.3f}Mt | WithPRP={t_wp19[-1]:.3f}Mt | "
-    f"FAO(noPRP)={fao_np[-1]:.3f}Mt | FAO(total)={fao_wp[-1]:.3f}Mt | "
-    f"EDGAR={edgar_tot[-1]:.3f}Mt | RCMIP-derived={rcmip_ms[-1]:.3f}Mt  |  "
+    f"2020: NoPRP={t_np19[-1]:.3f}Tg | WithPRP={t_wp19[-1]:.3f}Tg | "
+    f"FAO(noPRP)={fao_np[-1]:.3f}Tg | FAO(total)={fao_wp[-1]:.3f}Tg | "
+    f"EDGAR={edgar_tot[-1]:.3f}Tg | RCMIP-derived={rcmip_ms[-1]:.3f}Tg  |  "
     f"FSOM from FAO published | RCMIP: hist+SSP2-4.5 (2016-2019 interpolated)",
     ha="center", fontsize=7, color="#555555", style="italic",
     bbox=dict(boxstyle="round,pad=0.4", facecolor="#f5f5f0", edgecolor="#cccccc", alpha=0.9))

@@ -789,13 +789,41 @@ def _plot_taylor(master_df: pd.DataFrame, out_dir: Path) -> List[Path]:
             ax.plot(theta, ratio, marker=window_markers.get(r["window"], "o"),
                     color=scen_colors.get(r["scenario"], "gray"), markersize=8, linestyle="none")
         ax.set_title(
-            f"Taylor diagram (normalized) [{tier}] - {COMPARISONS[key]['label']} [{key}]\n"
-            f"radius = std_IMOGEN/std_ISIMIP, angle = spatial pattern r", fontsize=10)
+            f"Taylor diagram (normalized): {COMPARISONS[key]['label']}\n"
+            f"radius = std$_{{IMOGEN}}$/std$_{{ISIMIP}}$, angle = spatial pattern correlation", fontsize=10)
         scen_handles = [plt.Line2D([], [], color=scen_colors[s], marker="o", linestyle="none", label=s) for s in scen_list]
         win_handles = [plt.Line2D([], [], color="k", marker=window_markers[w], linestyle="none", label=w) for w in window_markers]
         leg1 = ax.legend(handles=scen_handles, loc="upper right", bbox_to_anchor=(1.34, 1.0), fontsize=8, title="Scenario")
         ax.add_artist(leg1)
         ax.legend(handles=win_handles, loc="lower right", bbox_to_anchor=(1.34, 0.0), fontsize=8, title="Window")
+
+        # Zoomed polar inset of the tight high-correlation cluster, so the
+        # scenario/window structure (otherwise overplotted near r~0.98) is legible.
+        zoom_corr_min, zoom_ratio_lo, zoom_ratio_hi = 0.95, 0.95, 1.10
+        in_zoom = [
+            (np.arccos(np.clip(rr["spatial_pattern_r"], -1, 1)), rr["std_ratio"], rr)
+            for _, rr in sub.iterrows()
+            if np.isfinite(rr["spatial_pattern_r"]) and np.isfinite(rr["std_ratio"])
+            and rr["spatial_pattern_r"] >= zoom_corr_min and zoom_ratio_lo <= rr["std_ratio"] <= zoom_ratio_hi
+        ]
+        if in_zoom:
+            axins = fig.add_axes([0.74, 0.34, 0.27, 0.31], projection="polar")
+            axins.set_thetalim(0, np.arccos(zoom_corr_min))
+            axins.set_theta_zero_location("E")
+            axins.set_theta_direction(1)
+            axins.set_rorigin(0)
+            axins.set_rlim(zoom_ratio_lo, zoom_ratio_hi)
+            ztk = np.array([0.95, 0.97, 0.98, 0.99, 1.0])
+            axins.set_thetagrids(np.degrees(np.arccos(ztk)), labels=[f"{c:g}" for c in ztk], fontsize=7)
+            axins.set_rgrids([0.95, 1.0, 1.1], fontsize=4)
+            axins.set_rlabel_position(8)
+            axins.tick_params(pad=1)
+            axins.plot(0, 1.0, "k*", markersize=11)
+            for theta, ratio, rr in in_zoom:
+                axins.plot(theta, ratio, marker=window_markers.get(rr["window"], "o"),
+                           color=scen_colors.get(rr["scenario"], "gray"), markersize=7, linestyle="none")
+            axins.set_title("zoom: corr 0.95-1.0", fontsize=8, pad=6)
+
         p = out_dir / f"fig_taylor_{tier}_{key}.png"
         fig.tight_layout()
         fig.savefig(p, dpi=150, bbox_inches="tight")
@@ -843,11 +871,20 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
                    help="Restrict to one window label (e.g. 2000_2020). Default: all three.")
     p.add_argument("--vars", type=str, default=None,
                    help="Comma-separated comparison vars (default: all). E.g. tas,pr,rsds")
+    p.add_argument("--replot-from", type=Path, default=None,
+                   help="Skip the climate recompute; re-draw Taylor diagrams from a cached "
+                        "master stats CSV (e.g. climate_comparison_stats_all.csv).")
     return p.parse_args(list(argv))
 
 
 def main(argv: List[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+    if args.replot_from is not None:
+        master = pd.read_csv(args.replot_from)
+        args.output_base.mkdir(parents=True, exist_ok=True)
+        for p in _plot_taylor(master, args.output_base):
+            print(f"Taylor figure (replot): {p}")
+        return 0
     scenarios = SCENARIOS
     if args.scenario:
         if args.scenario not in SCENARIOS:

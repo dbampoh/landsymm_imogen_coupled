@@ -131,7 +131,7 @@ ax.plot(yr, edgar,     color=C_EDG, linewidth=1.8, linestyle='-.', label='EDGAR 
 ax.plot(yr, our_tot,   color=C_OUR, linewidth=2.0,                 label='LandSyMM IPCC 2019 Tier 1')
 ax.plot(yr, fao,       color=C_FAO, linewidth=2.5, linestyle=':',  label='FAO TIER 1')
 ax.set_title('Global CH4 Totals', **TK)
-ax.set_ylabel('CH4 (Mt yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
+ax.set_ylabel('CH4 (Tg yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
 sax(ax, (50,160))
 ax.legend(fontsize=8, loc='upper left', framealpha=0.9, edgecolor=SC, fancybox=False)
 
@@ -142,7 +142,7 @@ ax.plot(yr, rcmip_ef, color=C_RCP, linewidth=2.0, linestyle=RLS,  label='RCMIP t
 ax.plot(yr, edgar,    color=C_EDG, linewidth=1.8, linestyle='-.', label='EDGAR total', zorder=10)
 ax.plot(yr, fao,      color=C_FAO, linewidth=2.5, linestyle=':',  label='FAO total',   zorder=12)
 ax.set_title('Species Breakdown (IPCC 2019 Tier 1)', **TK)
-ax.set_ylabel('CH4 (Mt yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
+ax.set_ylabel('CH4 (Tg yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
 sax(ax, (0,160))
 ax.legend(fontsize=7, loc='upper left', framealpha=0.9, edgecolor=SC, fancybox=False, ncol=2)
 
@@ -169,13 +169,13 @@ ax.plot(yr, rcmip_ef, color=C_RCP, linewidth=2.0, linestyle=RLS,  label='RCMIP t
 ax.plot(yr, edgar,    color=C_EDG, linewidth=1.8, linestyle='-.', label='EDGAR total', zorder=10)
 ax.plot(yr, fao,      color=C_FAO, linewidth=2.5, linestyle=':',  label='FAO total',   zorder=12)
 ax.set_title('Regional Breakdown (IPCC 2019 Tier 1)', **TK)
-ax.set_ylabel('CH4 (Mt yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
+ax.set_ylabel('CH4 (Tg yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
 sax(ax, (0,160))
 ax.legend(fontsize=7, loc='upper left', framealpha=0.9, edgecolor=SC, fancybox=False)
 
 fig.text(0.5, 0.003,
-    f'2020: Our={our_tot[-1]:.3f}Mt | FAO={fao[-1]:.3f}Mt | '
-    f'EDGAR={edgar[-1]:.3f}Mt | RCMIP-derived={rcmip_ef[-1]:.3f}Mt  |  '
+    f'2020: LandSyMM={our_tot[-1]:.3f}Tg | FAO={fao[-1]:.3f}Tg | '
+    f'EDGAR={edgar[-1]:.3f}Tg | RCMIP-derived={rcmip_ef[-1]:.3f}Tg  |  '
     f'RCMIP: CMIP6 hist+SSP2-4.5; 2016-2019 linearly interpolated; EDGAR 3.A.1 proportion',
     ha='center', fontsize=7, color='#555555', style='italic',
     bbox=dict(boxstyle='round,pad=0.4', facecolor='#f5f5f0', edgecolor='#cccccc', alpha=0.9))
