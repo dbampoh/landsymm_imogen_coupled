@@ -27,7 +27,7 @@ CMIP6 source variables (from `mri-esm2-0_patterns.nc` and friends; CF-1.7;
     lwdown_patt     (units "W m-2 K-1")    -> CMIP5 col 7 (LW)
     swdown_patt     (units "W m-2 K-1")    -> CMIP5 col 8 (SW)
     range_tl1_patt  (units "1")            -> CMIP5 col 9 (DTEMP_DAY)
-    precip_patt     (units "m-2.kg.s-1.K-1") -> CMIP5 col 10 (RAINFALL); col 11 (SNOWFALL) = 0  (see CAVEAT-C)
+    precip_patt     (units "m-2.kg.s-1.K-1") -> CMIP5 col 10 (RAINFALL, mm/day/K) VIA x86400; col 11 (SNOWFALL) = 0  (see CAVEAT-C)
     pstar_patt      (units "m-1.kg.s-2.K-1") -> CMIP5 col 12 (PSTAR)
 
 CAVEATS (also recorded in `notes/STEP_5.md` and `notes/FOLLOWUPS.md`):
@@ -142,6 +142,13 @@ _HALF_OVER_SQRT2 = 1.0 / SQRT2  # = 0.7071...
 
 def _identity(x): return x
 def _wind_split_half(x): return x * _HALF_OVER_SQRT2
+# precip_patt is kg m-2 s-1 K-1 (= mm s-1 K-1); the engine's col-10 RAINFALL is
+# mm/day/K. Convert with x86400 s/day. (Fix 2026-06-05: previously _identity left
+# precip ~1e-6 -> rounded to 0.00000 at the {:9.5f} write precision, so precipitation
+# never responded to warming. Confirmed against the CMIP5 reference patterns:
+# precip_patt*86400 mean=0.12 / max=2.0 mm/day/K ~= CanESM2 0.085 / 1.43.)
+_SEC_PER_DAY = 86400.0
+def _precip_flux_to_mm_per_day(x): return x * _SEC_PER_DAY
 
 
 # CMIP6 -> CMIP5 column mapping. Order matches output column order.
@@ -154,7 +161,7 @@ COLUMN_SPEC = [
     ("LW",       7,  "lwdown_patt",   _identity),
     ("SW",       8,  "swdown_patt",   _identity),
     ("DTEMP",    9,  "range_tl1_patt", _identity),
-    ("RAIN",    10,  "precip_patt",   _identity),
+    ("RAIN",    10,  "precip_patt",   _precip_flux_to_mm_per_day),
     ("SNOW",    11,  None,            None),
     ("PSTAR",   12,  "pstar_patt",    _identity),
 ]
