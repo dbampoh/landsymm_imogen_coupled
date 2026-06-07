@@ -328,3 +328,8 @@ intermediary_py/imogen_ghg_controller/outputs/_prefix_*backup*/
 scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/armB_inputs/
 scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/armB_csv/
 scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnostic/*.log
+
+# [session 18 follow-up 2026-06-07] SW-floor clamp reversible manifest (data backup) +
+# the climate-analysis scratch symlink dir (machine-specific absolute symlinks).
+forks/trunk_r13078_runs/SW_anom_clamp_manifest_*.json.gz
+scripts/Paper_Analysis/comparative_analysis_GMD_paper/_corrected_runs_root/

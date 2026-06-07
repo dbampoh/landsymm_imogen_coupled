@@ -3119,6 +3119,9 @@ C      print *,'Top of CLIM_CALC'
 
               T_DAILY(L,J,K)=T_CLIM(L,J)+T_ANOM(L,J)
               SW_DAILY(L,J,K)=SW_CLIM(L,J)+SW_ANOM(L,J)
+C     Make sure SW anomalies do not produce negative insolation (mirror
+C     the PRECIP/RH/DTEMP/WIND floors below; downward SW is physically >=0).
+              SW_DAILY(L,J,K) = MAX(SW_DAILY(L,J,K),0.0)
               RH15M_DAILY(L,J,K)=RH15M_CLIM(L,J)+RH15M_ANOM(L,J)
               DTEMP_DAILY(L,J,K)=DTEMP_CLIM(L,J)+DTEMP_ANOM(L,J)
 

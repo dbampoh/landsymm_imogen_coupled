@@ -3157,6 +3157,13 @@ mm, std::vector<std::vector<double>>(md, std::vector<double>(nsdmax, 0.0))));
             for (int k = 0; k < md; ++k) {
                 t_daily[l][j][k] = t_clim[l][j] + (anom ? t_anom[l][j] : 0.0);
                 sw_daily[l][j][k] = sw_clim[l][j] + (anom ? sw_anom[l][j] : 0.0);
+                // [SW floor: downward insolation is physically >= 0. Mirrors the
+                //  precip/RH/DTEMP/wind floors below; the original Fortran CLIM_CALC
+                //  (imogen_lpjg.f) and this verbatim C++ port both omitted this lone
+                //  floor (harmless under the legacy baseline, exposed by the CRU-JRA
+                //  baseline's near-zero polar-winter insolation + a negative SW anomaly).
+                //  - DKB 2026-06-07]
+                sw_daily[l][j][k] = std::max(sw_daily[l][j][k], 0.0);
                 rh15m_daily[l][j][k] = rh15m_clim[l][j] + (anom ? rh15m_anom[l][j] : 0.0);
                 dtemp_daily[l][j][k] = dtemp_clim[l][j] + (anom ? dtemp_anom[l][j] : 0.0);
 
