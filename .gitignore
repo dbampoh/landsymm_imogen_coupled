@@ -333,3 +333,7 @@ scripts/Paper_Analysis/comparative_analysis_GMD_paper/identical_emulator_diagnos
 # the climate-analysis scratch symlink dir (machine-specific absolute symlinks).
 forks/trunk_r13078_runs/SW_anom_clamp_manifest_*.json.gz
 scripts/Paper_Analysis/comparative_analysis_GMD_paper/_corrected_runs_root/
+
+# [2026-06-08] ecosystem-reanalysis scratch dirs (analysis outputs; large, regenerable)
+scripts/Paper_Analysis/**/_eco_clamped_out/
+scripts/Paper_Analysis/**/_clamped_climate_out/
