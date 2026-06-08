@@ -2,7 +2,11 @@
 
 **Version**: v0.1 (initial draft; session 7 evening close 2026-05-19; iteratively updated through validation triad execution + paper writing)
 **Status**: 🔧 LIVING DOCUMENT — populated incrementally as the validation triad scripts are ported + enhanced, results are analyzed, paper figures are produced, and the manuscript is drafted toward GMD submission.
-**Last updated**: 2026-06-03 ~12:30 CEST (session 13 day 5 — **🎉 TRACK 2 PRODUCTION RUNS ✅ COMPLETE: the validation triad's blocking dependency is now satisfied**).
+**Last updated**: 2026-06-08 ~08:00 CEST (session 18 cluster re-run — **🎉 TRACK 2 ECOSYSTEM RE-RUN ✅ COMPLETE on CORRECTED climate: the validation triad runs on the corrected ecosystem outputs**).
+
+> **🎉 CORRECTED-CLIMATE RE-RUN COMPLETE (2026-06-08, session 18) — use THESE outputs for the paper, not the 2026-06-03 set.** After the 7 climate corrections (session 18, incl. the SW-floor), the full Track 2 set was re-run clean on the owl cluster (4 genius nodes, 509 ranks): HIST (`SSP2-4.5_cluster_hist/output-2026-06-07/`, 62,512 cells →2020 + state 509/509) + 5 SCEN (`<SSP>_cluster_scen/output-2026-06-0[78]/`, 62,512 cells 2020-2100, ~7.4-7.6 GB each). All `COMPLETED` 0:0; 0 NaN/negatives.
+> - **The corrected outputs are now climate-responsive** (the prior set used the near-isothermal pre-correction climate). cmass Total gain 2020→2100: SSP1-2.6 +0.51 < SSP3-7.0 +0.60 < SSP2-4.5 +0.61 < SSP4-6.0 +0.68 < SSP5-8.5 +0.71 kgC/m² — a **CO₂-fertilization-vs-warming-stress tradeoff** (SSP3-7.0 moderated by its +10.8 K warming; SSP5-8.5 highest as CO₂ dominates at the extreme), which the old isothermal set physically could not produce.
+> - **For Axis 1/4 ecosystem analysis: use the `output-2026-06-0[78]/` dirs** (rsync'd from the cluster, excl. the ~27 GB benign `warnings.txt`). The 2026-06-02/03 dirs are superseded (and were removed on the cluster).
 
 > **🎉 TRACK 2 PRODUCTION COMPLETE (2026-06-03, session 13 day 5) — paper-stage work can now proceed.** The full v1.0 GMD-paper production set is banked + physically verified on the owl cluster:
 > - **6 runs**: HIST (SSP2-4.5 shared baseline, `forks/trunk_r13078_runs/SSP2-4.5_cluster_hist/output-2026-06-02/`, 32 GB, 62,512 cells →2020 + state 509/509) + 5 SCEN (`forks/trunk_r13078_runs/<SSP>_cluster_scen/output-2026-06-0[23]/`, ~7.3-7.4 GB each, 57 gz vars, 62,512 cells, 2020-2100). SSPs: 1-2.6, 2-4.5, 3-7.0, 4-6.0 (B64-corrected lib), 5-8.5; all restart from the shared SSP2-4.5 HIST 2020 state (Track-1-style shared HIST).

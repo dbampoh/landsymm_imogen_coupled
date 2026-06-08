@@ -14,6 +14,24 @@ preserved in `_phase2_findings/` and is **immutable across releases**
 
 ## [Unreleased] — Rebuild in progress
 
+### 2026-06-08 (~08:00 CEST, session 18 cluster re-run — Track 2 ecosystem-state production runs ✅ RE-DONE on corrected climate + physically verified) — the corrected v1.0 GMD-paper production set is banked; supersedes the 2026-06-02/03 set
+
+**The Track 2 ecosystem-state production runs have been successfully re-done on the corrected climate** (all 7 corrections incl. the 6th/SW-floor), on the KIT owl cluster. All 6 runs (`COMPLETED` ExitCode 0:0):
+
+| Run | nodes | wall | output | cells |
+|-----|-------|------|--------|-------|
+| SSP2-4.5 HIST (shared) | genius[06-09] (4×128=509 ranks) | 6h08m | `SSP2-4.5_cluster_hist/output-2026-06-07/` | 62,512 →2020 + state 509/509 |
+| SSP1-2.6 / 2-4.5 / 3-7.0 / 4-6.0 / 5-8.5 SCEN | genius 4×128=509 ea. | ~1h20–1h28m ea. | `<SSP>_cluster_scen/output-2026-06-0[78]/` (~7.4–7.6 GB) | 62,512 each, 2020–2100 |
+
+- **Ran on 4 genius nodes this time** (not 8 milan as in session 13 — weber-j freed genius); same validated **509-rank Rule #9 #36/#37 config** + per-rank stdout redirect. Engines recompiled from the SW-floor source (`build_owl`, byte-traceable). All 5 SCENs restart from the shared SSP2-4.5 HIST 2020 state.
+- **6th-correction (SW≥0 floor) validated end-to-end**: the first attempt (job 611649) failed ~1977 on `interp_monthly_means_conserve` rejecting negative SW; after the workstation's SW-floor fix + library clamp, the re-run (612070) ran **clean past 1977 → 2020**. SW verified `min=0` across all 5 SSPs / all years before launch.
+- **Physical sensibility ✅ (richer than the superseded isothermal set)**: global-mean `cmass` Total gain 2020→2100 — SSP1-2.6 **+0.51** < SSP3-7.0 **+0.60** < SSP2-4.5 **+0.61** < SSP4-6.0 **+0.68** < SSP5-8.5 **+0.71** kgC/m². 2020 means ~identical (~3.41, correct shared-state restart); 0 NaN/negatives across 62,512 cells × 5 SCENs. The gradient now reflects the **CO₂-fertilization-vs-warming-stress tradeoff** — SSP3-7.0 is slightly moderated (below SSP2-4.5 despite higher CO₂) by its larger warming (+10.8 K); SSP5-8.5 highest (CO₂ wins at the extreme). This climate-responsive behavior is itself evidence the transient-warming correction landed (the old isothermal climate physically could not produce it).
+- **Cleanup before re-run**: work base wiped + state dir cleared + the 69 GB of superseded (pre-correction) outputs removed; the failed-attempt artifacts cleared.
+- **Note**: each output dir carries a ~27 GB `warnings.txt` of benign loose-mode `[ImogenOutput] could not open ...` noise — **exclude from rsync to the workstation**; candidate to trim from `finishup_lpj_work.sh`.
+- **NEXT**: rsync the 6 corrected outputs (excl. `warnings.txt`) + state + updated `_chat_artifacts/` → workstation; workstation resumes paper analysis on the corrected ecosystem results. No tracked source change this commit (re-run was operational; binaries are gitignored build artifacts); HEAD was `3e698d5`.
+
+**Doc cascade**: this CHANGELOG + FOLLOWUPS dashboard + CLUSTER_SETUP + PRODUCTION_RUN_CONFIG + PAPER_COMPLETION + chat-transfer bundle (project_state_summary + workstation handoff prompt).
+
 ### 2026-06-06 (session 18 — IMOGEN cppengine "cool-bias" ROOT-CAUSED + FIXED; precip/RH/wind/pressure climate forcing RESTORED; rice-CH4 SFo + MRI-EBM corrected; corrected 5-SSP δ-B-variant climate regenerated). **This materially changes the v1.0 climate forcing; cluster ecosystem re-runs are the next gate.** Six compounding, mutually-independent defects were found and fixed this session (a seventh, the shortwave non-negativity floor, was added 2026-06-07 after the cluster HIST re-run surfaced it — see (7)); all are pre-existing (present in the paper-to-date climate + the predecessor `version_A` lineage), none introduced here.
 
 - **(1) C++ IMOGEN engine "cool bias" = a code bug (`gcm_anlg`), not a physical emulator limit.** `forks/trunk_r13078/modules/climatemodel.cpp::gcm_anlg` (a) declared `dtemp_l` INSIDE the month loop and called `delta_temp` only for `im==0`, so only January received the pattern-scaled anomaly (Feb-Dec scaled by 0); (b) re-zeroed `output.dtemp_o` every call, so the ocean never accumulated heat. Result: ~+0.4 K century warming (SSP5-8.5 land) vs Fortran ~+15 K. **FIX (oceanfix)**: compute `dtemp_l` once per year + apply to all 12 months; add `const std::vector<double>& dtemp_o_in` param, init `output.dtemp_o` from the persistent main-loop `dtempO`, pass it at the call site. VALIDATED: fixed C++ +15.19 K uniform ≈ Fortran +15.30 K. **Applied to BOTH engine trees** (trunk_r13078 + lpjguess; byte-identical sources per LEDGER §1) — see TRUNK_R13078_BACKPORT_LEDGER.
