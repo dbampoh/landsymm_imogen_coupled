@@ -175,73 +175,81 @@ def sources_needed(comparisons: Iterable[str]) -> List[str]:
 
 @dataclass
 class OnlineMoments:
-    """Welford-style online stats for paired (a, b) and difference d = a - b."""
+    """Online weighted stats for paired (a, b) and difference d = a - b.
+    All statistics are cos-latitude (gridcell-area) weighted: each (cell, month)
+    sample carries the weight of its grid cell, so the reported global-mean bias,
+    RMSE and pattern statistics are true area means over the 0.5 deg lat-lon land
+    field rather than equal-per-cell averages (update with w=None reproduces the
+    former unweighted behaviour)."""
 
-    n: int = 0
-    sum_a: float = 0.0
-    sum_b: float = 0.0
-    sum_d: float = 0.0
-    sum_d2: float = 0.0
-    sum_abs_d: float = 0.0
-    sum_a2: float = 0.0
-    sum_b2: float = 0.0
-    sum_ab: float = 0.0
+    n: int = 0          # unweighted sample count (for n_samples reporting)
+    sw: float = 0.0     # sum of weights
+    swa: float = 0.0
+    swb: float = 0.0
+    swd: float = 0.0
+    swd2: float = 0.0
+    swabs: float = 0.0
+    swa2: float = 0.0
+    swb2: float = 0.0
+    swab: float = 0.0
 
-    def update(self, a: np.ndarray, b: np.ndarray) -> None:
-        a = np.asarray(a).ravel()
-        b = np.asarray(b).ravel()
-        m = a.size
-        if m == 0:
+    def update(self, a: np.ndarray, b: np.ndarray, w: np.ndarray = None) -> None:
+        a = np.asarray(a, dtype=float).ravel()
+        b = np.asarray(b, dtype=float).ravel()
+        if a.size == 0:
             return
-        self.n += m
-        self.sum_a += float(a.sum())
-        self.sum_b += float(b.sum())
+        if w is None:
+            w = np.ones_like(a)
+        else:
+            w = np.asarray(w, dtype=float).ravel()
+        self.n += a.size
+        self.sw += float(w.sum())
+        self.swa += float((w * a).sum())
+        self.swb += float((w * b).sum())
         d = a - b
-        self.sum_d += float(d.sum())
-        self.sum_d2 += float((d * d).sum())
-        self.sum_abs_d += float(np.abs(d).sum())
-        self.sum_a2 += float((a * a).sum())
-        self.sum_b2 += float((b * b).sum())
-        self.sum_ab += float((a * b).sum())
+        self.swd += float((w * d).sum())
+        self.swd2 += float((w * d * d).sum())
+        self.swabs += float((w * np.abs(d)).sum())
+        self.swa2 += float((w * a * a).sum())
+        self.swb2 += float((w * b * b).sum())
+        self.swab += float((w * a * b).sum())
 
     def pearson_r(self) -> float:
-        if self.n < 2:
+        if self.sw <= 0:
             return float("nan")
-        num = self.n * self.sum_ab - self.sum_a * self.sum_b
-        den_a = self.n * self.sum_a2 - self.sum_a**2
-        den_b = self.n * self.sum_b2 - self.sum_b**2
+        num = self.sw * self.swab - self.swa * self.swb
+        den_a = self.sw * self.swa2 - self.swa**2
+        den_b = self.sw * self.swb2 - self.swb**2
         if den_a <= 0 or den_b <= 0:
             return float("nan")
         return num / np.sqrt(den_a * den_b)
 
     def bias(self) -> float:
-        return self.sum_d / self.n if self.n else float("nan")
+        return self.swd / self.sw if self.sw else float("nan")
 
     def rmse(self) -> float:
-        return np.sqrt(self.sum_d2 / self.n) if self.n else float("nan")
+        return np.sqrt(self.swd2 / self.sw) if self.sw else float("nan")
 
     def mae(self) -> float:
-        return self.sum_abs_d / self.n if self.n else float("nan")
+        return self.swabs / self.sw if self.sw else float("nan")
 
     def mean_a(self) -> float:
-        return self.sum_a / self.n if self.n else float("nan")
+        return self.swa / self.sw if self.sw else float("nan")
 
     def mean_b(self) -> float:
-        return self.sum_b / self.n if self.n else float("nan")
+        return self.swb / self.sw if self.sw else float("nan")
 
     def std_a(self) -> float:
-        if self.n < 2:
+        if self.sw <= 0:
             return float("nan")
         m = self.mean_a()
-        v = self.sum_a2 / self.n - m * m
-        return float(np.sqrt(max(v, 0.0)))
+        return float(np.sqrt(max(self.swa2 / self.sw - m * m, 0.0)))
 
     def std_b(self) -> float:
-        if self.n < 2:
+        if self.sw <= 0:
             return float("nan")
         m = self.mean_b()
-        v = self.sum_b2 / self.n - m * m
-        return float(np.sqrt(max(v, 0.0)))
+        return float(np.sqrt(max(self.swb2 / self.sw - m * m, 0.0)))
 
 
 def build_isimip_indices(lon: np.ndarray, lat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -431,24 +439,33 @@ class WindowAccum:
             self.cnt_pt[k] = np.zeros(self.npts, dtype=np.float64)
 
 
-def spatial_taylor_stats(a_bar: np.ndarray, b_bar: np.ndarray) -> Dict[str, float]:
-    """Taylor-diagram inputs from window-mean fields. Reference = ISIMIP (b)."""
+def spatial_taylor_stats(a_bar: np.ndarray, b_bar: np.ndarray,
+                         lat: np.ndarray = None) -> Dict[str, float]:
+    """Taylor-diagram inputs from window-mean fields. Reference = ISIMIP (b).
+    cos-latitude (gridcell-area) weighted when lat is provided, so the spatial
+    means, standard deviations, pattern correlation and centred RMSD are
+    area-weighted statistics of the 0.5 deg lat-lon field."""
     ok = np.isfinite(a_bar) & np.isfinite(b_bar)
-    a_bar = a_bar[ok]
-    b_bar = b_bar[ok]
+    a_bar = np.asarray(a_bar)[ok]
+    b_bar = np.asarray(b_bar)[ok]
     if a_bar.size < 2:
         return {k: float("nan") for k in ("std_imogen_spatial", "std_isimip_spatial",
                 "std_ratio", "spatial_pattern_r", "centered_rmsd_spatial",
                 "spatial_mean_imogen", "spatial_mean_isimip")}
-    am = float(a_bar.mean())
-    bm = float(b_bar.mean())
-    sa = float(a_bar.std())
-    sb = float(b_bar.std())
+    if lat is not None:
+        w = np.cos(np.deg2rad(np.asarray(lat)[ok]))
+    else:
+        w = np.ones_like(a_bar)
+    W = float(w.sum())
+    am = float((w * a_bar).sum() / W)
+    bm = float((w * b_bar).sum() / W)
     da = a_bar - am
     db = b_bar - bm
-    denom = np.sqrt((da * da).sum() * (db * db).sum())
-    corr = float((da * db).sum() / denom) if denom > 0 else float("nan")
-    crmsd = float(np.sqrt(((da - db) ** 2).mean()))
+    sa = float(np.sqrt((w * da * da).sum() / W))
+    sb = float(np.sqrt((w * db * db).sum() / W))
+    denom = np.sqrt((w * da * da).sum() * (w * db * db).sum())
+    corr = float((w * da * db).sum() / denom) if denom > 0 else float("nan")
+    crmsd = float(np.sqrt((w * (da - db) ** 2).sum() / W))
     return {
         "std_imogen_spatial": sa,
         "std_isimip_spatial": sb,
@@ -477,6 +494,7 @@ def run_scenario(
 
     coord_year = min(w[3] for w in windows)
     lon, lat = load_imogen_coords(imogen_root, coord_year)
+    cosw = np.cos(np.deg2rad(lat))   # cos-latitude gridcell-area weights
     ilat, ilon = build_isimip_indices(lon, lat)
     npts = lon.size
     print(f"  {npts} IMOGEN land points; comparisons={comparisons}")
@@ -504,20 +522,18 @@ def run_scenario(
                         a = imog[key][:, m]
                         b = isim[key][m]
                         ok = np.isfinite(a) & np.isfinite(b)
-                        if not ok.all():
-                            a_ok = a[ok]
-                            b_ok = b[ok]
-                        else:
-                            a_ok = a
-                            b_ok = b
-                        acc.moments[key].update(a_ok, b_ok)
-                        # per-point window-mean accumulation (NaN-safe)
+                        a_ok = a[ok]
+                        b_ok = b[ok]
+                        w_ok = cosw[ok]
+                        acc.moments[key].update(a_ok, b_ok, w_ok)
+                        # per-point window-mean accumulation (NaN-safe; per-cell, time-mean)
                         acc.sum_a_pt[key][ok] += a[ok]
                         acc.sum_b_pt[key][ok] += b[ok]
                         acc.cnt_pt[key][ok] += 1.0
-                        annual_means[key]["a"] += float(a_ok.sum())
-                        annual_means[key]["b"] += float(b_ok.sum())
-                        annual_means[key]["n"] += int(a_ok.size)
+                        # cos-lat area-weighted annual spatial mean
+                        annual_means[key]["a"] += float((w_ok * a_ok).sum())
+                        annual_means[key]["b"] += float((w_ok * b_ok).sum())
+                        annual_means[key]["n"] += float(w_ok.sum())
                 acc.n_months += 12
                 for key in comparisons:
                     n = max(annual_means[key]["n"], 1)
@@ -584,7 +600,7 @@ def _finalize_window(
     summary_rows: List[Dict[str, float]] = []
     for key in comparisons:
         om = acc.moments[key]
-        tay = spatial_taylor_stats(a_bar[key], b_bar[key])
+        tay = spatial_taylor_stats(a_bar[key], b_bar[key], lat)
         summary_rows.append(
             {
                 "scenario": scen_hyphen,

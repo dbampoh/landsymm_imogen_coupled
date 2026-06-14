@@ -399,7 +399,7 @@ def plot_trend_overlay(imogen: pd.DataFrame,
         ax.axvline(SCENARIO_START, color="grey", linestyle=":", linewidth=0.8)
         ax.set_xlabel("Year")
         ax.set_ylabel(f"{label} ({unit})")
-        ax.set_title(f"Atmospheric {label}: IMOGEN vs observed")
+        ax.set_title(f"({'abc'[i - 1]}) Atmospheric {label}: IMOGEN vs observed")
         ax.legend(fontsize=8, ncol=2)
         ax.grid(True, alpha=0.3)
         fig.tight_layout()

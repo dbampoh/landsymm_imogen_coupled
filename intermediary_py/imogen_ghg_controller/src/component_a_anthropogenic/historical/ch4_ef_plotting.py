@@ -119,9 +119,8 @@ def sax(ax, ylim=None):
 fig, axes = plt.subplots(2,2,figsize=(14,10))
 fig.patch.set_facecolor('#fafaf8')
 for ax in axes.flat: ax.set_facecolor('#fafaf8')
-fig.suptitle('CH4 Emissions -- Enteric Fermentation\n'
-             'IPCC 2019 Tier 1 vs FAO FAOSTAT GLE vs EDGAR (3.A.1) vs RCMIP CMIP6  |  1970-2020',
-             fontsize=12, fontweight='bold', color='#1a1a1a', y=0.99)
+fig.suptitle('CH4 Emissions - Enteric Fermentation',
+             fontsize=13, fontweight='bold', color='#1a1a1a', y=0.99)
 
 # Panel 1 -- Global totals
 ax = axes[0,0]
@@ -173,14 +172,7 @@ ax.set_ylabel('CH4 (Tg yr⁻¹)', **LK); ax.set_xlabel('Year', **LK)
 sax(ax, (0,160))
 ax.legend(fontsize=7, loc='upper left', framealpha=0.9, edgecolor=SC, fancybox=False)
 
-fig.text(0.5, 0.003,
-    f'2020: LandSyMM={our_tot[-1]:.3f}Tg | FAO={fao[-1]:.3f}Tg | '
-    f'EDGAR={edgar[-1]:.3f}Tg | RCMIP-derived={rcmip_ef[-1]:.3f}Tg  |  '
-    f'RCMIP: CMIP6 hist+SSP2-4.5; 2016-2019 linearly interpolated; EDGAR 3.A.1 proportion',
-    ha='center', fontsize=7, color='#555555', style='italic',
-    bbox=dict(boxstyle='round,pad=0.4', facecolor='#f5f5f0', edgecolor='#cccccc', alpha=0.9))
-
-plt.tight_layout(rect=[0,0.04,1,0.97])
+plt.tight_layout(rect=[0,0,1,0.96])
 plt.savefig(FIG_DIR + 'ch4_ef_trends.png', dpi=300, bbox_inches='tight',
             facecolor=fig.get_facecolor())
 plt.close()

@@ -28,11 +28,11 @@ for scen in ["SSP1-2.6", "SSP5-8.5"]:
     ax.plot(x, get(scen, "subst_opt2"), "--s", color=c, lw=1.4, mfc="white",
             label=f"{scen}: CH$_4$/N$_2$O substitution only")
 ax.set_xticks(list(x)); ax.set_xticklabels(WINDOWS)
-ax.set_ylabel("Emission-pathway feedback on global-land-mean\ntemperature, IMOGEN integrated $-$ RCMIP control (K)")
+ax.set_ylabel("Emission-pathway feedback on global-land-mean\ntemperature, IMOGEN integrated minus RCMIP control (K)")
 ax.set_xlabel("Analysis window")
 ax.set_ylim(-1.0, 1.0)
 ax.grid(alpha=0.3)
-ax.text(0.02, 0.97, "Total coupled $-$ ISIMIP-3b difference: $+1.3$ to $+5.0$ K (Table 12)\nso the emission-pathway feedback is a small fraction of the total",
+ax.text(0.02, 0.97, "Total coupled minus ISIMIP-3b difference: +1.3 to +4.6 K (Table 12)\nso the emission-pathway feedback is a small fraction of the total",
         transform=ax.transAxes, va="top", ha="left", fontsize=8, color="0.25")
 ax.legend(fontsize=7.5, loc="lower left", ncol=1, framealpha=0.9)
 ax.set_title("Identical-emulator diagnostic: emission-pathway feedback on temperature", fontsize=10)

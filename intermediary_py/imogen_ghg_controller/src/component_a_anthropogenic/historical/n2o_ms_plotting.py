@@ -113,9 +113,8 @@ def sax(ax, ylim=None):
 fig, axes = plt.subplots(2,2,figsize=(14,10))
 fig.patch.set_facecolor("#fafaf8")
 for ax in axes.flat: ax.set_facecolor("#fafaf8")
-fig.suptitle("N2O Managed Soils (Agricultural Soils)\n"
-             "IPCC 2019 Tier 1 vs FAO GLE vs EDGAR (3.C.4+3.C.5) vs RCMIP CMIP6 | 1970-2020",
-             fontsize=12, fontweight="bold", color="#1a1a1a", y=0.99)
+fig.suptitle("N2O Managed Soils (Agricultural Soils)",
+             fontsize=13, fontweight="bold", color="#1a1a1a", y=0.99)
 
 # Panel 1: Global totals with and without PRP
 ax = axes[0,0]
@@ -123,12 +122,12 @@ ax.fill_between(yr, t_np19, t_wp19, alpha=0.15, color=C_WP19)
 ax.plot(yr, rcmip_ms, color=C_RCP, linewidth=2.0, linestyle=RLS,
         label="RCMIP CMIP6 (EDGAR 3.C.4+3.C.5 prop.)")
 ax.plot(yr, edgar_tot, color=C_EDG, linewidth=1.8, linestyle="-.", label="EDGAR (3.C.4+3.C.5)")
-ax.plot(yr, t_wp06, color=C_WP06, linewidth=1.4, linestyle=":", label="2006 params -- with PRP")
-ax.plot(yr, t_np19, color=C_NP19, linewidth=2.0, linestyle="--", label="2019 params -- without PRP")
-ax.plot(yr, t_wp19, color=C_WP19, linewidth=2.2, label="2019 params -- with PRP")
+ax.plot(yr, t_wp06, color=C_WP06, linewidth=1.4, linestyle=":", label="2006 params - with PRP")
+ax.plot(yr, t_np19, color=C_NP19, linewidth=2.0, linestyle="--", label="2019 params - without PRP")
+ax.plot(yr, t_wp19, color=C_WP19, linewidth=2.2, label="2019 params - with PRP")
 ax.plot(yr, fao_wp, color=C_FAO, linewidth=2.5, linestyle=":", label="FAO Agricultural Soils")
 ax.plot(yr, fao_np, color=C_FAO, linewidth=1.5, linestyle="-.", label="FAO without PRP")
-ax.set_title("Global N2O Totals -- With and Without PRP", **TK)
+ax.set_title("Global N2O Totals - With and Without PRP", **TK)
 ax.set_ylabel("N2O (Tg yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
 sax(ax, (1.0, 10.5))
 ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=False)
@@ -154,7 +153,7 @@ ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=F
 ax.text(2019, 10.2,
     "Stacked = EF1 x N-input per pathway (direct only).\n"
     "Indirect (volatilisation + leaching) not decomposed\n"
-    "per pathway -- stack falls short of total ref. lines.",
+    "per pathway - stack falls short of total ref. lines.",
     ha="right", va="top", fontsize=6.5, color="#555555",
     bbox=dict(boxstyle="round,pad=0.3", facecolor="#f9f9f4", edgecolor=SC, alpha=0.85))
 
@@ -186,15 +185,7 @@ ax.set_ylabel("N2O (Tg yr\u207b\u00b9)", **LK); ax.set_xlabel("Year", **LK)
 sax(ax, (0, 8.5))
 ax.legend(fontsize=7, loc="upper left", framealpha=0.9, edgecolor=SC, fancybox=False)
 
-fig.text(0.5, 0.003,
-    f"2020: NoPRP={t_np19[-1]:.3f}Tg | WithPRP={t_wp19[-1]:.3f}Tg | "
-    f"FAO(noPRP)={fao_np[-1]:.3f}Tg | FAO(total)={fao_wp[-1]:.3f}Tg | "
-    f"EDGAR={edgar_tot[-1]:.3f}Tg | RCMIP-derived={rcmip_ms[-1]:.3f}Tg  |  "
-    f"FSOM from FAO published | RCMIP: hist+SSP2-4.5 (2016-2019 interpolated)",
-    ha="center", fontsize=7, color="#555555", style="italic",
-    bbox=dict(boxstyle="round,pad=0.4", facecolor="#f5f5f0", edgecolor="#cccccc", alpha=0.9))
-
-plt.tight_layout(rect=[0,0.04,1,0.97])
+plt.tight_layout(rect=[0,0,1,0.96])
 plt.savefig(FIG_DIR + 'n2o_ms_trends.png', dpi=300, bbox_inches="tight",
             facecolor=fig.get_facecolor())
 plt.close()

@@ -24,7 +24,7 @@ LAYOUT  (6 panels, 2 rows × 3 columns)
       - Default_total          (gray dotted thick, lw 1.4)
       - Historical budget step bands (GMB/GNB/GCB), light blue fill
 
-  Row 2: ΔIntegrated panels (Our_integrated_total − Default_total)
+  Row 2: ΔIntegrated panels (Our_integrated_total - Default_total)
     One filled band per scenario, with percentage-at-2100 annotation.
     Shows the net effect of replacing (RCMIP_anthro, FAIR_natural) with
     (Our_anthro_post_sub, LPJ_natural).
@@ -91,8 +91,8 @@ HIST_END = 2014                # last year before RCMIP scenarios diverge
 # -----------------------------------------------------------------------------
 # BUDGET REFERENCE VALUES (historical period only; documented in PROJECT_HANDOFF.md §6)
 # -----------------------------------------------------------------------------
-# GMB 2025 wetland + IFW − DCC, in Mt CH4/yr (combined natural CH4 best+range)
-# Best: wetland_best + IFW_best (112) − DCC_best (-23). Same for low/hi.
+# GMB 2025 wetland + IFW - DCC, in Mt CH4/yr (combined natural CH4 best+range)
+# Best: wetland_best + IFW_best (112) - DCC_best (-23). Same for low/hi.
 GMB_PERIODS_CH4 = [   # (y0, y1, wet_best, wet_lo, wet_hi)
     (2000, 2009, 159, 119, 203),
     (2010, 2019, 153, 116, 189),
@@ -204,9 +204,8 @@ fig.patch.set_facecolor('#fafaf8')
 for ax in axes.flat: ax.set_facecolor('#fafaf8')
 
 fig.suptitle(
-    'Integrated GHG Emission Trajectories (Anthropogenic + Natural) | 1900-2100 | Five SSP-RCP Scenarios\n'
-    'Anthropogenic: RCMIP-substituted (CH4, N2O) or RCMIP EFOS (CO2)  ·  Natural: LPJ-GUESS DGVM',
-    fontsize=12, fontweight='bold', color='#1a1a1a', y=0.995)
+    'Integrated GHG emission trajectories vs the scenario-baseline reference (RCMIP+FaIR), 1900-2100 (five SSP-RCP scenarios)',
+    fontsize=13, fontweight='bold', color='#1a1a1a', y=0.995)
 
 
 def panel_top(ax, df, gas_label, unit_label, ylim=None, draw_budget_band=None):
@@ -220,13 +219,13 @@ def panel_top(ax, df, gas_label, unit_label, ylim=None, draw_budget_band=None):
     if draw_budget_band is not None:
         draw_budget_band(ax)
 
-    # 2. FAIR-ERF natural reference — single shared line in gray
+    # 2. FAIR-ERF natural reference - single shared line in gray
     fair_default = df[df.Scenario == SCENARIOS[0]].sort_values('Year')
     ax.plot(fair_default['Year'], fair_default['FAIR_natural_Mt'],
             color='#666666', lw=1.2, ls='--', alpha=0.6, zorder=2,
-            label='FAIR-ERF v1.3 natural (constant after 2005)' if gas_label != 'CO2' else None)
+            label='FaIR-ERF v1.3 natural (constant after 2005)' if gas_label != 'CO2' else None)
 
-    # 3. Historical period — drawn once in black for all decomposition layers
+    # 3. Historical period - drawn once in black for all decomposition layers
     sub_h = df[df.Scenario == SCENARIOS[0]].sort_values('Year')
     yrs_full = sub_h['Year'].values
 
@@ -249,7 +248,7 @@ def panel_top(ax, df, gas_label, unit_label, ylim=None, draw_budget_band=None):
             alpha=0.95, zorder=7,
             label=f'Historical (1900-{HIST_END})')
 
-    # 4. Scenario period — per-scenario lines
+    # 4. Scenario period - per-scenario lines
     for scen in SCENARIOS:
         sub = df[df.Scenario == scen].sort_values('Year')
         c = SCEN_COLORS[scen]
@@ -277,21 +276,21 @@ def panel_top(ax, df, gas_label, unit_label, ylim=None, draw_budget_band=None):
     if ylim is not None:
         ax.set_ylim(*ylim)
 
-    ax.set_title(f'{gas_label} — Integrated Trajectory (anthropogenic + natural)', **TK)
+    ax.set_title(f'{gas_label} - Integrated Trajectory (anthropogenic + natural)', **TK)
     ax.set_ylabel(f'{gas_label} ({unit_label})', **LK)
     ax.set_xlabel('Year', **LK)
     sax(ax)
 
 
 def panel_diff(ax, df, gas_label, unit_label, ylim=None):
-    """Draw the bottom-row Δ panel: Our_total − Default_total.
+    """Draw the bottom-row Δ panel: Our_total - Default_total.
        Historical period (≤ HIST_END) drawn once in black; scenarios diverge
        from HIST_END+1 in their respective colors. Smoothed with 10-yr running
        mean (separately on hist and scenario segments). Percentage labels
        at year 2100 per scenario."""
     ax.axhline(0, color='#888888', lw=0.8, alpha=0.5)
 
-    # Historical Δ — drawn once in black
+    # Historical Δ - drawn once in black
     sub_h = df[df.Scenario == SCENARIOS[0]].sort_values('Year')
     yrs_full = sub_h['Year'].values
     delta_full_raw = sub_h['Total_Mt'].values - sub_h['Default_total_Mt'].values
@@ -312,11 +311,11 @@ def panel_diff(ax, df, gas_label, unit_label, ylim=None):
         ax.fill_between(s_yrs, 0, s_delta, color=c, alpha=0.18, edgecolor='none')
         ax.plot(s_yrs, s_delta, color=c, lw=1.6, label=scen, zorder=3)
 
-        # Label at 2100 — gas-aware (see conventional_comparator_plotting.py for rationale):
+        # Label at 2100 - gas-aware (see conventional_comparator_plotting.py for rationale):
         #   CH4 and N2O denominators stay strongly positive at 2100 → use percent.
         #   CO2 Default_total can become small/negative at 2100 (e.g. SSP1-2.6
         #   has net-negative DAC, making percent ratio sign-flip and mislead).
-        #   Use Pg C/yr for CO2 — natural diagnostic for sink magnitude.
+        #   Use Pg C/yr for CO2 - natural diagnostic for sink magnitude.
         idx_2100 = np.where(years == 2100)[0]
         if len(idx_2100):
             v_2100 = delta[idx_2100[0]]
@@ -339,7 +338,7 @@ def panel_diff(ax, df, gas_label, unit_label, ylim=None):
     ax.axvline(1970, color='#888888', lw=0.6, ls=':', alpha=0.5)
     ax.axvline(HIST_END + 0.5, color='#888888', lw=0.7, ls=':', alpha=0.65)
     if ylim is not None: ax.set_ylim(*ylim)
-    ax.set_title(f'Δ {gas_label}: Integrated − (RCMIP + FAIR), 10-yr running mean',
+    ax.set_title(f'Δ {gas_label}: Integrated - (RCMIP + FaIR), 10-yr running mean',
                  fontsize=10, fontweight='bold', color='#1a1a1a', pad=4)
     ax.set_ylabel(f'Δ ({unit_label})', **LK)
     ax.set_xlabel('Year', **LK)
@@ -355,9 +354,9 @@ def draw_ch4_band(ax):
     los   = [gmb_combined(p)[1] for p in GMB_PERIODS_CH4]
     his   = [gmb_combined(p)[2] for p in GMB_PERIODS_CH4]
     step_band(ax, pairs, los, his, alpha=0.14,
-              label='GMB 2025 wet+IFW−DCC range')
+              label='GMB 2025 wet+IFW-DCC range')
     step_line(ax, pairs, bests, color='#2166ac', lw=1.6, ls='--',
-              label='GMB 2025 wet+IFW−DCC best')
+              label='GMB 2025 wet+IFW-DCC best')
 
 panel_top(axes[0, 0], df_ch4, 'CH4', 'Tg CH4 yr$^{-1}$',
           ylim=(0, 1300), draw_budget_band=draw_ch4_band)
@@ -428,7 +427,7 @@ def linestyle_handles():
         Line2D([], [], color='#1a1a1a', lw=2.6, ls='-',
                label='Integrated total (10-yr mean)'),
         Line2D([], [], color='#666666', lw=1.2, ls='--',
-               label='FAIR-ERF natural reference'),
+               label='FaIR-ERF natural reference'),
     ]
 
 def scenario_handles(thick=False):
@@ -446,7 +445,7 @@ def budget_handles(gas):
     if gas == 'CH4':
         return [
             Line2D([], [], color='#2166ac', lw=1.6, ls='--',
-                   label='GMB 2025 wet+IFW−DCC best'),
+                   label='GMB 2025 wet+IFW-DCC best'),
             Patch(facecolor='#2166ac', alpha=0.18, edgecolor='none',
                   label='GMB 2025 range'),
         ]
@@ -488,20 +487,7 @@ for col, gas in enumerate(['CH4', 'N2O', 'CO2']):
                         title='Period', title_fontsize=7.2)
 
 # Footer
-fig.text(
-    0.5, 0.005,
-    'CH4 anthro: rcmip_substitution_ch4.csv New_total (RCMIP non-agri + our IPCC Tier 1 / PLUMv2 ag).  '
-    'N2O anthro: rcmip_substitution_n2o.csv New_total (same).  '
-    'CO2 anthro: rcmip_co2.csv EFOS only (Emissions|CO2|MAGICC Fossil and Industrial; no Tier 1 substitution exists for CO2). '
-    'Natural: LPJ-GUESS combined CH4 = wetland + GMB IFW (+112) − GMB DCC (-23 best); soil + fire N2O; NEE for CO2 (× 44/12 × 1000).  '
-    '"Default total" = RCMIP_total + FAIR-ERF natural baseline.  '
-    'Vertical dotted lines at 1970 (Tier 1 inventory start) and 2014.5 (historical→scenario splice; RCMIP scenarios diverge from 2015). '
-    'Pre-2015 trajectory is identical across scenarios and rendered in BLACK; per-scenario coloured lines begin at 2015.',
-    ha='center', fontsize=6.4, color='#555555', style='italic',
-    bbox=dict(boxstyle='round,pad=0.4', facecolor='#f5f5f0',
-              edgecolor='#cccccc', alpha=0.9), wrap=True)
-
-plt.tight_layout(rect=[0, 0.04, 1, 0.97])
+plt.tight_layout(rect=[0, 0, 1, 0.96])
 out = os.path.join(OUT_DIR, 'integrated_emissions_comparison.png')
 plt.savefig(out, dpi=300, facecolor=fig.get_facecolor())
 plt.close()

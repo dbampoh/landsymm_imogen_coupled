@@ -24,9 +24,9 @@ Row 1: full-trajectory comparison per gas (one panel each)
    - Hybrid comparator uncertainty band per-scenario (shaded)
    - Source-segment shading at the bottom of the panel as a thin strip
 
-Row 2: zoomed-in view of the historical period (1900-2020) — same content
+Row 2: zoomed-in view of the historical period (1900-2020) - same content
    but x-limited so the budget-anchored agreement is legible. (We omit
-   this — better to use a single full-range panel and let the legend
+   this - better to use a single full-range panel and let the legend
    document.)
 
 We'll instead use 2 rows: top = trajectories, bottom = residuals over time.
@@ -83,9 +83,9 @@ HIST_END = 2014                # last year before RCMIP scenarios diverge
 CMP_COLOR = '#08519c'
 
 UNIT = {
-    'CH4': 'Mt CH4 yr$^{-1}$',
-    'N2O': 'Mt N2O yr$^{-1}$',
-    'CO2': 'Mt CO2 yr$^{-1}$',
+    'CH4': 'Mt CH$_4$ yr$^{-1}$',
+    'N2O': 'Mt N$_2$O yr$^{-1}$',
+    'CO2': 'Gt CO$_2$ yr$^{-1}$',
 }
 
 # Load
@@ -93,6 +93,13 @@ df_int = {gas: pd.read_csv(os.path.join(DATA_DIR, f'integrated_emissions_{gas.lo
           for gas in ['CH4', 'N2O', 'CO2']}
 df_hyb = {gas: pd.read_csv(os.path.join(DATA_DIR, f'hybrid_comparator_{gas.lower()}.csv'))
           for gas in ['CH4', 'N2O', 'CO2']}
+
+# CO2 data are stored in Mt CO2 yr-1; express them in Gt CO2 yr-1 for legible axes
+# consistent with Table 10 and the main text.
+for _d in (df_int['CO2'], df_hyb['CO2']):
+    for _col in _d.columns:
+        if _col.endswith('_Mt'):
+            _d[_col] = _d[_col] * 1e-3
 
 # Style
 SC = '#cccccc'
@@ -141,10 +148,8 @@ fig.patch.set_facecolor('#fafaf8')
 for ax in axes.flat: ax.set_facecolor('#fafaf8')
 
 fig.suptitle(
-    'Integrated GHG Emission Trajectories vs Hybrid Full-Trajectory Comparator | 1900-2100 | Five SSP-RCP Scenarios\n'
-    'Comparator: 1900-1979 = RCMIP+FAIR-ERF (or RCMIP-SLAND+FAIR for CO2); '
-    '1980-2020 = budget top-down (GMB/GNB/GCB); 2021-2100 = RCMIP+FAIR continued',
-    fontsize=11, fontweight='bold', color='#1a1a1a', y=0.995)
+    'Integrated GHG emission trajectories vs the observation-anchored reference, 1900-2100 (five SSP-RCP scenarios)',
+    fontsize=13, fontweight='bold', color='#1a1a1a', y=0.995)
 
 
 def panel_traj(ax, gas, ylim=None):
@@ -207,13 +212,11 @@ def panel_traj(ax, gas, ylim=None):
     if len(bud_years):
         ax.axvspan(bud_years.min() - 0.5, bud_years.max() + 0.5,
                    facecolor='#f5e8d0', alpha=0.30, zorder=1)
-        if ylim is not None:
-            txt_y = ylim[1] * 0.96
-        else:
-            txt_y = ax.get_ylim()[1] * 0.96
+        _lo, _hi = ylim if ylim is not None else ax.get_ylim()
+        txt_y = _lo + 0.08 * (_hi - _lo)
         ax.text((bud_years.min() + bud_years.max()) / 2, txt_y,
-                'Budget-anchored\n(top-down inversions)', ha='center', va='top',
-                fontsize=7.5, color='#8a6d2f', fontweight='bold',
+                'Anchored to observational\nbudgets (1980-2020)', ha='center', va='bottom',
+                fontsize=8.5, color='#8a6d2f', fontweight='bold',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='#fcf6e6',
                           edgecolor='#d4b984', alpha=0.85), zorder=3)
 
@@ -221,19 +224,21 @@ def panel_traj(ax, gas, ylim=None):
     ax.axvline(1970, color='#888888', lw=0.6, ls=':', alpha=0.55)
     ax.axvline(HIST_END + 0.5, color='#888888', lw=0.7, ls=':', alpha=0.65)
     if ylim is not None: ax.set_ylim(*ylim)
-    ax.set_title(f'{gas} — Integrated vs Hybrid Comparator', **TK)
-    ax.set_ylabel(f'{gas} ({UNIT[gas]})', **LK)
+    gas_lbl = {'CH4': 'CH$_4$', 'N2O': 'N$_2$O', 'CO2': 'CO$_2$'}[gas]
+    ax.set_title(f'{gas_lbl} - integrated emissions vs observation-anchored reference',
+                 fontsize=12, fontweight='bold', color='#1a1a1a', pad=6)
+    ax.set_ylabel(f'{gas_lbl} ({UNIT[gas]})', **LK)
     ax.set_xlabel('Year', **LK)
     sax(ax)
 
 
 panel_traj(axes[0, 0], 'CH4', ylim=(0, 1300))
 panel_traj(axes[0, 1], 'N2O', ylim=(0, 50))
-panel_traj(axes[0, 2], 'CO2', ylim=(-30000, 140000))
+panel_traj(axes[0, 2], 'CO2', ylim=(-30, 140))
 
 
 def panel_residual(ax, gas, ylim=None):
-    """Residual = our integrated total − hybrid comparator (smoothed).
+    """Residual = our integrated total - hybrid comparator (smoothed).
     Historical period drawn in black (identical across scenarios pre-HIST_END);
     scenario period drawn per-scenario in colour."""
     df = df_int[gas]; hyb = df_hyb[gas]
@@ -265,14 +270,14 @@ def panel_residual(ax, gas, ylim=None):
 
         # Gas-aware label at 2100:
         #   CH4 / N2O: percent of comparator denominator (stable, strongly positive)
-        #   CO2: absolute Pg C/yr (denominator can be small or negative —
+        #   CO2: absolute Pg C/yr (denominator can be small or negative -
         #        e.g. SSP1-2.6 hybrid 2100 ≈ -17 Gt due to RCMIP DAC; percent
         #        ratio sign-flip would mislead).
         idx_2100 = np.where(years == 2100)[0]
         if len(idx_2100):
             v_2100 = residual_smooth[idx_2100[0]]
             if gas == 'CO2':
-                v_PgC = v_2100 / 3666.67   # Mt CO2/yr → Pg C/yr
+                v_PgC = v_2100 / 3.66667   # Gt CO2/yr -> Pg C/yr (x 12/44)
                 ax.annotate(f'{v_PgC:+.2f} PgC/yr',
                             xy=(2100, v_2100),
                             xytext=(2102, v_2100), color=c, fontsize=7.5,
@@ -296,9 +301,10 @@ def panel_residual(ax, gas, ylim=None):
     ax.axvline(1970, color='#888888', lw=0.6, ls=':', alpha=0.5)
     ax.axvline(HIST_END + 0.5, color='#888888', lw=0.7, ls=':', alpha=0.65)
     if ylim is not None: ax.set_ylim(*ylim)
-    ax.set_title(f'Δ {gas}: LandSyMM integrated − hybrid comparator (10-yr running mean)',
-                 fontsize=10, fontweight='bold', color='#1a1a1a', pad=4)
-    ax.set_ylabel(f'Δ ({UNIT[gas]})', **LK)
+    gas_lbl = {'CH4': 'CH$_4$', 'N2O': 'N$_2$O', 'CO2': 'CO$_2$'}[gas]
+    ax.set_title(f'\u0394 {gas_lbl}: integrated - observation-anchored reference (10-yr running mean)',
+                 fontsize=10.5, fontweight='bold', color='#1a1a1a', pad=4)
+    ax.set_ylabel(f'\u0394 ({UNIT[gas]})', **LK)
     ax.set_xlabel('Year', **LK)
     sax(ax)
 
@@ -325,52 +331,41 @@ panel_residual(axes[1, 2], 'CO2', ylim=auto_ylim_residual('CO2'))
 
 
 # Comprehensive legends
+# Line-style key (resolves the solid-vs-dashed ambiguity flagged in review):
+#   solid = LandSyMM integrated total; dashed = observation-anchored reference.
+style_handles = [
+    Line2D([], [], color='#555555', lw=2.6, ls='-', label='LandSyMM integrated total (solid)'),
+    Line2D([], [], color='#555555', lw=1.4, ls='--', label='Observation-anchored reference (dashed)'),
+]
 scen_handles = [Line2D([], [], color=SCEN_COLORS[s], lw=2.6, ls='-', label=s)
                 for s in SCENARIOS]
 hist_handle = Line2D([], [], color=HIST_COLOR, lw=2.6, ls='-',
-                     label=f'Historical (1900-{HIST_END})')
+                     label=f'Shared historical (1900-{HIST_END})')
 
 for col, gas in enumerate(['CH4', 'N2O', 'CO2']):
     cmp_handles = [
-        Line2D([], [], color='#666666', lw=1.4, ls='--',
-               label='Hybrid comparator best'),
         Patch(facecolor='#cccccc', alpha=0.30, edgecolor='none',
-              label='Comparator uncertainty band'),
+              label='Reference uncertainty band'),
         Patch(facecolor='#f5e8d0', alpha=0.45, edgecolor='#d4b984',
-              label='Budget-anchored region'),
+              label='Observation-anchored window (1980-2020)'),
     ]
-    handles = [hist_handle] + scen_handles + cmp_handles
-    axes[0, col].legend(handles=handles, fontsize=7.4, loc='upper left',
+    handles = style_handles + [hist_handle] + scen_handles + cmp_handles
+    axes[0, col].legend(handles=handles, fontsize=7.8, loc='upper left',
                         framealpha=0.93, edgecolor=SC, fancybox=False,
                         ncol=1, handlelength=2.0, handletextpad=0.5,
-                        labelspacing=0.4,
-                        title='Period + Scenarios + Comparator',
-                        title_fontsize=7.6)
+                        labelspacing=0.4)
 
 for col, gas in enumerate(['CH4', 'N2O', 'CO2']):
     cmp_band = [Patch(facecolor=CMP_COLOR, alpha=0.08, edgecolor='none',
-                       label='Comparator ±1σ band')]
+                       label='Reference uncertainty band')]
     handles = [hist_handle] + scen_handles + cmp_band
-    axes[1, col].legend(handles=handles, fontsize=7.0, loc='upper left',
+    axes[1, col].legend(handles=handles, fontsize=7.2, loc='upper left',
                         framealpha=0.93, edgecolor=SC, fancybox=False,
                         ncol=1, handlelength=1.8, handletextpad=0.4,
                         labelspacing=0.3)
 
 
-# Footer
-fig.text(
-    0.5, 0.005,
-    'Hybrid comparator construction: 1900-1979 = RCMIP_total + FAIR-ERF natural baseline (CO2 also subtracts a SLAND-equivalent estimate from GCB, '
-    'so the comparator always represents "atmospheric source = what the atmosphere actually receives", semantically consistent with our integrated total). '
-    '1980-2020 = budget top-down values (CH4: GMB 2025; N2O: GNB 2024; CO2: GCB 2025 partition EFOS+ELUC-SLAND), linearly interpolated at the period midpoints '
-    '(2005, 2015, 2020 for CH4; 1997, 2015, 2020 for N2O; 1965, 1975, 1985, 1995, 2005, 2018 for CO2). 2021-2100 = RCMIP+FAIR-ERF (CO2 with SLAND held at 2014-2023 value). '
-    '5-year linear blends at the segment boundaries. Caveat: scenario-period comparator natural component is held constant — divergence between our integrated total and the comparator '
-    'in 2021-2100 captures the natural-emission climate-feedback signal that climate emulators conventionally ignore.',
-    ha='center', fontsize=6.4, color='#555555', style='italic',
-    bbox=dict(boxstyle='round,pad=0.4', facecolor='#f5f5f0',
-              edgecolor='#cccccc', alpha=0.9), wrap=True)
-
-plt.tight_layout(rect=[0, 0.05, 1, 0.96])
+plt.tight_layout(rect=[0, 0.01, 1, 0.96])
 out = os.path.join(OUT_DIR, 'hybrid_comparator_comparison.png')
 plt.savefig(out, dpi=300, facecolor=fig.get_facecolor())
 plt.close()
